@@ -1,16 +1,13 @@
 # frontend
 
-This template should help get you started developing with Vue 3 in Vite.
-
-## Recommended IDE Setup
-
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
+This template should help you run this project.
 
 ## Project Setup
+
+```sh
+cd root_dir
+cd frontend
+```
 
 ```sh
 npm install
@@ -32,4 +29,10 @@ npm run build
 
 ```sh
 npm run lint
+```
+
+### Tailwind build command for this project structure
+
+```sh
+npx @tailwindcss/cli -i ./src/dist/input.css -o ./src/dist/output.css --watch
 ```
