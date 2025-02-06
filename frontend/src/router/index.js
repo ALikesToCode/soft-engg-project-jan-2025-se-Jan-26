@@ -10,15 +10,55 @@ const routes = [
     name: 'home',
     component: HomeView,
     meta: {
-      title: 'SE | IIT Madras'
+      title: 'Home | Cognitum'
+    }
+  },
+  {
+    path: '/about',
+    name: 'about',
+    component: () => import('../views/AboutView.vue'),
+    meta: {
+      title: 'About | Cognitum'
+    }
+  },
+  {
+    path: '/contact',
+    name: 'contact',
+    component: () => import('../views/ContactView.vue'),
+    meta: {
+      title: 'Contact | Cognitum'
     }
   },
   {
     path: '/login',
-    name: 'about',
+    name: 'login',
     component: () => import('../views/LoginView.vue'),
     meta: {
-      title: 'Login'
+      title: 'Login | Cognitum'
+    }
+  },
+  {
+    path: '/faq',
+    name: 'faq',
+    component: () => import('../views/FAQView.vue'),
+    meta: {
+      title: 'FAQ | Cognitum'
+    }
+  },
+  {
+    path: '/privacy-policy',
+    name: 'privacy',
+    component: () => import('../views/PrivacyView.vue'),
+    meta: {
+      title: 'Privacy Policy | Cognitum'
+    }
+  },
+  {
+    path: '/terms-of-service',
+    name: 'terms',
+    component: () => import('../views/TermsView.vue'),
+    meta: {
+      title: 'Terms of Service | Cognitum'
     }
   },
   { ...userRoutes },
@@ -32,10 +72,20 @@ const routes = [
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes
+  routes,
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    } else {
+      return { top: 0 }
+    }
+  }
 })
-router.beforeEach(async (to, from, next) => {
-  document.title = `${to.meta.title}`;
-  next();
+
+// Update document title based on route meta
+router.beforeEach((to, from, next) => {
+  document.title = to.meta.title || 'Cognitum'
+  next()
 })
+
 export default router

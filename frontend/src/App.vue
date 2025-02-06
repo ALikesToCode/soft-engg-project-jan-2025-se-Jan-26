@@ -1,22 +1,47 @@
-<script setup>
-import { RouterLink, RouterView } from 'vue-router'
-import Navbar from './layouts/Navbar.vue'
-import Footer from './layouts/Footer.vue'
+<script>
+import MainNavbar from '@/components/MainNavbar.vue'
+import MainFooter from '@/components/MainFooter.vue'
 
-
+export default {
+  name: 'App',
+  components: {
+    MainNavbar,
+    MainFooter
+  },
+  computed: {
+    showFooter() {
+      return this.$route.name !== 'login'
+    }
+  }
+}
 </script>
 
 <template>
-  <header v-if="$route.path !== '/' && $route.path !== '/login'">
-    <Navbar />
-  </header>
-  <RouterView />
-  <footer v-if="$route.path !== '/' && $route.path !== '/login'">
-    <Footer />
-  </footer>
+  <div class="flex flex-col min-h-screen">
+    <MainNavbar />
+    <main class="flex-grow">
+      <router-view />
+    </main>
+    <MainFooter v-if="showFooter" />
+  </div>
 </template>
 
+<style>
+@import './assets/main.css';
 
-<style scoped>
+/* Base styles */
+body {
+  @apply bg-gray-50;
+}
 
+/* Transition animations */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>
