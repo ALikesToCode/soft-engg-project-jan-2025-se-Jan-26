@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
+from fastapi.responses import JSONResponse
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -31,6 +32,18 @@ app.add_middleware(
 
 # Add Session Middleware
 app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
+
+@app.get("/")
+async def root():
+    return JSONResponse({
+        "message": "Welcome to SE Team 26 API",
+        "version": settings.APP_VERSION,
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "status": "operational",
+        "environment": settings.ENV,
+        "api_prefix": settings.API_PREFIX
+    })
 
 # Import and include your authentication routes
 from app.routes.auth import router as auth_router
