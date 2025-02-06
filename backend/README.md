@@ -25,7 +25,7 @@ postgres=# exit
 ## Start backend
 
 ```
-unicorn main:app
+uvicorn main:app
 ```
 
 Application should now be started on localhost.
