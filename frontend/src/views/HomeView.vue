@@ -49,7 +49,7 @@
                 <span class="text-yellow-400 block sm:inline">AI Academic Guide</span>
               </h1>
               <p class="text-base sm:text-lg text-gray-200 max-w-2xl mx-auto lg:mx-0">
-                Enhance your learning journey in the IITM BS program with personalized AI assistance.
+                Enhance your learning journey in the IITM program with personalized AI assistance.
                 Get smart recommendations, study strategies, and course guidance tailored just for you.
               </p>
               <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 justify-center lg:justify-start">

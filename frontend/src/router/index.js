@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import userRoutes from './userRoutes';
 import facultyRoutes from './facultyRoutes';
 import supportRoutes from './supportRoutes';
+import { authService } from '@/api/authService'
 
 const routes = [
   {
@@ -64,6 +65,7 @@ const routes = [
   { ...userRoutes },
   { ...facultyRoutes },
   { ...supportRoutes },
+
   {
     path: '/:pathMatch(.*)*',
     redirect: '/'
@@ -86,6 +88,23 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   document.title = to.meta.title || 'Cognitum'
   next()
+})
+
+// Navigation guard
+router.beforeEach(async (to, from, next) => {
+  if (to.matched.some(record => record.meta.requiresAuth)) {
+    const isAuthenticated = await authService.isAuthenticated()
+    if (!isAuthenticated) {
+      next({
+        path: '/login',
+        query: { redirect: to.fullPath }
+      })
+    } else {
+      next()
+    }
+  } else {
+    next()
+  }
 })
 
 export default router

@@ -23,7 +23,7 @@
               </h1>
             </div>
             <p class="text-xl text-gray-200/90 leading-relaxed">
-              Your gateway to intelligent academic support at IITM BS
+              Your gateway to intelligent academic support at IITM
             </p>
           </div>
 

@@ -3,8 +3,8 @@
     <div class="container mx-auto px-4">
       <div class="grid sm:grid-cols-2 gap-8 max-w-4xl mx-auto">
         <div class="text-center sm:text-left">
-          <h3 class="text-lg font-semibold mb-4">About IITM BS</h3>
-          <p class="text-gray-400 text-sm">A revolutionary online degree program bringing world-class education to everyone.</p>
+          <h3 class="text-lg font-semibold mb-4">About IITM</h3>
+          <p class="text-gray-400 text-sm">A Institution bringing world-class education to everyone.</p>
         </div>
         <div class="text-center sm:text-left">
           <h3 class="text-lg font-semibold mb-4">Quick Links</h3>
@@ -28,7 +28,7 @@
         </div>
       </div>
       <div class="border-t border-gray-700 mt-8 pt-8 text-center text-xs sm:text-sm text-gray-400">
-        © 2025 Software Engineering Project | IITM BS. All rights reserved.
+        © 2025 Software Engineering Project | SE Project Team 26 Jan Term 2025 | All rights reserved.
       </div>
     </div>
   </footer>

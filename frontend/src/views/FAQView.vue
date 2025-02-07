@@ -41,19 +41,19 @@ export default {
       faqs: [
         {
           question: 'What is AI Academic Guide?',
-          answer: 'AI Academic Guide is an intelligent learning assistant designed specifically for IITM BS students to enhance their academic journey through personalized support and guidance.'
+          answer: 'AI Academic Guide is an intelligent learning assistant designed specifically for IITM students to enhance their academic journey through personalized support and guidance.'
         },
         {
           question: 'How can AI Academic Guide help me?',
-          answer: 'Our platform provides personalized study strategies, course navigation assistance, and academic integrity tools to help you succeed in your IITM BS program.'
+          answer: 'Our platform provides personalized study strategies, course navigation assistance, and academic integrity tools to help you succeed in your IITM program.'
         },
         {
-          question: 'Is the service free for IITM BS students?',
-          answer: 'Yes, AI Academic Guide is completely free for all enrolled IITM BS students.'
+          question: 'Is the service free for IITM  students?',
+          answer: 'Yes, AI Academic Guide is completely free for all enrolled IITM students.'
         },
         {
           question: 'How do I get started?',
-          answer: 'Simply sign up using your IITM BS credentials through our login page, and you\'ll have immediate access to all features.'
+          answer: 'Simply sign up using your IITM credentials through our login page, and you\'ll have immediate access to all features.'
         }
       ]
     }

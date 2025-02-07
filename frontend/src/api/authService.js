@@ -3,12 +3,14 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL;
 const API_PREFIX = import.meta.env.VITE_API_PREFIX || '';
 
-const authService = {
+const axiosInstance = axios.create({
+    baseURL: `${API_URL}${API_PREFIX}`,
+    withCredentials: true,
+});
+
+export const authService = {
     // Initialize axios instance with credentials
-    axiosInstance: axios.create({
-        baseURL: `${API_URL}${API_PREFIX}`,
-        withCredentials: true,
-    }),
+    axiosInstance,
 
     // Login with Google
     async loginWithGoogle() {

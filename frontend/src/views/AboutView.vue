@@ -28,7 +28,7 @@
               AI Academic Guide
             </h2>
             <p class="text-gray-600 mb-6">
-              Our AI Academic Guide is designed to enhance the learning experience for students in the IITM BS program. 
+              Our AI Academic Guide is designed to enhance the learning experience for students in the  program. 
               The system provides personalized assistance, study strategies, and course navigation support while maintaining 
               high academic integrity standards.
             </p>

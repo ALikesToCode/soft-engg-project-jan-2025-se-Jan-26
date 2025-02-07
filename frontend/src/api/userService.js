@@ -3,12 +3,14 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL;
 const API_PREFIX = import.meta.env.VITE_API_PREFIX || '';
 
-const userService = {
+const axiosInstance = axios.create({
+    baseURL: `${API_URL}${API_PREFIX}`,
+    withCredentials: true,
+});
+
+export const userService = {
     // Initialize axios instance with credentials
-    axiosInstance: axios.create({
-        baseURL: `${API_URL}${API_PREFIX}`,
-        withCredentials: true,
-    }),
+    axiosInstance,
 
     // Get user profile
     async getUserProfile() {

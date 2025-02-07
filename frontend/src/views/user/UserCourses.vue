@@ -1,86 +1,323 @@
 <script>
+import SideNavBar from '../../layouts/SideNavBar.vue'
 import ChatBotBox from '../../components/ChatBotBox.vue'
 export default {
     
   data() {
     return {
-      courses: ["Software Engineering", "Software Testing", "Python", "Mathematics"],
-      weeks: ["Week 1", "Week 3", "Week 4", "Week 5", "Week 6", "Week 4", "Week 5", "Week 6"],
-      lectures: ["Course Information","Lecture 1",,"Lecture 2", "Lecture 3", "Lecture 4", "Lecture 5","Practice Assignment", "Graded Assignment"],
-      activeCourse: 0,
-      activeWeek: 0,
-      v_title: "Introduction to Python"
+      searchQuery: '',
+      filters: ['All', 'In Progress', 'Completed', 'Bookmarked'],
+      activeFilters: ['All'],
+      selectedCourse: null,
+      courses: [
+        {
+          id: 1,
+          title: 'Introduction to Python Programming',
+          description: 'Learn Python basics and programming fundamentals through hands-on projects and exercises.',
+          image: '/images/courses/python.jpg',
+          level: 'Beginner',
+          duration: '8 weeks',
+          progress: 75,
+          isBookmarked: true,
+          instructor: {
+            name: 'Dr. Sarah Johnson',
+            avatar: '/images/instructors/sarah.jpg'
+          },
+          videoUrl: 'https://www.youtube.com/embed/example',
+          learningObjectives: [
+            'Understand Python syntax and basic concepts',
+            'Work with data structures and algorithms',
+            'Build simple applications',
+            'Debug and test code effectively'
+          ],
+          modules: [
+            {
+              title: 'Getting Started with Python',
+              duration: '1h 30m',
+              completed: true
+            },
+            {
+              title: 'Data Types and Variables',
+              duration: '2h 15m',
+              completed: true
+            },
+            {
+              title: 'Control Flow and Functions',
+              duration: '2h 45m',
+              completed: false
+            }
+          ]
+        },
+        {
+          id: 2,
+          title: 'Web Development Fundamentals',
+          description: 'Master HTML, CSS, and JavaScript to build modern responsive websites.',
+          image: '/images/courses/web-dev.jpg',
+          level: 'Intermediate',
+          duration: '10 weeks',
+          progress: 30,
+          isBookmarked: false,
+          instructor: {
+            name: 'Alex Chen',
+            avatar: '/images/instructors/alex.jpg'
+          }
+        },
+        {
+          id: 3,
+          title: 'Machine Learning Essentials',
+          description: 'Explore the fundamentals of machine learning and AI applications.',
+          image: '/images/courses/ml.jpg',
+          level: 'Advanced',
+          duration: '12 weeks',
+          progress: 15,
+          isBookmarked: true,
+          instructor: {
+            name: 'Dr. Michael Brown',
+            avatar: '/images/instructors/michael.jpg'
+          }
+        }
+      ]
     };
     },
     components: {
+        SideNavBar,
         ChatBotBox, 
   },
+  computed: {
+    filteredCourses() {
+      let filtered = this.courses;
+      
+      // Apply search filter
+      if (this.searchQuery) {
+        const query = this.searchQuery.toLowerCase();
+        filtered = filtered.filter(course => 
+          course.title.toLowerCase().includes(query) ||
+          course.description.toLowerCase().includes(query)
+        );
+      }
+
+      // Apply status filters
+      if (!this.activeFilters.includes('All')) {
+        if (this.activeFilters.includes('In Progress')) {
+          filtered = filtered.filter(course => course.progress > 0 && course.progress < 100);
+        }
+        if (this.activeFilters.includes('Completed')) {
+          filtered = filtered.filter(course => course.progress === 100);
+        }
+        if (this.activeFilters.includes('Bookmarked')) {
+          filtered = filtered.filter(course => course.isBookmarked);
+        }
+      }
+
+      return filtered;
+    }
+  },
+  methods: {
+    toggleFilter(filter) {
+      if (filter === 'All') {
+        this.activeFilters = ['All'];
+      } else {
+        this.activeFilters = this.activeFilters.filter(f => f !== 'All');
+        const index = this.activeFilters.indexOf(filter);
+        if (index === -1) {
+          this.activeFilters.push(filter);
+        } else {
+          this.activeFilters.splice(index, 1);
+        }
+        if (this.activeFilters.length === 0) {
+          this.activeFilters = ['All'];
+        }
+      }
+    },
+    toggleBookmark(course) {
+      course.isBookmarked = !course.isBookmarked;
+    },
+    continueCourse(course) {
+      this.selectedCourse = course;
+    }
+  }
 };
 </script>
 
 <template>
-    <div class="p-4 py-2">
-      <div class="flex gap-x-6 border-b pb-2 justify-center">
-        <button
-          v-for="(course, index) in courses"
-          :key="index"
-          @click="activeCourse = index"
-          class="px-6 py-2 border rounded hover:text-red-800 hover:cursor-pointer"
-          :class="activeCourse === index ? 'border-red-600 text-red-800 font-semibold bg-gray-100' : 'border-red-300'"
-        >
-          {{ course }}
-        </button>
-      </div>
-  
-      <div class="flex gap-x-4 mt-4 border-b py-2 justify-center">
-        <button
-          v-for="(week, index) in weeks"
-          :key="index"
-          @click="activeWeek = index"
-          class="px-4 py-2 border rounded hover:text-red-800 hover:cursor-pointer"
-          :class="activeWeek === index ? 'border-red-600 font-semibold bg-gray-100' : 'border-gray-300'"
-        >
-          {{ week }}
-        </button>
-      </div>
-  
-      <div class="grid grid-cols-6 gap-4 !my-2">
-        <div class="col-span-1 border p-2 py-3 rounded text-center flex flex-col justify-between h-full">
-          <ul class="mt-2 space-y-2">
-            <li v-for="(lecture, index) in lectures" :key="index" class="py-[0.7px] rounded hover:underline hover:cursor-pointer hover:text-red-800">
-              
-            <!-- <span v-if="index===0" class="py-2 px-4 my-2 rounded bg-red-600 text-white hover:text-gray-100">{{ lecture }}</span> -->
-            <span >{{ lecture }}</span>
-            </li>
-          </ul>
-          <div class="mt-auto mb-8" id="supp">
-            <p class="text-gray-600 underline underline-offset-4 cursor-pointer hover:text-red-800">Supplementary contents</p>
+  <div class="flex h-screen bg-gray-50">
+    <SideNavBar />
+    <div class="flex-1 p-6 overflow-y-auto">
+      <!-- Course Header -->
+      <div class="max-w-7xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-800">My Courses</h1>
+            <p class="text-gray-600">Continue your learning journey</p>
+          </div>
+          <div class="flex space-x-4">
+            <div class="relative">
+              <input type="text" 
+                     placeholder="Search courses..." 
+                     class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                     v-model="searchQuery" />
+              <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+            </div>
+            <div class="flex space-x-2">
+              <button 
+                v-for="filter in filters" 
+                :key="filter"
+                @click="toggleFilter(filter)"
+                :class="[
+                  'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                  activeFilters.includes(filter)
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                ]">
+                {{ filter }}
+              </button>
+            </div>
           </div>
         </div>
-  
-        <div class="col-span-3 border rounded text-center sm:min-h-[400px] flex justify-center">
-            <div class="flex flex-col h-full w-full">
-                <div class="h-full w-full border-[1px]">
-                <p class="font-semibold">Lecture Video</p>
-                </div>
-                <div class="mt-auto w-full px-12 py-1">
-                <p class="font-black text-lg">Title : {{ v_title }}</p>
-                </div>
+
+        <!-- Course Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <div v-for="course in filteredCourses" :key="course.id" 
+               class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+            <div class="relative">
+              <img :src="course.image" :alt="course.title" class="w-full h-48 object-cover" />
+              <div class="absolute top-4 right-4">
+                <button @click="toggleBookmark(course)" 
+                        class="p-2 rounded-full bg-white shadow-md hover:bg-gray-50">
+                  <i :class="['fas', course.isBookmarked ? 'fa-bookmark text-blue-600' : 'fa-bookmark text-gray-400']"></i>
+                </button>
+              </div>
             </div>
+            <div class="p-6">
+              <div class="flex items-center justify-between mb-2">
+                <span :class="['px-3 py-1 rounded-full text-sm font-medium', 
+                  course.level === 'Beginner' ? 'bg-green-100 text-green-800' :
+                  course.level === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800']">
+                  {{ course.level }}
+                </span>
+                <span class="text-gray-600 text-sm">{{ course.duration }}</span>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-800 mb-2">{{ course.title }}</h3>
+              <p class="text-gray-600 text-sm mb-4">{{ course.description }}</p>
+              <div class="space-y-3">
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-gray-600">Progress</span>
+                  <span class="font-medium">{{ course.progress }}%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                  <div class="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                       :style="{ width: `${course.progress}%` }"></div>
+                </div>
+              </div>
+              <div class="mt-4 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                  <img :src="course.instructor.avatar" :alt="course.instructor.name" 
+                       class="w-8 h-8 rounded-full object-cover" />
+                  <span class="text-sm text-gray-600">{{ course.instructor.name }}</span>
+                </div>
+                <button @click="continueCourse(course)" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="col-span-2 border rounded">
-            <ChatBotBox />
+
+        <!-- Course Content (when a course is selected) -->
+        <div v-if="selectedCourse" class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-4">
+              <button @click="selectedCourse = null" class="text-gray-600 hover:text-gray-800">
+                <i class="fas fa-arrow-left"></i>
+              </button>
+              <h2 class="text-xl font-semibold text-gray-800">{{ selectedCourse.title }}</h2>
+            </div>
+            <div class="flex items-center space-x-4">
+              <button class="text-gray-600 hover:text-gray-800">
+                <i class="fas fa-download"></i>
+              </button>
+              <button class="text-gray-600 hover:text-gray-800">
+                <i class="fas fa-share"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-6">
+            <!-- Course Content -->
+            <div class="col-span-2">
+              <div class="aspect-w-16 aspect-h-9 mb-6">
+                <iframe 
+                  :src="selectedCourse.videoUrl" 
+                  class="w-full h-full rounded-lg"
+                  frameborder="0" 
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowfullscreen>
+                </iframe>
+              </div>
+              <div class="space-y-4">
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-800 mb-2">About this course</h3>
+                  <p class="text-gray-600">{{ selectedCourse.description }}</p>
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-800 mb-2">What you'll learn</h3>
+                  <ul class="grid grid-cols-2 gap-2">
+                    <li v-for="(objective, index) in selectedCourse.learningObjectives" 
+                        :key="index" 
+                        class="flex items-start space-x-2">
+                      <i class="fas fa-check text-green-500 mt-1"></i>
+                      <span class="text-gray-600">{{ objective }}</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- Course Modules -->
+            <div class="col-span-1">
+              <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Course Content</h3>
+                <div class="space-y-2">
+                  <div v-for="(module, index) in selectedCourse.modules" 
+                       :key="index"
+                       class="bg-white rounded-lg p-4 cursor-pointer hover:bg-gray-50">
+                    <div class="flex items-center justify-between mb-2">
+                      <h4 class="font-medium text-gray-800">{{ module.title }}</h4>
+                      <span class="text-sm text-gray-600">{{ module.duration }}</span>
+                    </div>
+                    <div class="flex items-center space-x-2 text-sm text-gray-600">
+                      <i :class="['fas', module.completed ? 'fa-check-circle text-green-500' : 'fa-circle text-gray-400']"></i>
+                      <span>{{ module.completed ? 'Completed' : 'Not completed' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </template>
-  
-  <style scoped>
-  button {
-    transition: all 0.2s ease-in-out;
-  }
-  button:hover {
-    background-color: #f3f4f6;
-  }
-  </style>
+  </div>
+</template>
+
+<style scoped>
+.aspect-w-16 {
+  position: relative;
+  padding-bottom: 56.25%;
+}
+
+.aspect-w-16 iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+input:focus {
+  outline: none;
+}
+</style>
   
