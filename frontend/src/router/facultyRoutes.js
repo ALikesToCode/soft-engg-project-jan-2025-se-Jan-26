@@ -7,7 +7,7 @@ import NotificationsView from '../views/faculty/NotificationsView.vue'
 // Base64 dummy image
 const dummyAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=="
 
-const facultyRoutes =   {
+const facultyRoutes = {
     path: '/faculty',
     name: 'facultyDashboard',
     children: [
@@ -15,14 +15,20 @@ const facultyRoutes =   {
             path: 'dashboard',
             component: FacultyDashboard,
             meta: {
-                title: 'Faculty Dashboard'
+                title: 'Faculty Dashboard',
+                hideNavbar: false,
+                hideFooter: true,
+                hideUserNavbar: false
             }
         },
         {
             path: 'content-upload',
             component: ContentUpload,
             meta: {
-                title: 'Content Upload'
+                title: 'Content Upload',
+                hideNavbar: false,
+                hideFooter: true,
+                hideUserNavbar: false
             }
         },
         {
@@ -97,7 +103,8 @@ const facultyRoutes =   {
             meta: {
                 title: 'Faculty Profile',
                 hideNavbar: true,
-                hideFooter: true
+                hideFooter: true,
+                isProfilePage: true
             }
         }
     ]

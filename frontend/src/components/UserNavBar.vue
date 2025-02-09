@@ -3,7 +3,7 @@
     <template #nav-items>
       <li v-if="isProfilePage">
         <router-link
-          to="/user/dashboard"
+          :to="dashboardUrl"
           class="flex items-center space-x-2 text-gray-700 hover:text-maroon-600 font-medium py-1 px-2 rounded-md transition-colors duration-200"
           :class="{ 'text-maroon-600 font-semibold': $route.name === 'home' }"
         >
@@ -13,7 +13,7 @@
       </li>
       <li v-else>
         <router-link
-          to="/user/profile"
+          :to="profilePageUrl"
           class="flex items-center space-x-2 text-gray-700 hover:text-maroon-600 font-medium py-1 px-2 rounded-md transition-colors duration-200"
           :class="{ 'text-maroon-600 font-semibold': $route.name === 'home' }"
         >
@@ -90,11 +90,12 @@
 import { ROLE } from '@/AppConstants/globalConstants'
 import useAuthStore from '@/stores/useAuthStore'
 import BaseNavbar from './BaseNavbar.vue'
+import rolePaths from '@/AppConstants/rolePaths'
 
 export default {
   name: 'UserNavbar',
   components: {
-    BaseNavbar
+    BaseNavbar,
   },
   data() {
     return {
@@ -119,12 +120,10 @@ export default {
       return this.userStore.userRole
     },
     dashboardUrl() {
-      if (this.userRole === ROLE.STUDENT) {
-        return '/user/dashboard'
-      } else if (this.userRole === ROLE.FACULTY) {
-        return '/faculty/dashboard'
-      }
-      return '/'
+      return rolePaths[this.userRole].dashboard
+    },
+    profilePageUrl() {
+      return rolePaths[this.userRole].profile
     },
     isProfilePage() {
       return this.$route.meta.isProfilePage
