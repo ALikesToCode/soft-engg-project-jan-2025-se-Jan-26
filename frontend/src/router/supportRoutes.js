@@ -1,7 +1,7 @@
 import SupportDashboard from '../views/support/SupportDashboard.vue'
 
 
-const supportRoutes =   {
+const supportRoutes = {
     path: '/support',
     name: 'supportDashboard',
     children: [
@@ -9,7 +9,9 @@ const supportRoutes =   {
             path: 'dashboard',
             component: SupportDashboard,
             meta: {
-                title: 'Support Dashboard'
+                title: 'Support Dashboard',
+                hideNavbar: true,
+                hideFooter: true,
             }
         }
     ]
