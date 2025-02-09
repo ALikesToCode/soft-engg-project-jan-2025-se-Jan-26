@@ -85,7 +85,9 @@ const facultyRoutes =   {
                 ]
             },
             meta: {
-                title: 'Faculty Profile'
+                title: 'Faculty Profile',
+                hideNavbar: true,
+                hideFooter: true
             }
         }
     ]

@@ -9,8 +9,11 @@ export default {
     MainFooter
   },
   computed: {
+    showNavbar() {
+      return !this.$route.meta.hideNavbar
+    },
     showFooter() {
-      return this.$route.name !== 'login'
+      return !this.$route.meta.hideFooter && this.$route.name !== 'login'
     }
   }
 }
@@ -18,7 +21,7 @@ export default {
 
 <template>
   <div class="flex flex-col min-h-screen">
-    <MainNavbar />
+    <MainNavbar v-if="showNavbar" />
     <main class="flex-grow">
       <router-view />
     </main>

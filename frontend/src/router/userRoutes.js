@@ -74,7 +74,9 @@ const userRoutes =   {
                 ]
             },
             meta: {
-                title: 'User Profile'
+                title: 'User Profile',
+                hideNavbar: true,
+                hideFooter: true
             }
         }
     ]
