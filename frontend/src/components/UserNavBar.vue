@@ -25,18 +25,21 @@
       <li class="relative">
         <button
           @click="toggleNotifications"
-          class="flex items-center space-x-2 text-gray-700 hover:text-maroon-600 font-medium py-1 px-2 rounded-md transition-colors duration-200"
+          class="flex items-center space-x-2 text-gray-700 hover:text-maroon-600 font-medium py-1 px-2 rounded-md transition-colors duration-200 relative"
+          :class="{ 'text-maroon-600': showNotifications }"
         >
-          <span class="material-symbols-outlined text-lg">circle_notifications</span>
-          <span class="hover:underline">Notification</span>
+          <span class="material-symbols-outlined text-lg">
+            {{ unreadNotifications.length ? 'notifications_active' : 'notifications' }}
+          </span>
+          <span class="hover:underline">Notifications</span>
+          <!-- Notification Badge -->
+          <span
+            v-if="unreadNotifications.length"
+            class="absolute -top-1 -right-1 bg-maroon-600 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center"
+          >
+            {{ unreadNotifications.length > 99 ? '99+' : unreadNotifications.length }}
+          </span>
         </button>
-        <!-- Notification Badge -->
-        <span
-          v-if="notifications.length"
-          class="absolute -top-1 -right-2 bg-maroon-600 text-white text-xs font-bold px-2 py-0.5 rounded-full"
-        >
-          {{ notifications.length }}
-        </span>
       </li>
 
       <li>
@@ -53,35 +56,20 @@
     </template>
 
     <template #additional-content>
-      <!-- Notification Modal -->
+      <!-- Backdrop -->
       <div
         v-if="showNotifications"
-        class="fixed inset-0 flex items-center justify-center lg:items-start lg:justify-end lg:p-4 z-50 backdrop-blur-xs bg-black bg-opacity-30"
-      >
-        <div
-          class="bg-white p-6 rounded-lg shadow-lg w-80 lg:w-96 relative lg:absolute lg:top-16 lg:right-5"
-        >
-          <h2 class="text-lg font-bold mb-3 text-center">Notifications</h2>
+        class="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
+        @click="showNotifications = false"
+      ></div>
 
-          <ul v-if="notifications.length">
-            <li
-              v-for="(notification, index) in notifications"
-              :key="index"
-              class="p-3 border-b text-sm"
-            >
-              {{ notification }}
-            </li>
-          </ul>
-          <p v-else class="text-gray-500 py-4 text-center">No new notifications</p>
-
-          <button
-            @click="showNotifications = false"
-            class="absolute top-2 right-2 text-white bg-red-600 hover:bg-red-700 px-2.5 py-1 rounded"
-          >
-            ✖
-          </button>
-        </div>
-      </div>
+      <!-- Notification Panel -->
+      <NotificationPanel
+        v-if="showNotifications"
+        :is-open="showNotifications"
+        @close="showNotifications = false"
+        @update:unread-count="updateUnreadCount"
+      />
     </template>
   </BaseNavbar>
 </template>
@@ -91,16 +79,18 @@ import { ROLE } from '@/AppConstants/globalConstants'
 import useAuthStore from '@/stores/useAuthStore'
 import BaseNavbar from './BaseNavbar.vue'
 import rolePaths from '@/AppConstants/rolePaths'
+import NotificationPanel from './NotificationPanel.vue'
 
 export default {
   name: 'UserNavbar',
   components: {
     BaseNavbar,
+    NotificationPanel,
   },
   data() {
     return {
       showNotifications: false,
-      notifications: ['New assignment posted', 'Your grade has been updated'], // Sample notifications
+      unreadNotifications: [], // This will be populated from your notification store/API
     }
   },
   methods: {
@@ -110,6 +100,11 @@ export default {
     },
     toggleNotifications() {
       this.showNotifications = !this.showNotifications
+    },
+    updateUnreadCount(count) {
+      // Update the unread notifications count
+      // This would typically be handled by your notification store
+      this.unreadNotifications = new Array(count)
     },
   },
   computed: {

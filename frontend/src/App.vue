@@ -2,6 +2,7 @@
 import MainNavbar from '@/components/MainNavbar.vue'
 import MainFooter from '@/components/MainFooter.vue'
 import UserNavBar from '@/components/UserNavBar.vue'
+import GlobalChat from '@/components/GlobalChat.vue'
 
 export default {
   name: 'App',
@@ -9,6 +10,7 @@ export default {
     MainNavbar,
     UserNavBar,
     MainFooter,
+    GlobalChat
   },
   computed: {
     showNavbar() {
@@ -32,6 +34,7 @@ export default {
       <router-view />
     </main>
     <MainFooter v-if="showFooter" />
+    <GlobalChat />
   </div>
 </template>
 
