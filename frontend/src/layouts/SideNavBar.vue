@@ -4,6 +4,8 @@
       class="w-16 hover:w-48 transition-all duration-300 ease-in-out bg-gradient-to-b from-maroon-800 to-maroon-600 flex flex-col justify-center items-start p-3 text-white overflow-hidden"
       role="navigation"
       aria-label="Main Navigation"
+      @mouseenter="navHovered = true"
+      @mouseleave="navHovered = false"
     >
       <ul class="w-full">
         <li v-for="item in navItems" :key="item.path" class="w-full">
@@ -27,9 +29,11 @@
             </span>
             <span 
               class="text-sm font-medium whitespace-nowrap transition-opacity duration-200"
-              :class="{ 
-                'opacity-100': isHovered === item.path,
-                'opacity-0': isHovered !== item.path
+              :class="{
+                'opacity-100': navHovered || isHovered === item.path,
+                'opacity-0': !navHovered && isHovered !== item.path,
+                'text-yellow-400': (navHovered || isHovered === item.path) && isActive(item.path),
+                'text-white': (navHovered || isHovered === item.path) && !isActive(item.path)
               }"
             >
               {{ item.label }}
@@ -48,10 +52,13 @@ import { useRoute } from 'vue-router'
 // Get the current route for active link detection.
 const route = useRoute()
 
-// Track the nav item currently being hovered.
+// Tracks which individual nav item is hovered.
 const isHovered = ref(null)
 
-// Define your navigation items.
+// Tracks whether the entire navigation bar is hovered.
+const navHovered = ref(false)
+
+// Define the navigation items.
 const navItems = [
   {
     path: '/user/dashboard',
@@ -70,7 +77,7 @@ const navItems = [
   }
 ]
 
-// Helper function to check if a route is active.
+// Helper function to check if a nav item is active.
 const isActive = (path) => route.path === path
 </script>
 
@@ -84,6 +91,7 @@ const isActive = (path) => route.path === path
   font-size: 24px;
 }
 
+/* Pulse animation for icons on hover */
 @keyframes iconPulse {
   0% { transform: scale(1); }
   50% { transform: scale(1.1); }
