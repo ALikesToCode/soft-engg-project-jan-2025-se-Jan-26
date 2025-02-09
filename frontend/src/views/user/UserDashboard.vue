@@ -1,6 +1,6 @@
 <script>
-import SideNavBar from '../../layouts/SideNavBar.vue'
-import ChatBotBox from '../../components/ChatBotBox.vue'
+import SideNavBar from '@/layouts/SideNavBar.vue'
+import ChatBotBox from '@/components/ChatBotBox.vue'
 export default {
   name: 'DashboardView',
   data() {

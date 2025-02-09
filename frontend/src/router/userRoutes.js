@@ -16,8 +16,9 @@ const userRoutes = {
             component: UserDashboard,
             meta: {
                 title: 'User Dashboard',
+                hideNavbar: false,
                 hideFooter: true,
-                hideUserNavbar: false,
+                hideUserNavbar: false
             }
         },
         {
@@ -25,16 +26,19 @@ const userRoutes = {
             component: UserCourses,
             meta: {
                 title: 'User Courses',
-                hideNavbar: true,
+                hideNavbar: false,
                 hideFooter: true,
-                hideUserNavbar: false,
+                hideUserNavbar: false
             }
         },
         {
             path: 'details',
             component: UserDetails,
             meta: {
-                title: 'User Details'
+                title: 'User Details',
+                hideNavbar: false,
+                hideFooter: true,
+                hideUserNavbar: false
             }
         },
         {
@@ -42,9 +46,9 @@ const userRoutes = {
             component: CourseHistory,
             meta: {
                 title: 'Course History',
-                hideNavbar: true,
+                hideNavbar: false,
                 hideFooter: true,
-                hideUserNavbar: true,
+                hideUserNavbar: false
             }
         },
         {

@@ -6,6 +6,8 @@ export default {
   data() {
     return {
       searchQuery: '',
+      searchResults: [],
+      isSearching: false,
       filters: ['All', 'In Progress', 'Completed', 'Bookmarked'],
       activeFilters: ['All'],
       selectedCourse: null,
@@ -14,14 +16,14 @@ export default {
           id: 1,
           title: 'Introduction to Python Programming',
           description: 'Learn Python basics and programming fundamentals through hands-on projects and exercises.',
-          image: '/images/courses/python.jpg',
+          image: 'https://placehold.co/400x300',
           level: 'Beginner',
           duration: '8 weeks',
           progress: 75,
           isBookmarked: true,
           instructor: {
             name: 'Dr. Sarah Johnson',
-            avatar: '/images/instructors/sarah.jpg'
+            avatar: 'https://placehold.co/100x100'
           },
           videoUrl: 'https://www.youtube.com/embed/example',
           learningObjectives: [
@@ -52,64 +54,101 @@ export default {
           id: 2,
           title: 'Web Development Fundamentals',
           description: 'Master HTML, CSS, and JavaScript to build modern responsive websites.',
-          image: '/images/courses/web-dev.jpg',
+          image: 'https://placehold.co/400x300',
           level: 'Intermediate',
           duration: '10 weeks',
           progress: 30,
           isBookmarked: false,
           instructor: {
             name: 'Alex Chen',
-            avatar: '/images/instructors/alex.jpg'
+            avatar: 'https://placehold.co/100x100'
           }
         },
         {
           id: 3,
           title: 'Machine Learning Essentials',
           description: 'Explore the fundamentals of machine learning and AI applications.',
-          image: '/images/courses/ml.jpg',
+          image: 'https://placehold.co/400x300',
           level: 'Advanced',
           duration: '12 weeks',
           progress: 15,
           isBookmarked: true,
           instructor: {
             name: 'Dr. Michael Brown',
-            avatar: '/images/instructors/michael.jpg'
+            avatar: 'https://placehold.co/100x100'
           }
         }
       ]
     };
-    },
-    components: {
-        SideNavBar,
-        ChatBotBox, 
+  },
+  components: {
+    SideNavBar,
+    ChatBotBox,
   },
   computed: {
     filteredCourses() {
-      let filtered = this.courses;
+      let filtered = [...this.courses];
       
-      // Apply search filter
-      if (this.searchQuery) {
+      // Apply search filter with debouncing
+      if (this.searchQuery.trim()) {
         const query = this.searchQuery.toLowerCase();
-        filtered = filtered.filter(course => 
-          course.title.toLowerCase().includes(query) ||
-          course.description.toLowerCase().includes(query)
-        );
+        filtered = filtered.filter(course => {
+          const searchableFields = [
+            course.title,
+            course.description,
+            course.instructor.name,
+            course.level,
+            ...(course.learningObjectives || []),
+            ...(course.modules?.map(m => m.title) || [])
+          ];
+          
+          return searchableFields.some(field => 
+            field.toLowerCase().includes(query)
+          );
+        });
+        
+        // Sort results by relevance
+        filtered.sort((a, b) => {
+          const aTitle = a.title.toLowerCase();
+          const bTitle = b.title.toLowerCase();
+          const aStartsWithQuery = aTitle.startsWith(query);
+          const bStartsWithQuery = bTitle.startsWith(query);
+          
+          if (aStartsWithQuery && !bStartsWithQuery) return -1;
+          if (!aStartsWithQuery && bStartsWithQuery) return 1;
+          return 0;
+        });
       }
 
       // Apply status filters
       if (!this.activeFilters.includes('All')) {
-        if (this.activeFilters.includes('In Progress')) {
-          filtered = filtered.filter(course => course.progress > 0 && course.progress < 100);
-        }
-        if (this.activeFilters.includes('Completed')) {
-          filtered = filtered.filter(course => course.progress === 100);
-        }
-        if (this.activeFilters.includes('Bookmarked')) {
-          filtered = filtered.filter(course => course.isBookmarked);
-        }
+        filtered = filtered.filter(course => {
+          const matchesInProgress = this.activeFilters.includes('In Progress') && 
+            course.progress > 0 && course.progress < 100;
+          const matchesCompleted = this.activeFilters.includes('Completed') && 
+            course.progress === 100;
+          const matchesBookmarked = this.activeFilters.includes('Bookmarked') && 
+            course.isBookmarked;
+            
+          return matchesInProgress || matchesCompleted || matchesBookmarked;
+        });
       }
 
       return filtered;
+    }
+  },
+  watch: {
+    searchQuery: {
+      handler(newQuery) {
+        if (this.searchTimeout) {
+          clearTimeout(this.searchTimeout);
+        }
+        this.isSearching = true;
+        
+        this.searchTimeout = setTimeout(() => {
+          this.isSearching = false;
+        }, 300);
+      }
     }
   },
   methods: {
@@ -117,13 +156,19 @@ export default {
       if (filter === 'All') {
         this.activeFilters = ['All'];
       } else {
+        // Remove 'All' if it exists
         this.activeFilters = this.activeFilters.filter(f => f !== 'All');
+        
         const index = this.activeFilters.indexOf(filter);
         if (index === -1) {
+          // Add the filter
           this.activeFilters.push(filter);
         } else {
+          // Remove the filter
           this.activeFilters.splice(index, 1);
         }
+        
+        // If no filters selected, default to 'All'
         if (this.activeFilters.length === 0) {
           this.activeFilters = ['All'];
         }
@@ -131,6 +176,10 @@ export default {
     },
     toggleBookmark(course) {
       course.isBookmarked = !course.isBookmarked;
+      // If we're filtering by bookmarked, update the view
+      if (this.activeFilters.includes('Bookmarked')) {
+        this.$forceUpdate();
+      }
     },
     continueCourse(course) {
       this.selectedCourse = course;
@@ -154,9 +203,26 @@ export default {
             <div class="relative">
               <input type="text" 
                      placeholder="Search courses..." 
-                     class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                     v-model="searchQuery" />
+                     class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
+                     v-model="searchQuery"
+                     @focus="isSearching = true"
+                     @blur="isSearching = false" />
               <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+              <div v-if="isSearching && searchQuery" 
+                   class="absolute w-full bg-white mt-1 rounded-lg shadow-lg border border-gray-200 z-10">
+                <div class="p-2 text-sm text-gray-500" v-if="filteredCourses.length === 0">
+                  No results found
+                </div>
+                <div v-else class="max-h-64 overflow-y-auto">
+                  <div v-for="course in filteredCourses" 
+                       :key="course.id"
+                       class="p-2 hover:bg-gray-50 cursor-pointer"
+                       @click="selectedCourse = course">
+                    <div class="font-medium text-gray-800">{{ course.title }}</div>
+                    <div class="text-sm text-gray-500">{{ course.instructor.name }}</div>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="flex space-x-2">
               <button 
@@ -320,4 +386,3 @@ input:focus {
   outline: none;
 }
 </style>
-  
