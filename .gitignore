@@ -1,0 +1,15 @@
+# Ignore Python cache and virtual environment
+# Ignore environment files
+.env
+
+__pycache__/
+*.pyc
+*.pyo
+venv/
+backend/__pycache__/
+backend/venv/
+backend/app/__pycache__/
+backend/app/models/__pycache__/
+backend/app/routes/__pycache__/
+backend/app/services/__pycache__/
+
