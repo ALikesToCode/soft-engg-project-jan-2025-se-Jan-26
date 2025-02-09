@@ -1,163 +1,249 @@
 <template>
-  <div class="flex flex-col h-full w-full p-2">
-    <!-- Messages Container -->
-    <div ref="messagesContainer" class="flex-1 overflow-y-auto mb-3 space-y-4 pr-2">
-      <!-- Message Bubbles -->
-      <div 
-        v-for="(message, index) in messages" 
-        :key="index" 
-        class="flex"
-        :class="message.sender === 'user' ? 'justify-end' : 'justify-start'"
+  <div class="flex flex-col h-full">
+    <!-- Messages Area -->
+    <div class="flex-1 overflow-y-auto p-4 space-y-4" ref="messagesContainer">
+      <div v-if="messages.length === 0" class="flex flex-col items-center justify-center h-full text-gray-500">
+        <span class="material-icons text-4xl mb-2">chat</span>
+        <p class="text-center">Start a new conversation with your AI Learning Assistant</p>
+      </div>
+      
+      <div v-for="(message, index) in messages" 
+           :key="index"
+           class="flex items-start space-x-3"
+           :class="{'justify-end': message.type === 'user'}"
       >
-        <div class="max-w-[85%] flex flex-col space-y-1">
-          <div 
-            :class="[
-              message.sender === 'user' 
-                ? 'bg-maroon-600 text-white' 
-                : 'bg-gray-100 text-gray-800',
-              message.type === 'image' ? 'p-1' : 'p-3'
-            ]"
-            class="rounded-xl transition-all duration-200"
-          >
-            <!-- Text Message -->
-            <p v-if="message.type === 'text'" class="text-sm leading-5">
-              {{ message.content }}
-            </p>
-            
-            <!-- Image Message -->
-            <img 
-              v-if="message.type === 'image'"
-              :src="message.content" 
-              alt="Uploaded content"
-              class="w-48 h-32 object-cover rounded-lg"
-            />
+        <!-- AI Avatar -->
+        <div v-if="message.type === 'ai'" class="flex-shrink-0">
+          <div class="w-8 h-8 rounded-full bg-maroon-100 flex items-center justify-center">
+            <span class="material-icons text-maroon-600 text-sm">smart_toy</span>
           </div>
-          
-          <!-- Timestamp -->
-          <span 
-            class="text-xs text-gray-500 px-2"
-            :class="message.sender === 'user' ? 'text-right' : 'text-left'"
-          >
-            {{ message.timestamp }}
-          </span>
+        </div>
+        
+        <!-- Message Content -->
+        <div
+          class="rounded-lg px-4 py-2 max-w-[80%]"
+          :class="{
+            'bg-maroon-600 text-white': message.type === 'user',
+            'bg-gray-100 text-gray-800': message.type === 'ai'
+          }"
+        >
+          <div class="prose prose-sm" v-html="formatMessage(message.content)"></div>
+          <div v-if="message.type === 'ai'" class="flex items-center space-x-2 mt-2 text-xs text-gray-500">
+            <button class="hover:text-gray-700" @click="copyToClipboard(message.content)">
+              <span class="material-icons text-sm">content_copy</span>
+            </button>
+            <button class="hover:text-gray-700" @click="thumbsUp(index)">
+              <span class="material-icons text-sm">thumb_up</span>
+            </button>
+            <button class="hover:text-gray-700" @click="thumbsDown(index)">
+              <span class="material-icons text-sm">thumb_down</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- User Avatar -->
+        <div v-if="message.type === 'user'" class="flex-shrink-0">
+          <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+            <span class="material-icons text-gray-600 text-sm">person</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Typing Indicator -->
+      <div v-if="isTyping" class="flex items-start space-x-3">
+        <div class="flex-shrink-0">
+          <div class="w-8 h-8 rounded-full bg-maroon-100 flex items-center justify-center">
+            <span class="material-icons text-maroon-600 text-sm">smart_toy</span>
+          </div>
+        </div>
+        <div class="bg-gray-100 rounded-lg px-4 py-2">
+          <div class="flex space-x-1">
+            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Input Area -->
-    <div class="flex items-center space-x-2 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
-      <!-- File Upload -->
-      <label class="cursor-pointer p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-        <span class="material-symbols-outlined text-gray-600 text-xl">image</span>
-        <input 
-          type="file" 
-          class="hidden" 
-          accept="image/*" 
-          @change="uploadImage"
-        />
-      </label>
-
-      <!-- Message Input -->
-      <input
-        type="text"
-        v-model="newMessage"
-        placeholder="Ask me anything..."
-        class="flex-1 p-2 focus:outline-none placeholder-gray-400 text-sm"
-        @keyup.enter="sendMessage"
-      />
-
-      <!-- Send Button -->
-      <button
-        @click="sendMessage"
-        class="p-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors"
-        :disabled="!newMessage.trim()"
-        aria-label="Send message"
-      >
-        <span class="material-symbols-outlined text-xl">send</span>
-      </button>
+    <div class="border-t border-gray-100 p-4">
+      <form @submit.prevent="sendMessage" class="flex items-end space-x-2">
+        <div class="flex-1">
+          <textarea
+            v-model="newMessage"
+            rows="1"
+            placeholder="Type your message..."
+            class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 resize-none"
+            @keydown.enter.exact.prevent="sendMessage"
+            @keydown="handleKeyDown"
+            ref="messageInput"
+          ></textarea>
+        </div>
+        <button
+          type="submit"
+          class="px-4 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="!newMessage.trim() || isTyping"
+        >
+          <span class="material-icons">send</span>
+        </button>
+      </form>
     </div>
   </div>
 </template>
 
 <script>
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+
 export default {
+  name: 'ChatBotBox',
+  props: {
+    chatId: {
+      type: Number,
+      default: null
+    }
+  },
   data() {
     return {
       messages: [],
       newMessage: '',
+      isTyping: false,
+      messageHistory: new Map() // Store messages for each chat
     }
   },
   watch: {
-    messages() {
-      this.$nextTick(this.scrollToBottom);
+    chatId: {
+      immediate: true,
+      handler(newId) {
+        if (newId) {
+          // Load messages for this chat
+          this.messages = this.messageHistory.get(newId) || []
+        } else {
+          this.messages = []
+        }
+      }
     }
   },
   methods: {
-    sendMessage() {
-      if (this.newMessage.trim()) {
-        const message = {
-          type: 'text',
-          content: this.newMessage.trim(),
-          sender: 'user',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        
-        this.messages.push(message);
-        this.newMessage = '';
-        
-        // Add temporary bot response (replace with actual API call)
-        setTimeout(() => {
-          this.messages.push({
-            type: 'text',
-            content: "This is a sample response from the AI assistant. Real implementation would connect to an AI API.",
-            sender: 'bot',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          });
-        }, 1000);
+    async sendMessage() {
+      const message = this.newMessage.trim()
+      if (!message || this.isTyping) return
+
+      // Add user message
+      this.messages.push({
+        type: 'user',
+        content: message
+      })
+      this.newMessage = ''
+      this.scrollToBottom()
+
+      // Save to history
+      if (this.chatId) {
+        this.messageHistory.set(this.chatId, [...this.messages])
       }
+
+      // Simulate AI response
+      this.isTyping = true
+      await this.simulateTyping()
+      
+      // Add AI response
+      const aiResponse = await this.getAIResponse(message)
+      this.messages.push({
+        type: 'ai',
+        content: aiResponse
+      })
+      
+      // Update chat title if it's the first message
+      if (this.messages.length === 2) {
+        this.$emit('update:title', this.chatId, this.generateChatTitle(message))
+      }
+
+      // Save to history again
+      if (this.chatId) {
+        this.messageHistory.set(this.chatId, [...this.messages])
+      }
+
+      this.isTyping = false
+      this.scrollToBottom()
     },
-    uploadImage(event) {
-      const file = event.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          this.messages.push({
-            type: 'image',
-            content: e.target.result,
-            sender: 'user',
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          });
-        };
-        reader.readAsDataURL(file);
-      }
+    async simulateTyping() {
+      // Simulate AI thinking time
+      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000))
+    },
+    async getAIResponse(message) {
+      // TODO: Replace with actual AI API call
+      return `This is a simulated response to: "${message}"\n\nI can help you with:\n- Programming questions\n- Course materials\n- Learning paths`
+    },
+    generateChatTitle(message) {
+      // Generate a title based on the first message
+      return message.length > 30 ? message.substring(0, 30) + '...' : message
+    },
+    formatMessage(content) {
+      // Convert markdown to HTML and sanitize
+      const html = marked(content)
+      return DOMPurify.sanitize(html)
     },
     scrollToBottom() {
-      const container = this.$refs.messagesContainer;
-      if (container) {
-        container.scrollTop = container.scrollHeight;
+      this.$nextTick(() => {
+        const container = this.$refs.messagesContainer
+        container.scrollTop = container.scrollHeight
+      })
+    },
+    handleKeyDown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        this.sendMessage()
       }
+    },
+    async copyToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text)
+        // TODO: Show success toast
+      } catch (err) {
+        // TODO: Show error toast
+      }
+    },
+    thumbsUp(index) {
+      // TODO: Implement feedback
+      console.log('Thumbs up for message:', index)
+    },
+    thumbsDown(index) {
+      // TODO: Implement feedback
+      console.log('Thumbs down for message:', index)
     }
   }
 }
 </script>
 
 <style scoped>
-/* Custom scrollbar */
-.flex-1::-webkit-scrollbar {
-  width: 6px;
+/* Hide scrollbar for Chrome, Safari and Opera */
+.overflow-y-auto::-webkit-scrollbar {
+  display: none;
 }
 
-.flex-1::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
+/* Hide scrollbar for IE, Edge and Firefox */
+.overflow-y-auto {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
-.flex-1::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
+/* Markdown styles */
+:deep(.prose) {
+  max-width: none;
 }
 
-.flex-1::-webkit-scrollbar-thumb:hover {
-  background: #666;
+:deep(.prose pre) {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  margin: 0.5rem 0;
+}
+
+:deep(.prose code) {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 0.1rem 0.25rem;
+  border-radius: 0.25rem;
 }
 </style>
