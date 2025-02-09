@@ -32,13 +32,13 @@ async def login_with_google(request: Request):
 
 # Step 2: Google Callback
 @router.get("/auth/callback")
-async def auth_callback(request: Request):
+async def auth_callback(request: Request, db=Depends(get_db)): # -> dict :
     token = await oauth.google.authorize_access_token(request)
     user_data = await oauth.google.parse_id_token(token, None)
     request.session["user"] = user_data
 
     # Check if user is already stored in db
-    user = await get_or_create_user(get_db(), user_data)
+    user = await get_or_create_user(db, user_data)
 
     if not user_data:
         raise HTTPException(status_code=400, detail="Invalid token")

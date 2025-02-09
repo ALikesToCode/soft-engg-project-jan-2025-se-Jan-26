@@ -35,4 +35,8 @@ class Settings(BaseSettings):
     def allowed_origins_list(self) -> List[str]:
         return self.ALLOWED_ORIGINS.split(",")
 
+    def __init__(self):
+        if not self.GOOGLE_CLIENT_ID or not self.GOOGLE_CLIENT_SECRET or not self.DATABASE_URL:
+            raise ValueError("Missing environment variables. Please check your .env file.")
+
 settings = Settings()
