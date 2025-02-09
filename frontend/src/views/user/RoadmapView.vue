@@ -171,12 +171,19 @@
 <script>
 import SideNavBar from '@/layouts/SideNavBar.vue'
 import ChatBotBox from '@/components/ChatBotBox.vue'
+import { useChatStore } from '@/stores/useChatStore'
 
 export default {
   name: 'RoadmapView',
   components: {
     SideNavBar,
     ChatBotBox
+  },
+  setup() {
+    const chatStore = useChatStore()
+    return {
+      chatStore
+    }
   },
   data() {
     return {
@@ -336,8 +343,12 @@ export default {
       return icons[type] || 'article'
     },
     startLearning(material) {
-      this.currentLearningContext = material
-      this.showChat = true
+      this.chatStore.setContext({
+        type: material.type,
+        title: material.title,
+        description: material.description,
+        url: material.url
+      })
       this.$router.push(material.url)
     }
   }

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import useAuthStore from '@/stores/useAuthStore'
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
@@ -38,6 +39,10 @@ export const useChatStore = defineStore('chat', {
     contextTitle: (state) => {
       if (!state.currentContext) return 'Learning Assistant'
       return state.currentContext.title || 'Learning Assistant'
+    },
+    shouldShowChat: () => {
+      const authStore = useAuthStore()
+      return authStore.isAuthenticated
     }
   }
 }) 
