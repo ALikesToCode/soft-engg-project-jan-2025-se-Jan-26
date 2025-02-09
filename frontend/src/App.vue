@@ -1,12 +1,14 @@
 <script>
 import MainNavbar from '@/components/MainNavbar.vue'
 import MainFooter from '@/components/MainFooter.vue'
+import UserNavBar from '@/components/UserNavBar.vue'
 
 export default {
   name: 'App',
   components: {
     MainNavbar,
-    MainFooter
+    UserNavBar,
+    MainFooter,
   },
   computed: {
     showNavbar() {
@@ -14,15 +16,19 @@ export default {
     },
     showFooter() {
       return !this.$route.meta.hideFooter && this.$route.name !== 'login'
-    }
-  }
+    },
+    showUserNavbar() {
+      return !this.$route.meta.hideUserNavbar
+    },
+  },
 }
 </script>
 
 <template>
   <div class="flex flex-col min-h-screen">
     <MainNavbar v-if="showNavbar" />
-    <main class="flex-grow">
+    <UserNavBar v-if="showUserNavbar" />
+    <main class="flex-grow" :class="{ 'pt-16': showUserNavbar }">
       <router-view />
     </main>
     <MainFooter v-if="showFooter" />

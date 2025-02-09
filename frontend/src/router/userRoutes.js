@@ -7,7 +7,7 @@ import CourseHistory from '../views/user/CourseHistory.vue'
 // Base64 dummy image
 const dummyAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=="
 
-const userRoutes =   {
+const userRoutes = {
     path: '/user',
     name: 'userDashboard',
     children: [
@@ -15,14 +15,19 @@ const userRoutes =   {
             path: 'dashboard',
             component: UserDashboard,
             meta: {
-                title: 'User Dashboard'
+                title: 'User Dashboard',
+                hideFooter: true,
+                hideUserNavbar: false,
             }
         },
         {
             path: 'courses',
             component: UserCourses,
             meta: {
-                title: 'User Courses'
+                title: 'User Courses',
+                hideNavbar: true,
+                hideFooter: true,
+                hideUserNavbar: false,
             }
         },
         {
@@ -38,7 +43,8 @@ const userRoutes =   {
             meta: {
                 title: 'Course History',
                 hideNavbar: true,
-                hideFooter: true
+                hideFooter: true,
+                hideUserNavbar: true,
             }
         },
         {
@@ -86,7 +92,8 @@ const userRoutes =   {
             meta: {
                 title: 'User Profile',
                 hideNavbar: true,
-                hideFooter: true
+                hideFooter: true,
+                isProfilePage: true
             }
         }
     ]

@@ -7,12 +7,12 @@ import { User } from '@/models/User';
 import { APP_BASE_URL, ROLE } from '@/AppConstants/globalConstants';
 
 const useAuthStore = defineStore({
-    id:'auth',
+    id: 'auth',
     state: () => ({
         token: JSON.parse(localStorage.getItem('token')),
         returnUrl: null,
         user: new User(null, "", "", ""),
-        userRole:'STUDENT'
+        userRole: 'STUDENT'
     }),
     actions: {
         async login(email, pswd) {
@@ -52,9 +52,9 @@ const useAuthStore = defineStore({
             }
         },
         logout() {
-            localStorage.removeItem('token');
+            this.user = null
             this.token = null;
-            router.push({path: '/',query: { logout: 'true' } });
+            localStorage.removeItem('token');
         },
         setUser(userData) {
             this.user.id = userData.id;

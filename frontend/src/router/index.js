@@ -11,7 +11,8 @@ const routes = [
     name: 'home',
     component: HomeView,
     meta: {
-      title: 'Home | Cognitum'
+      title: 'Home | Cognitum',
+      hideUserNavbar: true
     }
   },
   {
@@ -19,7 +20,8 @@ const routes = [
     name: 'about',
     component: () => import('../views/AboutView.vue'),
     meta: {
-      title: 'About | Cognitum'
+      title: 'About | Cognitum',
+      hideUserNavbar: true
     }
   },
   {
@@ -27,7 +29,8 @@ const routes = [
     name: 'contact',
     component: () => import('../views/ContactView.vue'),
     meta: {
-      title: 'Contact | Cognitum'
+      title: 'Contact | Cognitum',
+      hideUserNavbar: true
     }
   },
   {
@@ -35,7 +38,8 @@ const routes = [
     name: 'login',
     component: () => import('../views/LoginView.vue'),
     meta: {
-      title: 'Login | Cognitum'
+      title: 'Login | Cognitum',
+      hideUserNavbar: true
     }
   },
   {
@@ -43,7 +47,8 @@ const routes = [
     name: 'faq',
     component: () => import('../views/FAQView.vue'),
     meta: {
-      title: 'FAQ | Cognitum'
+      title: 'FAQ | Cognitum',
+      hideUserNavbar: true
     }
   },
   {
@@ -51,7 +56,8 @@ const routes = [
     name: 'privacy',
     component: () => import('../views/PrivacyView.vue'),
     meta: {
-      title: 'Privacy Policy | Cognitum'
+      title: 'Privacy Policy | Cognitum',
+      hideUserNavbar: true
     }
   },
   {
@@ -59,7 +65,8 @@ const routes = [
     name: 'terms',
     component: () => import('../views/TermsView.vue'),
     meta: {
-      title: 'Terms of Service | Cognitum'
+      title: 'Terms of Service | Cognitum',
+      hideUserNavbar: true
     }
   },
   { ...userRoutes },
