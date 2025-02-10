@@ -182,7 +182,10 @@ export default {
       }
     },
     continueCourse(course) {
-      this.selectedCourse = course;
+      this.$router.push({
+        name: 'CourseLectureView',
+        params: { courseId: course.id }
+      });
     }
   }
 };
