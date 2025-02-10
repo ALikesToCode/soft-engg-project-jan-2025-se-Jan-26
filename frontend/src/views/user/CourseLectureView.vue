@@ -248,7 +248,7 @@ button {
 
 /* Progress bar improvements */
 .bg-gradient-to-r {
-  background: linear-gradient to right, var(--primary-color), var(--primary-hover));
+  background: linear-gradient(to right, var(--primary-color), var(--primary-hover));
 }
 
 /* Text colors */
