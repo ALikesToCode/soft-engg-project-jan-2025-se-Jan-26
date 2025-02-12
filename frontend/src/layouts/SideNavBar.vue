@@ -1,6 +1,6 @@
 <template>
   <div class="flex h-screen">
-    <nav 
+    <nav
       class="w-16 hover:w-48 transition-all duration-300 ease-in-out bg-gradient-to-b from-maroon-800 to-maroon-600 flex flex-col justify-center items-start p-3 text-white overflow-hidden"
       role="navigation"
       aria-label="Main Navigation"
@@ -9,7 +9,7 @@
     >
       <ul class="w-full">
         <li v-for="item in navItems" :key="item.path" class="w-full">
-          <router-link 
+          <router-link
             :to="item.path"
             @mouseenter="isHovered = item.path"
             @mouseleave="isHovered = null"
@@ -19,21 +19,21 @@
           >
             <span
               class="material-symbols-outlined transition-transform duration-200"
-              :class="{ 
+              :class="{
                 'text-yellow-400': isActive(item.path),
-                'scale-110': isHovered === item.path
+                'scale-110': isHovered === item.path,
               }"
               aria-hidden="true"
             >
               {{ item.icon }}
             </span>
-            <span 
+            <span
               class="text-sm font-medium whitespace-nowrap transition-opacity duration-200"
               :class="{
                 'opacity-100': navHovered || isHovered === item.path,
                 'opacity-0': !navHovered && isHovered !== item.path,
                 'text-yellow-400': (navHovered || isHovered === item.path) && isActive(item.path),
-                'text-white': (navHovered || isHovered === item.path) && !isActive(item.path)
+                'text-white': (navHovered || isHovered === item.path) && !isActive(item.path),
               }"
             >
               {{ item.label }}
@@ -46,8 +46,15 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
+import {
+  studentDashboardUrls,
+  facultyDashboardUrls,
+  supportDashboardUrls,
+} from '@/AppConstants/sideNavBarUrls'
+import useAuthStore from '@/stores/useAuthStore'
+import { ROLE } from '@/AppConstants/globalConstants'
 
 // Get the current route for active link detection.
 const route = useRoute()
@@ -58,27 +65,20 @@ const isHovered = ref(null)
 // Tracks whether the entire navigation bar is hovered.
 const navHovered = ref(false)
 
-// Define the navigation items.
-const navItems = [
-  {
-    path: '/user/dashboard',
-    icon: 'dashboard',
-    label: 'Dashboard'
-  },
-  {
-    path: '/user/courses', 
-    icon: 'auto_stories',
-    label: 'Courses'
-  },
-  {
-    path: '/user/course-history',
-    icon: 'history', 
-    label: 'History'
-  }
-]
-
 // Helper function to check if a nav item is active.
 const isActive = (path) => route.path === path
+
+//Get User Store
+const userStore = useAuthStore()
+const userRole = computed(() => userStore.userRole)
+
+// Define the navigation items/urls.
+const navItems = computed(() => {
+  if (userRole.value === ROLE.STUDENT) return studentDashboardUrls
+  if (userRole.value === ROLE.FACULTY) return facultyDashboardUrls
+  if (userRole.value === ROLE.SUPPORT) return supportDashboardUrls
+  return [] // Default case
+})
 </script>
 
 <style>
@@ -93,9 +93,15 @@ const isActive = (path) => route.path === path
 
 /* Pulse animation for icons on hover */
 @keyframes iconPulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .material-symbols-outlined:hover {
