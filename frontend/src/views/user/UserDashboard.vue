@@ -15,7 +15,7 @@ export default {
           type: 'Course',
           progress: 0,
           thumbnail: 'https://placehold.co/100x100',
-          reason: 'Based on your interest in Programming'
+          reason: 'Based on your interest in Programming',
         },
         {
           id: 2,
@@ -23,7 +23,7 @@ export default {
           type: 'Exercise',
           progress: 0,
           thumbnail: 'https://placehold.co/100x100',
-          reason: 'Recommended for your next topic'
+          reason: 'Recommended for your next topic',
         },
         {
           id: 3,
@@ -31,7 +31,7 @@ export default {
           type: 'Tutorial',
           progress: 0,
           thumbnail: 'https://placehold.co/100x100',
-          reason: 'Popular in your field'
+          reason: 'Popular in your field',
         },
         {
           id: 4,
@@ -39,8 +39,8 @@ export default {
           type: 'Course',
           progress: 0,
           thumbnail: 'https://placehold.co/100x100',
-          reason: 'Next step in your learning path'
-        }
+          reason: 'Next step in your learning path',
+        },
       ],
       personalizedRoadmaps: [
         {
@@ -48,29 +48,29 @@ export default {
           title: 'Full Stack Development',
           progress: 45,
           totalSteps: 12,
-          completedSteps: 5
+          completedSteps: 5,
         },
         {
           id: 2,
           title: 'Data Structures & Algorithms',
           progress: 30,
           totalSteps: 10,
-          completedSteps: 3
+          completedSteps: 3,
         },
         {
           id: 3,
           title: 'Machine Learning Basics',
           progress: 20,
           totalSteps: 8,
-          completedSteps: 2
+          completedSteps: 2,
         },
         {
           id: 4,
           title: 'Software Engineering Practices',
           progress: 60,
           totalSteps: 15,
-          completedSteps: 9
-        }
+          completedSteps: 9,
+        },
       ],
       bookmarkedMaterials: [
         {
@@ -78,29 +78,29 @@ export default {
           title: 'Design Patterns in Python',
           type: 'Article',
           author: 'Dr. Sarah Johnson',
-          dateBookmarked: '2024-01-15'
+          dateBookmarked: '2024-01-15',
         },
         {
           id: 2,
           title: 'REST API Best Practices',
           type: 'Tutorial',
           author: 'Tech Academy',
-          dateBookmarked: '2024-01-20'
-        }
-      ]
+          dateBookmarked: '2024-01-20',
+        },
+      ],
     }
   },
   components: {
     SideNavBar,
-    ChatBotWrapper
+    ChatBotWrapper,
   },
   computed: {
     mainContentClass() {
       return {
         'md:grid-cols-2': !this.showSplitScreen,
-        'md:grid-cols-3': this.showSplitScreen
+        'md:grid-cols-3': this.showSplitScreen,
       }
-    }
+    },
   },
   methods: {
     startMaterial(material) {
@@ -113,12 +113,12 @@ export default {
     },
     removeBookmark(material) {
       // TODO: Implement bookmark removal
-      this.bookmarkedMaterials = this.bookmarkedMaterials.filter(m => m.id !== material.id)
+      this.bookmarkedMaterials = this.bookmarkedMaterials.filter((m) => m.id !== material.id)
     },
     toggleSplitScreen() {
       this.showSplitScreen = !this.showSplitScreen
-    }
-  }
+    },
+  },
 }
 </script>
 
@@ -133,12 +133,17 @@ export default {
         <div class="mb-8">
           <h2 class="text-2xl font-bold text-gray-800 mb-4">Recommended for You</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div v-for="material in recommendedMaterials" 
-                 :key="material.id"
-                 class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
+            <div
+              v-for="material in recommendedMaterials"
+              :key="material.id"
+              class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
             >
               <div class="flex items-start space-x-4">
-                <img :src="material.thumbnail" :alt="material.title" class="w-16 h-16 rounded-lg object-cover" />
+                <img
+                  :src="material.thumbnail"
+                  :alt="material.title"
+                  class="w-16 h-16 rounded-lg object-cover"
+                />
                 <div class="flex-1 min-w-0">
                   <div class="flex items-start justify-between">
                     <div class="min-w-0">
@@ -147,7 +152,7 @@ export default {
                     </div>
                   </div>
                   <p class="text-sm text-gray-600 mt-2 line-clamp-2">{{ material.reason }}</p>
-                  <button 
+                  <button
                     @click="startMaterial(material)"
                     class="mt-3 text-sm text-maroon-600 hover:text-maroon-700 font-medium inline-flex items-center"
                   >
@@ -165,9 +170,10 @@ export default {
           <div class="space-y-6">
             <h2 class="text-2xl font-bold text-gray-800">Your Learning Paths</h2>
             <div class="space-y-4">
-              <div v-for="roadmap in personalizedRoadmaps" 
-                   :key="roadmap.id"
-                   class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
+              <div
+                v-for="roadmap in personalizedRoadmaps"
+                :key="roadmap.id"
+                class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
               >
                 <div class="flex items-center justify-between mb-2">
                   <h3 class="font-semibold text-gray-800 truncate">{{ roadmap.title }}</h3>
@@ -176,12 +182,12 @@ export default {
                   </span>
                 </div>
                 <div class="w-full bg-gray-100 rounded-full h-2">
-                  <div 
+                  <div
                     class="bg-maroon-600 h-2 rounded-full transition-all duration-500"
                     :style="{ width: `${roadmap.progress}%` }"
                   ></div>
                 </div>
-                <button 
+                <button
                   @click="viewRoadmap(roadmap)"
                   class="mt-3 text-sm text-maroon-600 hover:text-maroon-700 font-medium inline-flex items-center"
                 >
@@ -193,12 +199,13 @@ export default {
           </div>
 
           <!-- Bookmarked Materials -->
-          <div class="space-y-6">
-            <h2 class="text-2xl font-bold text-gray-800">Bookmarked Materials</h2>
+          <div class="space-y-6 sm:space-x-4">
+            <h2 class="text-2xl font-bold text-gray-800 sm:ml-4">Bookmarked Materials</h2>
             <div class="space-y-4">
-              <div v-for="material in bookmarkedMaterials" 
-                   :key="material.id"
-                   class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow group"
+              <div
+                v-for="material in bookmarkedMaterials"
+                :key="material.id"
+                class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow group"
               >
                 <div class="flex items-start justify-between">
                   <div class="min-w-0 flex-1">
@@ -212,7 +219,7 @@ export default {
                       Bookmarked on {{ new Date(material.dateBookmarked).toLocaleDateString() }}
                     </div>
                   </div>
-                  <button 
+                  <button
                     @click="removeBookmark(material)"
                     class="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
