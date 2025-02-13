@@ -93,9 +93,9 @@ export default {
     <div class="mb-1">
       <span class="text-gray-700">Select a Course: </span>
       <button
-        :class="course === activeCourse ? 'bg-red-700 text-gray-100' : ''"
+        :class="course === activeCourse ? 'bg-red-700 text-gray-100' : 'text-gray-700'"
         @click="chooseSubjectData(course)"
-        class="border border-red-700 text-gray-700 px-2 py-[2px] mr-2 rounded font-medium"
+        class="border border-red-700 px-2 py-[2px] mr-2 rounded font-medium"
         v-for="course in Object.keys(gradeData)"
         :key="course"
       >
