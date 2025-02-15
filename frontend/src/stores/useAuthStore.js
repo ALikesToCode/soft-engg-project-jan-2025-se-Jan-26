@@ -12,7 +12,8 @@ const useAuthStore = defineStore({
         token: JSON.parse(localStorage.getItem('token')),
         returnUrl: null,
         user: new User(null, "", "", ""),
-        userRole: 'FACULTY'
+        userRole: 'SUPPORT',
+        isAdmin: true
     }),
     actions: {
         async login(email, pswd) {

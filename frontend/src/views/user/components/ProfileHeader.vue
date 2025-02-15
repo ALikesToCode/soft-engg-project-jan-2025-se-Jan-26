@@ -3,12 +3,12 @@
   <div class="profile-header bg-white rounded-xl shadow-sm border border-gray-100 p-6">
     <div class="flex items-center space-x-6">
       <div class="relative">
-        <img 
-          :src="user.profilePictureUrl || '/images/default-avatar.png'" 
+        <img
+          :src="user.profilePictureUrl || '/images/default-avatar.png'"
           :alt="`${user.name}'s Profile Picture`"
-          class="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg" 
+          class="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
         />
-        <button 
+        <button
           v-if="isEditable"
           class="absolute bottom-0 right-0 bg-maroon-600 text-white p-2 rounded-full shadow-lg hover:bg-maroon-700 transition-colors"
           @click="$emit('update-photo')"
@@ -16,7 +16,7 @@
           <i class="fas fa-camera text-sm"></i>
         </button>
       </div>
-      
+
       <div class="flex-1">
         <div class="flex items-center justify-between">
           <div>
@@ -26,7 +26,7 @@
               {{ user.department }}
             </p>
           </div>
-          <button 
+          <button
             v-if="isEditable"
             class="px-4 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors"
             @click="$emit('edit-profile')"
@@ -34,8 +34,8 @@
             Edit Profile
           </button>
         </div>
-        
-        <div class="mt-4 flex space-x-6">
+
+        <div v-if="userType !== 'support'" class="mt-4 flex space-x-6">
           <div class="text-center">
             <p class="text-2xl font-bold text-gray-800">{{ user.coursesCount || 0 }}</p>
             <p class="text-sm text-gray-600">Courses</p>
@@ -46,7 +46,8 @@
           </div>
           <div class="text-center">
             <p class="text-2xl font-bold text-gray-800">{{ user.rating || 0 }}</p>
-            <p class="text-sm text-gray-600">Rating</p>
+            <p v-if="userType === 'student'" class="text-sm text-gray-600">CGPA</p>
+            <p v-else class="text-sm text-gray-600">Rating</p>
           </div>
         </div>
       </div>
@@ -60,15 +61,19 @@ export default {
   props: {
     user: {
       type: Object,
-      required: true
+      required: true,
+    },
+    userType: {
+      type: String,
+      required: true,
     },
     isEditable: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
-  emits: ['update-photo', 'edit-profile']
-};
+  emits: ['update-photo', 'edit-profile'],
+}
 </script>
 
 <style scoped>
@@ -76,4 +81,4 @@ export default {
   background: linear-gradient(to right, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95));
   backdrop-filter: blur(10px);
 }
-</style> 
+</style>

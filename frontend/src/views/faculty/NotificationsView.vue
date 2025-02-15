@@ -67,6 +67,8 @@
 
 <script>
 import NotificationForm from '@/components/NotificationForm.vue'
+import useAuthStore from '@/stores/useAuthStore'
+import formatDateFunc from '@/utils/formatDate'
 export default {
   name: 'NotificationsView',
   components: {
@@ -74,7 +76,7 @@ export default {
   },
   data() {
     return {
-      isAdmin: true, // This should come from your auth system
+      // isAdmin: true, // This should come from your auth system
       courses: [
         { id: 1, title: 'Advanced Algorithms' },
         { id: 2, title: 'Machine Learning Fundamentals' },
@@ -116,34 +118,19 @@ export default {
       })
     },
     formatDate(date) {
-      const d = new Date(date)
-      const months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ]
-      const month = months[d.getMonth()]
-      const day = d.getDate()
-      const year = d.getFullYear()
-      const hours = d.getHours()
-      const minutes = d.getMinutes().toString().padStart(2, '0')
-      const ampm = hours >= 12 ? 'PM' : 'AM'
-      const formattedHours = hours % 12 || 12
-
-      return `${month} ${day}, ${year} ${formattedHours}:${minutes} ${ampm}`
+      return formatDateFunc(date)
     },
     getCourseTitle(courseId) {
       const course = this.courses.find((c) => c.id === courseId)
       return course ? course.title : 'Unknown Course'
+    },
+  },
+  computed: {
+    userStore() {
+      return useAuthStore()
+    },
+    isAdmin() {
+      return this.userStore.isAdmin
     },
   },
 }
