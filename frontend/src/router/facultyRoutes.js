@@ -3,6 +3,9 @@ import FacultyDashboard from '../views/faculty/FacultyDashboard.vue'
 import FacultyDetails from '../views/faculty/FacultyDetails.vue'
 import ProfilePage from '../views/faculty/ProfilePage.vue'
 import NotificationsView from '../views/faculty/NotificationsView.vue'
+import CourseEnrollmentView from '@/views/faculty/CourseEnrollmentView.vue'
+import AcademicIntegrityMonitoring from '../views/faculty/AcademicIntegrityMonitoring.vue'
+import FacultyNotifications from '../views/faculty/FacultyNotifications.vue'
 
 // Base64 dummy image
 const dummyAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=="
@@ -16,19 +19,17 @@ const facultyRoutes = {
             component: FacultyDashboard,
             meta: {
                 title: 'Faculty Dashboard',
-                hideNavbar: false,
-                hideFooter: true,
-                hideUserNavbar: false
+                hideNavbar: true,
+                hideFooter: true
             }
         },
         {
             path: 'content-upload',
             component: ContentUpload,
             meta: {
-                title: 'Content Upload',
-                hideNavbar: false,
-                hideFooter: true,
-                hideUserNavbar: false
+                title: 'Upload Content',
+                hideNavbar: true,
+                hideFooter: true
             }
         },
         {
@@ -105,6 +106,30 @@ const facultyRoutes = {
                 hideNavbar: true,
                 hideFooter: true,
                 isProfilePage: true
+            }
+        },
+        {
+            path: '/faculty/course/:courseId/enrollment',
+            name: 'CourseEnrollment',
+            component: CourseEnrollmentView,
+            meta: { requiresFacultyAuth: true }
+        },
+        {
+            path: 'academic-integrity',
+            component: AcademicIntegrityMonitoring,
+            meta: {
+                title: 'Academic Integrity Monitoring',
+                hideNavbar: true,
+                hideFooter: true
+            }
+        },
+        {
+            path: 'notifications',
+            component: FacultyNotifications,
+            meta: {
+                title: 'Notifications',
+                hideNavbar: true,
+                hideFooter: true
             }
         }
     ]

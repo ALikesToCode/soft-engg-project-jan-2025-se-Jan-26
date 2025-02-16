@@ -5,127 +5,153 @@
       <div class="h-full flex">
         <!-- Main Content -->
         <div class="flex-1 overflow-y-auto p-6">
-          <!-- Header -->
-          <div class="max-w-5xl mx-auto mb-8">
-            <div class="flex items-center justify-between">
-              <div>
-                <h1 class="text-3xl font-bold text-gray-900">{{ roadmap.title }}</h1>
-                <p class="text-gray-600 mt-1">{{ roadmap.description }}</p>
-              </div>
-              <div class="flex items-center space-x-4">
-                <div class="text-right">
-                  <div class="text-sm text-gray-600">Overall Progress</div>
-                  <div class="text-2xl font-bold text-gray-900">
-                    {{ Math.round((roadmap.completedSteps / roadmap.totalSteps) * 100) }}%
-                  </div>
-                </div>
-                <div class="h-16 w-16 rounded-full bg-maroon-100 flex items-center justify-center">
-                  <span class="material-icons text-maroon-600 text-2xl">timeline</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Progress Bar -->
-            <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-              <div class="flex items-center justify-between text-sm mb-2">
-                <span class="font-medium text-gray-900">Learning Progress</span>
-                <span class="text-gray-600">{{ roadmap.completedSteps }} of {{ roadmap.totalSteps }} Steps Completed</span>
-              </div>
-              <div class="w-full bg-gray-100 rounded-full h-2.5">
-                <div 
-                  class="bg-maroon-600 h-2.5 rounded-full transition-all duration-500"
-                  :style="{ width: `${(roadmap.completedSteps / roadmap.totalSteps) * 100}%` }"
-                ></div>
-              </div>
+          <!-- Loading State -->
+          <div v-if="loading" class="flex items-center justify-center h-full">
+            <div class="text-center">
+              <div class="w-16 h-16 border-4 border-maroon-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+              <p class="mt-4 text-gray-600">Loading roadmap...</p>
             </div>
           </div>
 
-          <!-- Roadmap Timeline -->
-          <div class="max-w-5xl mx-auto">
-            <div class="space-y-8">
-              <div 
-                v-for="(milestone, index) in roadmap.milestones" 
-                :key="milestone.id"
-                class="relative"
-              >
-                <!-- Timeline Line -->
-                <div 
-                  v-if="index < roadmap.milestones.length - 1"
-                  class="absolute left-8 top-14 bottom-0 w-0.5 bg-gray-200"
-                ></div>
+          <!-- Error State -->
+          <div v-else-if="error" class="flex items-center justify-center h-full">
+            <div class="text-center">
+              <div class="w-16 h-16 mx-auto text-red-500">
+                <span class="material-icons text-6xl">error_outline</span>
+              </div>
+              <p class="mt-4 text-gray-800 font-medium">{{ error }}</p>
+              <button 
+                @click="$router.push('/user/courses')"
+                class="mt-4 px-4 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors">
+                Back to Courses
+              </button>
+            </div>
+          </div>
 
-                <!-- Milestone Card -->
-                <div 
-                  class="bg-white rounded-xl shadow-sm border border-gray-100 relative"
-                  :class="{ 'opacity-60': milestone.locked }"
-                >
-                  <!-- Milestone Header -->
-                  <div class="p-6 flex items-start space-x-4">
-                    <div 
-                      class="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0"
-                      :class="getMilestoneStatusClasses(milestone.status).bgClass"
-                    >
-                      <span 
-                        class="material-icons text-2xl"
-                        :class="getMilestoneStatusClasses(milestone.status).textClass"
-                      >
-                        {{ getMilestoneStatusIcon(milestone.status) }}
-                      </span>
+          <!-- Roadmap Content -->
+          <template v-else-if="roadmap">
+            <!-- Header -->
+            <div class="max-w-5xl mx-auto mb-8">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h1 class="text-3xl font-bold text-gray-900">{{ roadmap.title }}</h1>
+                  <p class="text-gray-600 mt-1">{{ roadmap.description }}</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                  <div class="text-right">
+                    <div class="text-sm text-gray-600">Overall Progress</div>
+                    <div class="text-2xl font-bold text-gray-900">
+                      {{ Math.round((roadmap.completedSteps / roadmap.totalSteps) * 100) }}%
                     </div>
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center justify-between">
-                        <div>
-                          <h3 class="text-xl font-semibold text-gray-900">{{ milestone.title }}</h3>
-                          <p class="text-gray-600 mt-1">{{ milestone.description }}</p>
-                        </div>
-                        <div class="text-right">
-                          <span 
-                            class="px-3 py-1 rounded-full text-sm font-medium"
-                            :class="getMilestoneStatusClasses(milestone.status).badgeClass"
-                          >
-                            {{ milestone.status }}
-                          </span>
-                          <div class="text-sm text-gray-500 mt-1">
-                            {{ milestone.estimatedTime }}
+                  </div>
+                  <div class="h-16 w-16 rounded-full bg-maroon-100 flex items-center justify-center">
+                    <span class="material-icons text-maroon-600 text-2xl">timeline</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                <div class="flex items-center justify-between text-sm mb-2">
+                  <span class="font-medium text-gray-900">Learning Progress</span>
+                  <span class="text-gray-600">{{ roadmap.completedSteps }} of {{ roadmap.totalSteps }} Steps Completed</span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-2.5">
+                  <div 
+                    class="bg-maroon-600 h-2.5 rounded-full transition-all duration-500"
+                    :style="{ width: `${(roadmap.completedSteps / roadmap.totalSteps) * 100}%` }"
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Roadmap Timeline -->
+            <div class="max-w-5xl mx-auto">
+              <div class="space-y-8">
+                <div 
+                  v-for="(milestone, index) in roadmap.milestones" 
+                  :key="milestone.id"
+                  class="relative"
+                >
+                  <!-- Timeline Line -->
+                  <div 
+                    v-if="index < roadmap.milestones.length - 1"
+                    class="absolute left-8 top-14 bottom-0 w-0.5 bg-gray-200"
+                  ></div>
+
+                  <!-- Milestone Card -->
+                  <div 
+                    class="bg-white rounded-xl shadow-sm border border-gray-100 relative"
+                    :class="{ 'opacity-60': milestone.locked }"
+                  >
+                    <!-- Milestone Header -->
+                    <div class="p-6 flex items-start space-x-4">
+                      <div 
+                        class="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0"
+                        :class="getMilestoneStatusClasses(milestone.status).bgClass"
+                      >
+                        <span 
+                          class="material-icons text-2xl"
+                          :class="getMilestoneStatusClasses(milestone.status).textClass"
+                        >
+                          {{ getMilestoneStatusIcon(milestone.status) }}
+                        </span>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                          <div>
+                            <h3 class="text-xl font-semibold text-gray-900">{{ milestone.title }}</h3>
+                            <p class="text-gray-600 mt-1">{{ milestone.description }}</p>
+                          </div>
+                          <div class="text-right">
+                            <span 
+                              class="px-3 py-1 rounded-full text-sm font-medium"
+                              :class="getMilestoneStatusClasses(milestone.status).badgeClass"
+                            >
+                              {{ milestone.status }}
+                            </span>
+                            <div class="text-sm text-gray-500 mt-1">
+                              {{ milestone.estimatedTime }}
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <!-- Learning Materials -->
-                  <div v-if="milestone.materials && milestone.materials.length > 0" class="px-6 pb-6">
-                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div
-                        v-for="material in milestone.materials"
-                        :key="material.id"
-                        class="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
-                      >
-                        <div class="flex items-start space-x-3">
-                          <div 
-                            class="p-2 rounded-lg"
-                            :class="getMaterialTypeClasses(material.type).bgClass"
-                          >
-                            <span 
-                              class="material-icons"
-                              :class="getMaterialTypeClasses(material.type).textClass"
+                    <!-- Learning Materials -->
+                    <div v-if="milestone.materials && milestone.materials.length > 0" class="px-6 pb-6">
+                      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div
+                          v-for="material in milestone.materials"
+                          :key="material.id"
+                          class="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
+                        >
+                          <div class="flex items-start space-x-3">
+                            <div 
+                              class="p-2 rounded-lg"
+                              :class="getMaterialTypeClasses(material.type).bgClass"
                             >
-                              {{ getMaterialTypeIcon(material.type) }}
-                            </span>
-                          </div>
-                          <div class="flex-1 min-w-0">
-                            <h4 class="font-medium text-gray-900">{{ material.title }}</h4>
-                            <p class="text-sm text-gray-600 mt-1">{{ material.description }}</p>
-                            <div class="flex items-center space-x-4 mt-2">
-                              <button 
-                                @click="startLearning(material)"
-                                class="text-sm text-maroon-600 hover:text-maroon-700 font-medium inline-flex items-center"
-                                :disabled="milestone.locked"
+                              <span 
+                                class="material-icons"
+                                :class="getMaterialTypeClasses(material.type).textClass"
                               >
-                                Start Learning
-                                <span class="material-icons text-sm ml-1">arrow_forward</span>
-                              </button>
-                              <span class="text-sm text-gray-500">{{ material.duration }}</span>
+                                {{ getMaterialTypeIcon(material.type) }}
+                              </span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                              <h4 class="font-medium text-gray-900">{{ material.title }}</h4>
+                              <p class="text-sm text-gray-600 mt-1">{{ material.description }}</p>
+                              <div class="flex items-center space-x-4 mt-2">
+                                <button 
+                                  @click="startLearning(material)"
+                                  class="text-sm text-maroon-600 hover:text-maroon-700 font-medium inline-flex items-center"
+                                  :disabled="milestone.locked"
+                                >
+                                  Start Learning
+                                  <span class="material-icons text-sm ml-1">arrow_forward</span>
+                                </button>
+                                <span class="text-sm text-gray-500">{{ material.duration }}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -135,7 +161,7 @@
                 </div>
               </div>
             </div>
-          </div>
+          </template>
         </div>
 
         <!-- Chat Panel -->
@@ -179,6 +205,17 @@ export default {
     SideNavBar,
     ChatBotBox
   },
+  props: {
+    id: {
+      type: [String, Number],
+      required: true
+    }
+  },
+  created() {
+    console.log('Loading roadmap for course:', this.id);
+    // TODO: Fetch roadmap data for the specific course
+    // this.loadRoadmapData(this.id);
+  },
   setup() {
     const chatStore = useChatStore()
     return {
@@ -189,93 +226,128 @@ export default {
     return {
       showChat: false,
       currentLearningContext: null,
-      roadmap: {
-        id: 1,
-        title: 'Full Stack Development Path',
-        description: 'Master full stack development with this comprehensive learning path',
-        completedSteps: 5,
-        totalSteps: 12,
-        milestones: [
-          {
-            id: 1,
-            title: 'Frontend Fundamentals',
-            description: 'Learn the basics of HTML, CSS, and JavaScript',
-            status: 'completed',
-            estimatedTime: '4 weeks',
-            locked: false,
-            materials: [
-              {
-                id: 1,
-                type: 'video',
-                title: 'HTML & CSS Basics',
-                description: 'Introduction to web development fundamentals',
-                duration: '2 hours',
-                url: '/course/web-dev/html-css'
-              },
-              {
-                id: 2,
-                type: 'exercise',
-                title: 'JavaScript Exercises',
-                description: 'Practice JavaScript fundamentals with hands-on exercises',
-                duration: '3 hours',
-                url: '/course/web-dev/js-exercises'
-              }
-            ]
-          },
-          {
-            id: 2,
-            title: 'Vue.js Framework',
-            description: 'Master modern frontend development with Vue.js',
-            status: 'in_progress',
-            estimatedTime: '6 weeks',
-            locked: false,
-            materials: [
-              {
-                id: 3,
-                type: 'course',
-                title: 'Vue.js Fundamentals',
-                description: 'Learn Vue.js core concepts and best practices',
-                duration: '8 hours',
-                url: '/course/vue/fundamentals'
-              },
-              {
-                id: 4,
-                type: 'project',
-                title: 'Build a Vue.js App',
-                description: 'Create a real-world application using Vue.js',
-                duration: '10 hours',
-                url: '/course/vue/project'
-              }
-            ]
-          },
-          {
-            id: 3,
-            title: 'Backend Development',
-            description: 'Learn server-side programming and databases',
-            status: 'locked',
-            estimatedTime: '8 weeks',
-            locked: true,
-            materials: [
-              {
-                id: 5,
-                type: 'course',
-                title: 'Node.js Basics',
-                description: 'Introduction to server-side JavaScript',
-                duration: '6 hours',
-                url: '/course/backend/nodejs'
-              },
-              {
-                id: 6,
-                type: 'tutorial',
-                title: 'Database Design',
-                description: 'Learn SQL and database fundamentals',
-                duration: '4 hours',
-                url: '/course/backend/database'
-              }
-            ]
-          }
-        ]
+      roadmap: null,
+      loading: true,
+      error: null
+    }
+  },
+  async created() {
+    try {
+      // For now using mock data based on course ID
+      const mockRoadmaps = {
+        1: {
+          id: 1,
+          title: 'Python Programming Path',
+          description: 'Master Python programming with hands-on projects and exercises',
+          completedSteps: 3,
+          totalSteps: 8,
+          milestones: [
+            {
+              id: 1,
+              title: 'Python Basics',
+              description: 'Learn Python syntax and basic concepts',
+              status: 'completed',
+              estimatedTime: '2 weeks',
+              locked: false,
+              materials: [
+                {
+                  id: 1,
+                  type: 'video',
+                  title: 'Introduction to Python',
+                  description: 'Get started with Python programming',
+                  duration: '2 hours',
+                  url: '/course/python/intro'
+                }
+              ]
+            },
+            {
+              id: 2,
+              title: 'Data Structures',
+              description: 'Master Python data structures',
+              status: 'in_progress',
+              estimatedTime: '3 weeks',
+              locked: false,
+              materials: [
+                {
+                  id: 2,
+                  type: 'exercise',
+                  title: 'Lists and Dictionaries',
+                  description: 'Practice with Python collections',
+                  duration: '3 hours',
+                  url: '/course/python/collections'
+                }
+              ]
+            }
+          ]
+        },
+        2: {
+          id: 2,
+          title: 'Web Development Path',
+          description: 'Master web development fundamentals and modern frameworks',
+          completedSteps: 2,
+          totalSteps: 6,
+          milestones: [
+            {
+              id: 1,
+              title: 'HTML & CSS',
+              description: 'Learn the basics of web development',
+              status: 'completed',
+              estimatedTime: '2 weeks',
+              locked: false,
+              materials: [
+                {
+                  id: 1,
+                  type: 'video',
+                  title: 'HTML Fundamentals',
+                  description: 'Get started with HTML5',
+                  duration: '2 hours',
+                  url: '/course/web/html'
+                }
+              ]
+            }
+          ]
+        },
+        3: {
+          id: 3,
+          title: 'Machine Learning Path',
+          description: 'Learn machine learning concepts and practical applications',
+          completedSteps: 1,
+          totalSteps: 10,
+          milestones: [
+            {
+              id: 1,
+              title: 'ML Foundations',
+              description: 'Understanding machine learning basics',
+              status: 'in_progress',
+              estimatedTime: '4 weeks',
+              locked: false,
+              materials: [
+                {
+                  id: 1,
+                  type: 'course',
+                  title: 'Introduction to ML',
+                  description: 'Basic concepts and terminology',
+                  duration: '4 hours',
+                  url: '/course/ml/intro'
+                }
+              ]
+            }
+          ]
+        }
+      };
+
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      this.roadmap = mockRoadmaps[this.id] || null;
+      if (!this.roadmap) {
+        this.error = 'Roadmap not found';
       }
+    } catch (err) {
+      this.error = 'Failed to load roadmap';
+      console.error('Error loading roadmap:', err);
+    } finally {
+      this.loading = false;
     }
   },
   methods: {
@@ -343,13 +415,25 @@ export default {
       return icons[type] || 'article'
     },
     startLearning(material) {
-      this.chatStore.setContext({
+      // Set the learning context for the chat
+      this.currentLearningContext = {
         type: material.type,
         title: material.title,
         description: material.description,
         url: material.url
-      })
-      this.$router.push(material.url)
+      };
+      
+      // Show the chat panel when starting a new material
+      this.showChat = true;
+      
+      // Navigate to the course lecture view
+      this.$router.push({
+        name: 'CourseLectureView',
+        params: { 
+          courseId: this.id,
+          materialId: material.id
+        }
+      });
     }
   }
 }

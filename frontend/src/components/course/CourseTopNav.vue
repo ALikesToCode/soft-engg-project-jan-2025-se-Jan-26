@@ -1,40 +1,48 @@
 <template>
-  <div class="bg-white border-b border-gray-200/80 px-4 sm:px-6 py-4 shadow-sm backdrop-blur-sm">
-    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-3 sm:space-y-0">
-      <div class="flex items-center space-x-3">
-        <button @click="$router.go(-1)" class="p-2 hover:bg-gray-100/80 rounded-lg transition-all duration-300
-                 text-gray-600 hover:text-primary-600 active:scale-95">
-          <i class="fas fa-arrow-left text-lg"></i>
-        </button>
-        <div class="space-y-0.5">
-          <h1 class="text-2xl font-bold text-gray-900 tracking-tight">{{ course.title }}</h1>
+  <div class="sticky top-0 z-10 bg-white border-b border-slate-200 shadow-sm">
+    <div class="px-6 py-4">
+      <div class="flex items-center justify-between">
+        <!-- Left Section -->
+        <div class="flex items-center space-x-4">
+          <button @click="$emit('back-to-courses')" 
+                  class="p-2 rounded-lg hover:bg-maroon-50 text-slate-600 hover:text-maroon-600 transition-colors">
+            <span class="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div class="flex flex-col">
+            <h1 class="text-xl font-bold text-slate-900">{{ course.title }}</h1>
+            <div class="flex items-center space-x-2 mt-1">
+              <span class="material-symbols-outlined text-maroon-400">person</span>
+              <div class="flex items-center space-x-2">
+                <span class="text-sm font-medium text-slate-700">{{ course.instructor?.name }}</span>
+                <span class="text-xs text-slate-500">{{ course.instructor?.title }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Section -->
+        <div class="flex items-center space-x-6">
+          <!-- Progress Section -->
+          <div class="flex items-center space-x-3">
+            <div class="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div class="h-full bg-gradient-to-r from-maroon-500 to-maroon-600 rounded-full transition-all duration-500"
+                   :style="{ width: `${progress}%` }"></div>
+            </div>
+            <span class="text-sm font-medium text-slate-700">{{ progress }}%</span>
+          </div>
+
+          <!-- Action Buttons -->
           <div class="flex items-center space-x-2">
-            <i class="fas fa-chalkboard-teacher text-gray-400 text-sm"></i>
-            <p class="text-sm text-gray-600 font-medium">{{ course.instructor?.name }}</p>
+            <button @click="$emit('toggle-bookmark')"
+                    class="p-2 rounded-lg hover:bg-maroon-50 transition-colors"
+                    :class="isBookmarked ? 'text-yellow-500' : 'text-slate-400 hover:text-maroon-600'">
+              <span class="material-symbols-outlined" :class="{ 'filled': isBookmarked }">bookmark</span>
+            </button>
+            <button @click="$emit('toggle-notes')"
+                    class="p-2 rounded-lg hover:bg-maroon-50 text-slate-400 hover:text-maroon-600 transition-colors">
+              <span class="material-symbols-outlined">edit_note</span>
+            </button>
           </div>
-        </div>
-      </div>
-      
-      <div class="flex items-center space-x-4 sm:space-x-5">
-        <div class="flex items-center space-x-3 bg-gray-50 px-4 py-2 rounded-xl">
-          <div class="relative w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div class="absolute inset-0 bg-gradient-to-r from-primary-500 to-primary-400 rounded-full transition-all duration-500"
-                 :style="{ width: `${course.progress || 0}%` }"></div>
-          </div>
-          <span class="text-sm font-semibold text-primary-600">{{ course.progress || 0 }}%</span>
-        </div>
-        <div class="flex items-center space-x-2">
-          <button @click="$emit('toggle-bookmark')" 
-                  class="p-2.5 hover:bg-gray-100/80 rounded-xl transition-all duration-300
-                         text-gray-600 hover:text-primary-600 active:scale-95"
-                  :class="{'text-primary-600': isBookmarked}">
-            <i class="fas fa-bookmark text-lg"></i>
-          </button>
-          <button @click="$emit('toggle-notes')" 
-                  class="p-2.5 hover:bg-gray-100/80 rounded-xl transition-all duration-300
-                         text-gray-600 hover:text-primary-600 active:scale-95">
-            <i class="fas fa-sticky-note text-lg"></i>
-          </button>
         </div>
       </div>
     </div>
@@ -52,8 +60,30 @@ export default {
     isBookmarked: {
       type: Boolean,
       default: false
+    },
+    progress: {
+      type: Number,
+      default: 0
     }
   },
-  emits: ['toggle-bookmark', 'toggle-notes']
+  emits: ['back-to-courses', 'toggle-bookmark', 'toggle-notes']
 }
-</script> 
+</script>
+
+<style scoped>
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+.material-symbols-outlined.filled {
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
+</style> 

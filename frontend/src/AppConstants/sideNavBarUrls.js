@@ -23,13 +23,23 @@ const facultyDashboardUrls = [
     },
     {
         path: '/faculty/notifications',
-        icon: 'campaign',
-        label: 'Send Notifications'
+        icon: 'notifications',
+        label: 'Notifications'
     },
     {
         path: '/faculty/content-upload',
         icon: 'upload',
         label: 'Upload Content'
+    },
+    {
+        path: '/faculty/academic-integrity',
+        icon: 'gavel',
+        label: 'Academic Integrity'
+    },
+    {
+        path: '/faculty/course/1/enrollment',
+        icon: 'group',
+        label: 'Course Enrollment'
     }
 ]
 const supportDashboardUrls = [
@@ -42,6 +52,29 @@ const supportDashboardUrls = [
         path: '/support/notifications',
         icon: 'campaign',
         label: 'Send Notifications'
+    },
+    {
+        path: '/support/faq-management',
+        icon: 'help_center',
+        label: 'FAQ Management'
+    },
+    {
+        path: '/support/user-management',
+        icon: 'manage_accounts',
+        label: 'User Management',
+        requiresAdmin: true
+    },
+    {
+        path: '/support/course-assignments',
+        icon: 'school',
+        label: 'Course Assignments',
+        requiresAdmin: true
+    },
+    {
+        path: '/support/system-settings',
+        icon: 'settings',
+        label: 'System Settings',
+        requiresAdmin: true
     }
 ]
 

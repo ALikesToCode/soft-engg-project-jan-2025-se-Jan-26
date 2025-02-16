@@ -38,7 +38,8 @@ export const MOCK_COURSES = [
             duration: '15:00',
             type: 'video',
             completed: true,
-            videoUrl: 'https://www.youtube.com/embed/example1',
+            videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+            thumbnailUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg',
             description: 'Get started with Python programming language and understand its importance in modern development.',
             objectives: [
               'Understand what Python is and its applications in real world',
@@ -114,7 +115,8 @@ export const MOCK_COURSES = [
             duration: '20:00',
             type: 'video',
             completed: true,
-            videoUrl: 'https://www.youtube.com/embed/example2',
+            videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+            thumbnailUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ElephantsDream.jpg',
             description: 'Learn about variables and basic data types in Python programming.',
             objectives: [
               'Understand variables and their importance',
@@ -155,7 +157,8 @@ export const MOCK_COURSES = [
             duration: '25:00',
             type: 'video',
             completed: false,
-            videoUrl: 'https://www.youtube.com/embed/example3',
+            videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+            thumbnailUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerBlazes.jpg',
             description: 'Learn about if-else statements and control flow in Python.',
             materials: [
               {
