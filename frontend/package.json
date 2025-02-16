@@ -11,10 +11,12 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@display-studio/vue-player": "^0.0.6",
     "@fortawesome/fontawesome-free": "^6.5.1",
     "@headlessui/vue": "^1.7.16",
     "@heroicons/vue": "^2.1.1",
     "@tailwindcss/forms": "^0.5.7",
+    "@vueuse/core": "^12.7.0",
     "axios": "^1.6.5",
     "chart.js": "^4.4.7",
     "date-fns": "^4.1.0",

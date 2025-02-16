@@ -1,17 +1,123 @@
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { getCourseById, getLectureById } from '../mock-data/courses'
+import { useNotification } from './useNotification'
+
+const STORAGE_KEY = 'course_progress'
 
 export function useCourse(courseId) {
-  const currentCourse = ref(getCourseById(parseInt(courseId)))
+  const { notify } = useNotification()
+  const currentCourse = ref(null)
   const selectedLecture = ref(null)
-  const isBookmarked = ref(currentCourse.value?.isBookmarked || false)
+  const isBookmarked = ref(false)
   const showNotes = ref(false)
   const currentNotes = ref('')
+  const loading = ref(true)
+  const error = ref(null)
+
+  // Load course data with error handling
+  const loadCourse = async () => {
+    try {
+      loading.value = true
+      error.value = null
+      
+      // In production, this would be an API call
+      const course = getCourseById(parseInt(courseId))
+      if (!course) {
+        throw new Error('Course not found')
+      }
+      
+      currentCourse.value = course
+      isBookmarked.value = course.isBookmarked || false
+      
+      // Load saved progress
+      loadProgress()
+    } catch (err) {
+      error.value = err.message
+      notify.error('Failed to load course data')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // Save progress to localStorage
+  const saveProgress = () => {
+    if (!currentCourse.value) return
+    
+    const progress = {
+      courseId: currentCourse.value.id,
+      completedLectures: completedLectures.value,
+      lastLectureId: selectedLecture.value?.id,
+      notes: currentNotes.value,
+      timestamp: Date.now()
+    }
+    
+    try {
+      localStorage.setItem(
+        `${STORAGE_KEY}_${courseId}`,
+        JSON.stringify(progress)
+      )
+    } catch (err) {
+      console.error('Failed to save progress:', err)
+    }
+  }
+
+  // Load progress from localStorage
+  const loadProgress = () => {
+    try {
+      const saved = localStorage.getItem(`${STORAGE_KEY}_${courseId}`)
+      if (saved) {
+        const progress = JSON.parse(saved)
+        
+        // Restore completed lectures
+        if (progress.completedLectures) {
+          currentCourse.value.syllabus.forEach(week => {
+            week.lectures.forEach(lecture => {
+              lecture.completed = progress.completedLectures.includes(lecture.id)
+            })
+          })
+        }
+        
+        // Restore last viewed lecture
+        if (progress.lastLectureId) {
+          const lastLecture = findLectureById(progress.lastLectureId)
+          if (lastLecture) {
+            selectedLecture.value = lastLecture
+          }
+        }
+        
+        // Restore notes
+        if (progress.notes) {
+          currentNotes.value = progress.notes
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load progress:', err)
+    }
+  }
+
+  const findLectureById = (lectureId) => {
+    for (const week of weeks.value) {
+      const lecture = week.lectures.find(l => l.id === lectureId)
+      if (lecture) return lecture
+    }
+    return null
+  }
 
   const completedLectures = computed(() => {
-    if (!currentCourse.value) return 0
-    return currentCourse.value.syllabus.reduce((acc, week) => 
-      acc + week.lectures.filter(lecture => lecture.completed).length, 0)
+    if (!currentCourse.value) return []
+    const completed = []
+    currentCourse.value.syllabus.forEach(week => {
+      week.lectures.forEach(lecture => {
+        if (lecture.completed) {
+          completed.push(lecture.id)
+        }
+      })
+    })
+    return completed
+  })
+
+  const completedLecturesCount = computed(() => {
+    return completedLectures.value.length
   })
 
   const totalLectures = computed(() => {
@@ -82,6 +188,16 @@ export function useCourse(courseId) {
     }
   }
 
+  // Add auto-save on component unmount
+  onBeforeUnmount(() => {
+    saveProgress()
+  })
+
+  // Initialize
+  onMounted(() => {
+    loadCourse()
+  })
+
   return {
     currentCourse,
     selectedLecture,
@@ -89,13 +205,18 @@ export function useCourse(courseId) {
     showNotes,
     currentNotes,
     completedLectures,
+    completedLecturesCount,
     totalLectures,
     weeks,
+    loading,
+    error,
     selectLecture,
     toggleBookmark,
     toggleNotes,
     markAsComplete,
     getWeekProgress,
-    getFileIcon
+    getFileIcon,
+    saveProgress,
+    loadProgress
   }
 } 

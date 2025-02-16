@@ -55,7 +55,9 @@ const userRoutes = {
         },
         {
             path: 'roadmap/:id',
+            name: 'roadmap',
             component: RoadmapView,
+            props: true,
             meta: {
                 title: 'Learning Roadmap', 
                 hideNavbar: false,

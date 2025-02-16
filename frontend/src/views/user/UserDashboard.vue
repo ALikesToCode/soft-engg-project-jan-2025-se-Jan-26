@@ -108,8 +108,7 @@ export default {
       console.log('Starting material:', material.title)
     },
     viewRoadmap(roadmap) {
-      // TODO: Implement navigation to roadmap
-      console.log('Viewing roadmap:', roadmap.title)
+      this.$router.push(`/user/roadmap/${roadmap.id}`);
     },
     removeBookmark(material) {
       // TODO: Implement bookmark removal

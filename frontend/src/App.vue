@@ -3,6 +3,7 @@ import MainNavbar from '@/components/MainNavbar.vue'
 import MainFooter from '@/components/MainFooter.vue'
 import UserNavBar from '@/components/UserNavBar.vue'
 import GlobalChat from '@/components/GlobalChat.vue'
+import NotificationToast from '@/components/NotificationToast.vue'
 
 export default {
   name: 'App',
@@ -10,7 +11,8 @@ export default {
     MainNavbar,
     UserNavBar,
     MainFooter,
-    GlobalChat
+    GlobalChat,
+    NotificationToast
   },
   computed: {
     showNavbar() {
@@ -31,6 +33,7 @@ export default {
     <MainNavbar v-if="showNavbar" />
     <UserNavBar v-if="showUserNavbar" />
     <main class="flex-grow" :class="{ 'pt-16': showUserNavbar }">
+      <NotificationToast />
       <router-view />
     </main>
     <MainFooter v-if="showFooter" />

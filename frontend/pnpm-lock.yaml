@@ -15,6 +15,9 @@ importers:
 
   .:
     dependencies:
+      '@display-studio/vue-player':
+        specifier: ^0.0.6
+        version: 0.0.6
       '@fortawesome/fontawesome-free':
         specifier: ^6.5.1
         version: 6.7.2
@@ -27,6 +30,9 @@ importers:
       '@tailwindcss/forms':
         specifier: ^0.5.7
         version: 0.5.10(tailwindcss@3.4.17)
+      '@vueuse/core':
+        specifier: ^12.7.0
+        version: 12.7.0
       axios:
         specifier: ^1.6.5
         version: 1.7.9
@@ -117,6 +123,9 @@ packages:
   '@babel/types@7.26.7':
     resolution: {integrity: sha512-t8kDRGrKXyp6+tjUh7hw2RLyclsW4TRoRvRHtSyAX9Bb5ldlFh+90YAYY6awRXrlB4G5G2izNeGySpATlFzmOg==}
     engines: {node: '>=6.9.0'}
+
+  '@display-studio/vue-player@0.0.6':
+    resolution: {integrity: sha512-u6ERh4026zvXl+zECnDtGNwp1pUbxM+TwwM37a7xpP6sFFzNGTq1jwpFSQaWQ8W6eZnHnYMBFbNHAVliI6pS9A==}
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution: {integrity: sha512-1SDgH6ZSPTlggy1yI6+Dbkiz8xzpHJEVAlF/AM1tHPLsf5STom9rwtjE4hKAF20FfXXNTFqEYXyJNWh1GiZedQ==}
@@ -644,6 +653,9 @@ packages:
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
 
+  '@types/web-bluetooth@0.0.20':
+    resolution: {integrity: sha512-g9gZnnXVq7gM7v3tJCWV/qw7w+KeOlSHAhgF9RytFyifW6AF61hdT2ucrYhPq9hLs5JIryeupHV3qGk95dH9ow==}
+
   '@vitejs/plugin-vue@5.2.1':
     resolution: {integrity: sha512-cxh314tzaWwOLqVes2gnnCtvBDcM1UMdn+iFR+UjAn411dPT3tOmqrJjbMd7koZpMAmBM/GqeV4n9ge7JSiJJQ==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -688,6 +700,15 @@ packages:
 
   '@vue/shared@3.5.13':
     resolution: {integrity: sha512-/hnE/qP5ZoGpol0a5mDi45bOd7t3tjYJBjsgCsivow7D48cJeV5l05RD82lPqi7gRiphZM37rnhW1l6ZoCNNnQ==}
+
+  '@vueuse/core@12.7.0':
+    resolution: {integrity: sha512-jtK5B7YjZXmkGNHjviyGO4s3ZtEhbzSgrbX+s5o+Lr8i2nYqNyHuPVOeTdM1/hZ5Tkxg/KktAuAVDDiHMraMVA==}
+
+  '@vueuse/metadata@12.7.0':
+    resolution: {integrity: sha512-4VvTH9mrjXqFN5LYa5YfqHVRI6j7R00Vy4995Rw7PQxyCL3z0Lli86iN4UemWqixxEvYfRjG+hF9wL8oLOn+3g==}
+
+  '@vueuse/shared@12.7.0':
+    resolution: {integrity: sha512-coLlUw2HHKsm7rPN6WqHJQr18WymN4wkA/3ThFaJ4v4gWGWAQQGK+MJxLuJTBs4mojQiazlVWAKNJNpUWGRkNw==}
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -1664,6 +1685,12 @@ snapshots:
       '@babel/helper-string-parser': 7.25.9
       '@babel/helper-validator-identifier': 7.25.9
 
+  '@display-studio/vue-player@0.0.6':
+    dependencies:
+      vue: 3.5.13
+    transitivePeerDependencies:
+      - typescript
+
   '@esbuild/aix-ppc64@0.21.5':
     optional: true
 
@@ -2001,6 +2028,8 @@ snapshots:
   '@types/trusted-types@2.0.7':
     optional: true
 
+  '@types/web-bluetooth@0.0.20': {}
+
   '@vitejs/plugin-vue@5.2.1(vite@5.4.14(lightningcss@1.29.1))(vue@3.5.13)':
     dependencies:
       vite: 5.4.14(lightningcss@1.29.1)
@@ -2070,6 +2099,23 @@ snapshots:
       vue: 3.5.13
 
   '@vue/shared@3.5.13': {}
+
+  '@vueuse/core@12.7.0':
+    dependencies:
+      '@types/web-bluetooth': 0.0.20
+      '@vueuse/metadata': 12.7.0
+      '@vueuse/shared': 12.7.0
+      vue: 3.5.13
+    transitivePeerDependencies:
+      - typescript
+
+  '@vueuse/metadata@12.7.0': {}
+
+  '@vueuse/shared@12.7.0':
+    dependencies:
+      vue: 3.5.13
+    transitivePeerDependencies:
+      - typescript
 
   acorn-jsx@5.3.2(acorn@8.14.0):
     dependencies:
