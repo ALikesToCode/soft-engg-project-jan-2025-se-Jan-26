@@ -1,6 +1,6 @@
 import SupportDashboard from '../views/support/SupportDashboard.vue'
-import NotificationsView from '../views/faculty/NotificationsView.vue'
-import ProfilePage from '../views/user/ProfilePage.vue'
+import NotificationsView from '../views/support/NotificationsView.vue'
+import ProfilePage from '../views/support/ProfilePage.vue'
 
 const dummyAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=="
 

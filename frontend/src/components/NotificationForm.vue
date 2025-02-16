@@ -52,6 +52,7 @@
         </button>
 
         <button
+          v-if="showSystemOption"
           @click="notificationType = 'system'"
           class="p-4 rounded-lg border-2 transition-all duration-200 flex items-center"
           :class="[
@@ -59,7 +60,6 @@
               ? 'border-maroon-600 bg-maroon-50'
               : 'border-gray-200 hover:border-gray-300',
           ]"
-          :disabled="!isAdmin"
         >
           <span
             class="p-2 rounded-lg mr-3"
@@ -359,6 +359,9 @@ export default {
     }
   },
   computed: {
+    showSystemOption() {
+      return this.isAdmin
+    },
     isFormValid() {
       const baseValidation =
         this.title.trim() && this.message.trim() && this.priority && this.category
@@ -397,9 +400,24 @@ export default {
       return baseCategories
     },
   },
+  watch: {
+    isAdmin: {
+      immediate: true,
+      handler(newValue) {
+        if (!newValue && this.notificationType === 'system') {
+          this.notificationType = 'course'
+        }
+      }
+    }
+  },
   methods: {
     async sendNotification() {
       try {
+        if (!this.isAdmin && this.notificationType === 'system') {
+          this.$toast.error('You do not have permission to send system-wide notifications')
+          return
+        }
+
         const notification = {
           type: this.notificationType,
           courseId: this.selectedCourse,

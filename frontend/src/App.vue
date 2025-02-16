@@ -27,7 +27,7 @@ export default {
 </script>
 
 <template>
-  <div class="flex flex-col min-h-screen">
+  <div class="flex flex-col min-h-screen custom-scrollbar-light">
     <MainNavbar v-if="showNavbar" />
     <UserNavBar v-if="showUserNavbar" />
     <main class="flex-grow" :class="{ 'pt-16': showUserNavbar }">

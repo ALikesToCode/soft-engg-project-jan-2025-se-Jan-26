@@ -1,7 +1,7 @@
 import ContentUpload from '../views/faculty/ContentUpload.vue'
 import FacultyDashboard from '../views/faculty/FacultyDashboard.vue'
 import FacultyDetails from '../views/faculty/FacultyDetails.vue'
-import ProfilePage from '../views/user/ProfilePage.vue'
+import ProfilePage from '../views/faculty/ProfilePage.vue'
 import NotificationsView from '../views/faculty/NotificationsView.vue'
 
 // Base64 dummy image
