@@ -1,6 +1,10 @@
 import SupportDashboard from '../views/support/SupportDashboard.vue'
 import NotificationsView from '../views/support/NotificationsView.vue'
 import ProfilePage from '../views/support/ProfilePage.vue'
+import FAQManagement from '../views/support/FAQManagement.vue'
+import SystemSettings from '../views/support/SystemSettings.vue'
+import UserManagement from '../views/support/UserManagement.vue'
+import CourseAssignmentManagement from '../views/support/CourseAssignmentManagement.vue'
 
 const dummyAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=="
 
@@ -24,6 +28,45 @@ const supportRoutes = {
                 title: 'Send Notifications',
                 hideNavbar: true,
                 hideFooter: true
+            }
+        },
+        {
+            path: 'faq-management',
+            component: FAQManagement,
+            meta: {
+                title: 'FAQ Management',
+                hideNavbar: true,
+                hideFooter: true
+            }
+        },
+        {
+            path: 'system-settings',
+            component: SystemSettings,
+            meta: {
+                title: 'System Settings',
+                hideNavbar: true,
+                hideFooter: true,
+                requiresAdmin: true
+            }
+        },
+        {
+            path: 'user-management',
+            component: UserManagement,
+            meta: {
+                title: 'User Management',
+                hideNavbar: true,
+                hideFooter: true,
+                requiresAdmin: true
+            }
+        },
+        {
+            path: 'course-assignments',
+            component: CourseAssignmentManagement,
+            meta: {
+                title: 'Course Assignment Management',
+                hideNavbar: true,
+                hideFooter: true,
+                requiresAdmin: true
             }
         },
         {

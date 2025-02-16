@@ -7,6 +7,11 @@ import { authService } from '@/api/authService'
 import useAuthStore from '@/stores/useAuthStore'
 import { ROLE } from '@/AppConstants/globalConstants'
 
+// Import support routes
+import SupportDashboard from '../views/support/SupportDashboard.vue';
+import NotificationsView from '../views/support/NotificationsView.vue';
+import ProfilePage from '../views/support/ProfilePage.vue';
+
 const routes = [
   {
     path: '/',
@@ -74,6 +79,26 @@ const routes = [
   { ...userRoutes },
   { ...facultyRoutes },
   { ...supportRoutes },
+
+  // Support routes
+  {
+    path: '/support',
+    name: 'support',
+    component: SupportDashboard,
+    meta: { requiresAuth: true, role: 'support' }
+  },
+  {
+    path: '/support/notifications',
+    name: 'support-notifications',
+    component: NotificationsView,
+    meta: { requiresAuth: true, role: 'support' }
+  },
+  {
+    path: '/support/profile',
+    name: 'support-profile',
+    component: ProfilePage,
+    meta: { requiresAuth: true, role: 'support' }
+  },
 
   {
     path: '/:pathMatch(.*)*',

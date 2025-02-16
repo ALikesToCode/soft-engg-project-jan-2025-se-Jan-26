@@ -1,175 +1,198 @@
 import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
 import { AssignmentService } from '@/services/assignment.service'
 import { Assignment } from '@/models/Assignment'
 
-export const useAssignmentStore = defineStore('assignment', {
-  state: () => ({
-    assignments: [],
-    currentAssignment: null,
-    submissions: [],
-    loading: false,
-    error: null
-  }),
+export const useAssignmentStore = defineStore('assignment', () => {
+  const assignments = ref([])
+  const currentAssignment = ref(null)
+  const submissions = ref([])
+  const loading = ref(false)
+  const error = ref(null)
 
-  getters: {
-    getAssignmentById: (state) => (id) => {
-      const assignment = state.assignments.find(assignment => assignment.id === id)
-      return assignment ? new Assignment(assignment) : null
-    },
-    
-    getAssignmentsByModule: (state) => (moduleId) => {
-      return state.assignments
-        .filter(assignment => assignment.moduleId === moduleId)
-        .map(assignment => new Assignment(assignment))
-    },
-    
-    getActiveAssignments: (state) => {
-      return state.assignments
-        .filter(assignment => assignment.status === 'published')
-        .map(assignment => new Assignment(assignment))
-    },
+  // Getters
+  const getAssignmentById = computed(() => (id) => {
+    const assignment = assignments.value.find(assignment => assignment.id === id)
+    return assignment ? new Assignment(assignment) : null
+  })
+  
+  const getAssignmentsByModule = computed(() => (moduleId) => {
+    return assignments.value
+      .filter(assignment => assignment.moduleId === moduleId)
+      .map(assignment => new Assignment(assignment))
+  })
+  
+  const getActiveAssignments = computed(() => {
+    return assignments.value
+      .filter(assignment => assignment.status === 'published')
+      .map(assignment => new Assignment(assignment))
+  })
 
-    getPendingSubmissions: (state) => {
-      return state.submissions.filter(submission => submission.status === 'pending')
-    },
+  const getPendingSubmissions = computed(() => {
+    return submissions.value.filter(submission => submission.status === 'pending')
+  })
 
-    getGradedSubmissions: (state) => {
-      return state.submissions.filter(submission => submission.status === 'graded')
+  const getGradedSubmissions = computed(() => {
+    return submissions.value.filter(submission => submission.status === 'graded')
+  })
+
+  // Actions
+  async function fetchAssignments(courseId) {
+    try {
+      loading.value = true
+      const response = await AssignmentService.fetchAssignments(courseId)
+      assignments.value = response.data.map(assignment => new Assignment(assignment))
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
     }
-  },
+  }
 
-  actions: {
-    async fetchAssignments(courseId) {
-      try {
-        this.loading = true
-        const response = await AssignmentService.fetchAssignments(courseId)
-        this.assignments = response.data.map(assignment => new Assignment(assignment))
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
+  async function createAssignment(assignmentData) {
+    try {
+      loading.value = true
+      const assignment = new Assignment(assignmentData)
+      if (!assignment.isValid()) {
+        throw new Error('Invalid assignment data')
       }
-    },
-
-    async createAssignment(assignmentData) {
-      try {
-        this.loading = true
-        const assignment = new Assignment(assignmentData)
-        if (!assignment.isValid()) {
-          throw new Error('Invalid assignment data')
-        }
-        const response = await AssignmentService.createAssignment(assignment.toJSON())
-        this.assignments.push(new Assignment(response.data))
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async updateAssignment(assignmentId, assignmentData) {
-      try {
-        this.loading = true
-        const assignment = new Assignment(assignmentData)
-        if (!assignment.isValid()) {
-          throw new Error('Invalid assignment data')
-        }
-        const response = await AssignmentService.updateAssignment(assignmentId, assignment.toJSON())
-        const index = this.assignments.findIndex(a => a.id === assignmentId)
-        if (index !== -1) {
-          this.assignments[index] = new Assignment(response.data)
-        }
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async deleteAssignment(assignmentId) {
-      try {
-        this.loading = true
-        await AssignmentService.deleteAssignment(assignmentId)
-        this.assignments = this.assignments.filter(a => a.id !== assignmentId)
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async submitAssignment(assignmentId, submissionData) {
-      try {
-        this.loading = true
-        const response = await AssignmentService.submitAssignment(assignmentId, submissionData)
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async gradeSubmission(submissionId, gradingData) {
-      try {
-        this.loading = true
-        const response = await AssignmentService.gradeSubmission(submissionId, gradingData)
-        
-        const submissionIndex = this.submissions.findIndex(s => s.id === submissionId)
-        if (submissionIndex !== -1) {
-          this.submissions[submissionIndex] = response.data
-        }
-        
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async fetchSubmissions(assignmentId) {
-      try {
-        this.loading = true
-        const response = await AssignmentService.fetchSubmissions(assignmentId)
-        this.submissions = response.data
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async getSubmissionDetails(submissionId) {
-      try {
-        this.loading = true
-        const response = await AssignmentService.getSubmissionDetails(submissionId)
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    setCurrentAssignment(assignment) {
-      this.currentAssignment = assignment ? new Assignment(assignment) : null
-    },
-
-    clearError() {
-      this.error = null
+      const response = await AssignmentService.createAssignment(assignment.toJSON())
+      assignments.value.push(new Assignment(response.data))
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
     }
+  }
+
+  async function updateAssignment(assignmentId, assignmentData) {
+    try {
+      loading.value = true
+      const assignment = new Assignment(assignmentData)
+      if (!assignment.isValid()) {
+        throw new Error('Invalid assignment data')
+      }
+      const response = await AssignmentService.updateAssignment(assignmentId, assignment.toJSON())
+      const index = assignments.value.findIndex(a => a.id === assignmentId)
+      if (index !== -1) {
+        assignments.value[index] = new Assignment(response.data)
+      }
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function deleteAssignment(assignmentId) {
+    try {
+      loading.value = true
+      await AssignmentService.deleteAssignment(assignmentId)
+      assignments.value = assignments.value.filter(a => a.id !== assignmentId)
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function submitAssignment(assignmentId, submissionData) {
+    try {
+      loading.value = true
+      const response = await AssignmentService.submitAssignment(assignmentId, submissionData)
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function gradeSubmission(submissionId, gradingData) {
+    try {
+      loading.value = true
+      const response = await AssignmentService.gradeSubmission(submissionId, gradingData)
+      
+      const submissionIndex = submissions.value.findIndex(s => s.id === submissionId)
+      if (submissionIndex !== -1) {
+        submissions.value[submissionIndex] = response.data
+      }
+      
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function fetchSubmissions(assignmentId) {
+    try {
+      loading.value = true
+      const response = await AssignmentService.fetchSubmissions(assignmentId)
+      submissions.value = response.data
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function getSubmissionDetails(submissionId) {
+    try {
+      loading.value = true
+      const response = await AssignmentService.getSubmissionDetails(submissionId)
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function setCurrentAssignment(assignment) {
+    currentAssignment.value = assignment ? new Assignment(assignment) : null
+  }
+
+  function clearError() {
+    error.value = null
+  }
+
+  return {
+    // State
+    assignments,
+    currentAssignment,
+    submissions,
+    loading,
+    error,
+    // Getters
+    getAssignmentById,
+    getAssignmentsByModule,
+    getActiveAssignments,
+    getPendingSubmissions,
+    getGradedSubmissions,
+    // Actions
+    fetchAssignments,
+    createAssignment,
+    updateAssignment,
+    deleteAssignment,
+    submitAssignment,
+    gradeSubmission,
+    fetchSubmissions,
+    getSubmissionDetails,
+    setCurrentAssignment,
+    clearError
   }
 }) 

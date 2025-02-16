@@ -1,7 +1,7 @@
 import forms from '@tailwindcss/forms'
 
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
     "./index.html",
     "./src/**/*.{vue,js,ts,jsx,tsx}",
@@ -9,6 +9,60 @@ export default {
   theme: {
     extend: {
       colors: {
+        maroon: {
+          50: '#fdf2f2',
+          100: '#f3e2e2', 
+          200: '#dbc1c1',
+          300: '#c39e9e',
+          400: '#a67979',
+          500: '#8b4444',
+          600: '#722b2b',
+          700: '#591f1f',
+          800: '#411616',
+          900: '#2c0f0f',
+        },
+        yellow: {
+          50: '#fdfaeb',
+          100: '#fdf2c7',
+          200: '#f8e3a3',
+          300: '#f6d47e',
+          400: '#e9b64d',
+          500: '#d49b35',
+          600: '#b37d24',
+          700: '#8c5e1a',
+          800: '#674415',
+          900: '#4d3110',
+        },
+        gray: {
+          50: '#f9fafb',
+          100: '#f4f5f7',
+          200: '#e5e7eb',
+          300: '#d2d6dc',
+          400: '#9fa6b2',
+          500: '#6b7280',
+          600: '#4b5563',
+          700: '#374151',
+          800: '#1f2937',
+          900: '#111827',
+          950: '#030712',
+        },
+      },
+      fontSize: {
+        'xs': ['0.75rem', { lineHeight: '1rem' }],
+        'sm': ['0.875rem', { lineHeight: '1.25rem' }],
+        'base': ['1rem', { lineHeight: '1.5rem' }],
+        'lg': ['1.125rem', { lineHeight: '1.75rem' }],
+        'xl': ['1.25rem', { lineHeight: '1.75rem' }],
+        '2xl': ['1.5rem', { lineHeight: '2rem' }],
+        '3xl': ['1.875rem', { lineHeight: '2.25rem' }],
+        '4xl': ['2.25rem', { lineHeight: '2.5rem' }],
+        '5xl': ['3rem', { lineHeight: '1' }],
+        '6xl': ['3.75rem', { lineHeight: '1' }],
+        '7xl': ['4.5rem', { lineHeight: '1' }],
+        '8xl': ['6rem', { lineHeight: '1' }],
+        '9xl': ['8rem', { lineHeight: '1' }],
+      },
+      textColor: {
         maroon: {
           50: '#fdf2f2',
           100: '#f3e2e2',
@@ -33,8 +87,21 @@ export default {
           800: '#674415',
           900: '#4d3110',
         },
+        gray: {
+          50: '#f9fafb',
+          100: '#f4f5f7',
+          200: '#e5e7eb',
+          300: '#d2d6dc',
+          400: '#9fa6b2',
+          500: '#6b7280',
+          600: '#4b5563',
+          700: '#374151',
+          800: '#1f2937',
+          900: '#111827',
+          950: '#030712',
+        },
       },
     },
   },
   plugins: [forms],
-} 
+}

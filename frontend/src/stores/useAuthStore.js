@@ -1,120 +1,129 @@
 import { defineStore } from 'pinia';
-
+import { ref } from 'vue';
 import FetchFunction from '../utils/FetchFunction';
 import router from '../router/index';
 import { User } from '@/models/User';
-
 import { APP_BASE_URL, ROLE } from '@/AppConstants/globalConstants';
 
 // For development only - remove in production
 const DEV_MODE = import.meta.env.VITE_NODE_ENV === 'development';
 
-const useAuthStore = defineStore({
-    id: 'auth',
-    state: () => ({
-        token: JSON.parse(localStorage.getItem('token')),
-        returnUrl: null,
-        user: new User(null, "", "", ""),
-        userRole: localStorage.getItem('userRole') || ROLE.STUDENT,
-        isAdmin: false,
-        isDevelopment: DEV_MODE
-    }),
-    actions: {
-        // Development only - helper to switch roles
-        switchRole(role) {
-            if (!this.isDevelopment) return;
-            if (Object.values(ROLE).includes(role)) {
-                this.setUserRole(role);
-                // Don't redirect, let the router handle navigation
-            }
-        },
+export default defineStore('auth', () => {
+    const token = ref(JSON.parse(localStorage.getItem('token')));
+    const returnUrl = ref(null);
+    const user = ref(new User(null, "", "", ""));
+    const userRole = ref(localStorage.getItem('userRole') || ROLE.STUDENT);
+    const isAdmin = ref(false);
+    const isDevelopment = ref(DEV_MODE);
 
-        async login(email, pswd) {
-            if (this.isDevelopment) {
-                // For development, just set a dummy token and keep current role
-                this.token = "dummy-token";
-                localStorage.setItem('token', JSON.stringify(this.token));
-                
-                // Navigate based on current role
-                this.navigateToRoleDashboard();
-                return;
-            }
-
-            try {
-                const data = await FetchFunction({
-                    url: `${APP_BASE_URL}/${user}`,
-                    init_obj: {
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        method: 'POST',
-                        body: JSON.stringify(user),
-                    }
-                }).catch((err) => {
-                    throw new Error("Error = " + err);
-                })
-                if (data) {
-                    this.token = data.response.user.authentication_token;
-                    this.setUserRole(data.role);
-                    localStorage.setItem('token', JSON.stringify(this.token));
-                    this.navigateToRoleDashboard();
-                }
-            } catch (error) {
-                console.log("error = " + error);
-                router.push({ path: '/', query: { error: 'true' } });
-            }
-        },
-
-        // Helper method to navigate based on role
-        navigateToRoleDashboard() {
-            switch(this.userRole) {
-                case ROLE.STUDENT:
-                    router.push('/user/dashboard');
-                    break;
-                case ROLE.FACULTY:
-                    router.push('/faculty/dashboard');
-                    break;
-                case ROLE.SUPPORT:
-                    router.push('/support/dashboard');
-                    break;
-                default:
-                    router.push('/');
-            }
-        },
-
-        logout() {
-            this.user = null;
-            this.token = null;
-            this.userRole = ROLE.STUDENT;
-            localStorage.removeItem('token');
-            localStorage.removeItem('userRole');
-        },
-
-        setUser(userData) {
-            this.user.id = userData.id;
-            this.user.name = userData.name;
-            this.user.email = userData.email;
-            this.user.role = userData.role;
-            this.setUserRole(userData.role);
-        },
-
-        setUserRole(role) {
-            if (Object.values(ROLE).includes(role)) {
-                this.userRole = role;
-                localStorage.setItem('userRole', role);
-            } else {
-                console.warn('Invalid role:', role);
-                this.userRole = ROLE.STUDENT;
-                localStorage.setItem('userRole', ROLE.STUDENT);
-            }
-        },
-
-        clearUser() {
-            this.user = new User(null, "", "", "");
-            this.userRole = ROLE.STUDENT;
-            localStorage.removeItem('userRole');
-        },
+    // Development only - helper to switch roles
+    function switchRole(role) {
+        if (!isDevelopment.value) return;
+        if (Object.values(ROLE).includes(role)) {
+            setUserRole(role);
+            // Don't redirect, let the router handle navigation
+        }
     }
-});
 
-export default useAuthStore;
+    async function login(email, pswd) {
+        if (isDevelopment.value) {
+            // For development, just set a dummy token and keep current role
+            token.value = "dummy-token";
+            localStorage.setItem('token', JSON.stringify(token.value));
+            
+            // Navigate based on current role
+            navigateToRoleDashboard();
+            return;
+        }
+
+        try {
+            const data = await FetchFunction({
+                url: `${APP_BASE_URL}/${user}`,
+                init_obj: {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    method: 'POST',
+                    body: JSON.stringify(user),
+                }
+            }).catch((err) => {
+                throw new Error("Error = " + err);
+            })
+            if (data) {
+                token.value = data.response.user.authentication_token;
+                setUserRole(data.role);
+                localStorage.setItem('token', JSON.stringify(token.value));
+                navigateToRoleDashboard();
+            }
+        } catch (error) {
+            console.log("error = " + error);
+            router.push({ path: '/', query: { error: 'true' } });
+        }
+    }
+
+    // Helper method to navigate based on role
+    function navigateToRoleDashboard() {
+        switch(userRole.value) {
+            case ROLE.STUDENT:
+                router.push('/user/dashboard');
+                break;
+            case ROLE.FACULTY:
+                router.push('/faculty/dashboard');
+                break;
+            case ROLE.SUPPORT:
+                router.push('/support/dashboard');
+                break;
+            default:
+                router.push('/');
+        }
+    }
+
+    function logout() {
+        user.value = null;
+        token.value = null;
+        userRole.value = ROLE.STUDENT;
+        localStorage.removeItem('token');
+        localStorage.removeItem('userRole');
+    }
+
+    function setUser(userData) {
+        user.value.id = userData.id;
+        user.value.name = userData.name;
+        user.value.email = userData.email;
+        user.value.role = userData.role;
+        setUserRole(userData.role);
+    }
+
+    function setUserRole(role) {
+        if (Object.values(ROLE).includes(role)) {
+            userRole.value = role;
+            localStorage.setItem('userRole', role);
+        } else {
+            console.warn('Invalid role:', role);
+            userRole.value = ROLE.STUDENT;
+            localStorage.setItem('userRole', ROLE.STUDENT);
+        }
+    }
+
+    function clearUser() {
+        user.value = new User(null, "", "", "");
+        userRole.value = ROLE.STUDENT;
+        localStorage.removeItem('userRole');
+    }
+
+    return {
+        token,
+        returnUrl,
+        user,
+        userRole,
+        isAdmin,
+        isDevelopment,
+        switchRole,
+        login,
+        logout,
+        setUser,
+        setUserRole,
+        clearUser,
+        navigateToRoleDashboard
+    };
+});

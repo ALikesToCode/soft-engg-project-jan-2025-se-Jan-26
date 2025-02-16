@@ -47,6 +47,29 @@ const supportDashboardUrls = [
         path: '/support/notifications',
         icon: 'campaign',
         label: 'Send Notifications'
+    },
+    {
+        path: '/support/faq-management',
+        icon: 'help_center',
+        label: 'FAQ Management'
+    },
+    {
+        path: '/support/user-management',
+        icon: 'manage_accounts',
+        label: 'User Management',
+        requiresAdmin: true
+    },
+    {
+        path: '/support/course-assignments',
+        icon: 'school',
+        label: 'Course Assignments',
+        requiresAdmin: true
+    },
+    {
+        path: '/support/system-settings',
+        icon: 'settings',
+        label: 'System Settings',
+        requiresAdmin: true
     }
 ]
 

@@ -1,107 +1,125 @@
 import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
 import axios from 'axios'
 
-export const useCourseStore = defineStore('course', {
-  state: () => ({
-    courses: [],
-    currentCourse: null,
-    loading: false,
-    error: null
-  }),
+export const useCourseStore = defineStore('course', () => {
+  // State
+  const courses = ref([])
+  const currentCourse = ref(null)
+  const loading = ref(false)
+  const error = ref(null)
 
-  getters: {
-    getCourseById: (state) => (id) => {
-      return state.courses.find(course => course.id === id)
-    },
-    
-    facultyCourses: (state) => {
-      return state.courses.filter(course => course.role === 'faculty')
-    },
-    
-    activeCourses: (state) => {
-      return state.courses.filter(course => course.status === 'active')
+  // Getters
+  const getCourseById = computed(() => (id) => {
+    return courses.value.find(course => course.id === id)
+  })
+  
+  const facultyCourses = computed(() => {
+    return courses.value.filter(course => course.role === 'faculty')
+  })
+  
+  const activeCourses = computed(() => {
+    return courses.value.filter(course => course.status === 'active')
+  })
+
+  // Actions
+  async function fetchCourses() {
+    try {
+      loading.value = true
+      const response = await axios.get('/api/v1/courses')
+      courses.value = response.data
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
     }
-  },
+  }
 
-  actions: {
-    async fetchCourses() {
-      try {
-        this.loading = true
-        const response = await axios.get('/api/v1/courses')
-        this.courses = response.data
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async getFacultyCourses() {
-      try {
-        this.loading = true
-        const response = await axios.get('/api/v1/faculty/courses')
-        this.courses = response.data
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async createCourse(courseData) {
-      try {
-        this.loading = true
-        const response = await axios.post('/api/v1/courses', courseData)
-        this.courses.push(response.data)
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async updateCourse(courseId, courseData) {
-      try {
-        this.loading = true
-        const response = await axios.put(`/api/v1/courses/${courseId}`, courseData)
-        const index = this.courses.findIndex(c => c.id === courseId)
-        if (index !== -1) {
-          this.courses[index] = response.data
-        }
-        return response
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    async deleteCourse(courseId) {
-      try {
-        this.loading = true
-        await axios.delete(`/api/v1/courses/${courseId}`)
-        this.courses = this.courses.filter(c => c.id !== courseId)
-      } catch (error) {
-        this.error = error.message
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
-    setCurrentCourse(course) {
-      this.currentCourse = course
-    },
-
-    clearError() {
-      this.error = null
+  async function getFacultyCourses() {
+    try {
+      loading.value = true
+      const response = await axios.get('/api/v1/faculty/courses')
+      courses.value = response.data
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
     }
+  }
+
+  async function createCourse(courseData) {
+    try {
+      loading.value = true
+      const response = await axios.post('/api/v1/courses', courseData)
+      courses.value.push(response.data)
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function updateCourse(courseId, courseData) {
+    try {
+      loading.value = true
+      const response = await axios.put(`/api/v1/courses/${courseId}`, courseData)
+      const index = courses.value.findIndex(c => c.id === courseId)
+      if (index !== -1) {
+        courses.value[index] = response.data
+      }
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function deleteCourse(courseId) {
+    try {
+      loading.value = true
+      await axios.delete(`/api/v1/courses/${courseId}`)
+      courses.value = courses.value.filter(c => c.id !== courseId)
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function setCurrentCourse(course) {
+    currentCourse.value = course
+  }
+
+  function clearError() {
+    error.value = null
+  }
+
+  return {
+    // State
+    courses,
+    currentCourse,
+    loading,
+    error,
+    // Getters
+    getCourseById,
+    facultyCourses,
+    activeCourses,
+    // Actions
+    fetchCourses,
+    getFacultyCourses,
+    createCourse,
+    updateCourse,
+    deleteCourse,
+    setCurrentCourse,
+    clearError
   }
 }) 
