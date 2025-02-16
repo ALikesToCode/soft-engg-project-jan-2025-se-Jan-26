@@ -4,6 +4,8 @@ import userRoutes from './userRoutes';
 import facultyRoutes from './facultyRoutes';
 import supportRoutes from './supportRoutes';
 import { authService } from '@/api/authService'
+import useAuthStore from '@/stores/useAuthStore'
+import { ROLE } from '@/AppConstants/globalConstants'
 
 const routes = [
   {
@@ -112,6 +114,26 @@ router.beforeEach(async (to, from, next) => {
   } else {
     next()
   }
+})
+
+// Navigation guard to handle role switching based on URL
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore()
+  const isDevelopment = import.meta.env.VITE_NODE_ENV === 'development'
+
+  if (isDevelopment) {
+    // Extract role from URL path
+    const path = to.path
+    if (path.startsWith('/user/')) {
+      authStore.switchRole(ROLE.STUDENT)
+    } else if (path.startsWith('/faculty/')) {
+      authStore.switchRole(ROLE.FACULTY)
+    } else if (path.startsWith('/support/')) {
+      authStore.switchRole(ROLE.SUPPORT)
+    }
+  }
+
+  next()
 })
 
 export default router

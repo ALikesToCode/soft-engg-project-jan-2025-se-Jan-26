@@ -1,104 +1,232 @@
 <template>
-  <div class="flex h-screen">
-    <nav 
-      class="w-16 hover:w-48 transition-all duration-300 ease-in-out bg-gradient-to-b from-maroon-800 to-maroon-600 flex flex-col justify-center items-start p-3 text-white overflow-hidden"
+  <div class="flex h-[calc(100vh-4rem)]">
+    <nav
+      class="w-16 hover:w-48 transition-all duration-300 ease-in-out bg-gradient-to-b from-maroon-800 to-maroon-600 flex flex-col p-3 text-white overflow-hidden"
       role="navigation"
       aria-label="Main Navigation"
-      @mouseenter="navHovered = true"
-      @mouseleave="navHovered = false"
+      @mouseenter="handleMouseEnter"
+      @mouseleave="handleMouseLeave"
     >
-      <ul class="w-full">
-        <li v-for="item in navItems" :key="item.path" class="w-full">
-          <router-link 
-            :to="item.path"
-            @mouseenter="isHovered = item.path"
-            @mouseleave="isHovered = null"
-            class="flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 hover:bg-maroon-700/50"
-            :class="{ 'bg-maroon-700': isActive(item.path) }"
-            :aria-current="isActive(item.path) ? 'page' : undefined"
+      <!-- Main Navigation -->
+      <div class="flex-1 flex flex-col min-h-0">
+        <div class="flex-1 flex items-center custom-scrollbar">
+          <ul class="w-full space-y-1">
+            <li v-for="item in navItems" :key="item.path" class="w-full">
+              <router-link
+                :to="item.path"
+                @mouseenter="isHovered = item.path"
+                @mouseleave="isHovered = null"
+                class="flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 hover:bg-maroon-700/50"
+                :class="{ 'bg-maroon-700': isActive(item.path) }"
+                :aria-current="isActive(item.path) ? 'page' : undefined"
+              >
+                <span
+                  class="material-symbols-outlined transition-transform duration-200"
+                  :class="{
+                    'text-yellow-400': isActive(item.path),
+                    'scale-110': isHovered === item.path,
+                  }"
+                  aria-hidden="true"
+                >
+                  {{ item.icon }}
+                </span>
+                <span
+                  class="text-sm font-medium whitespace-nowrap transition-opacity duration-200"
+                  :class="{
+                    'opacity-100': navHovered || isHovered === item.path,
+                    'opacity-0': !navHovered && isHovered !== item.path,
+                    'text-yellow-400': (navHovered || isHovered === item.path) && isActive(item.path),
+                    'text-white': (navHovered || isHovered === item.path) && !isActive(item.path),
+                  }"
+                >
+                  {{ item.label }}
+                </span>
+              </router-link>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Role Switcher (Development Only) -->
+      <div v-if="isDevelopment" class="flex-shrink-0 w-full pt-4 border-t border-maroon-700/50">
+        <button
+          @click="toggleRoleSwitcher"
+          class="w-full flex items-center space-x-3 p-3 rounded-lg transition-all duration-200 hover:bg-maroon-700/50"
+          :class="{ 'bg-maroon-700': showRoleSwitcher }"
+        >
+          <span class="material-symbols-outlined text-yellow-400/90">admin_panel_settings</span>
+          <span
+            class="text-sm font-medium whitespace-nowrap transition-opacity duration-200"
+            :class="{
+              'opacity-100': navHovered,
+              'opacity-0': !navHovered,
+            }"
           >
+            Switch Role
+          </span>
+        </button>
+        
+        <!-- Role Options -->
+        <div 
+          v-show="showRoleSwitcher" 
+          class="mt-2 space-y-1 max-h-[120px] custom-scrollbar"
+        >
+          <button
+            v-for="role in roles"
+            :key="role"
+            @click="switchRole(role)"
+            class="w-full flex items-center space-x-3 p-2 rounded-lg transition-all duration-200 hover:bg-maroon-700/50"
+            :class="{
+              'bg-maroon-700 text-yellow-400': currentRole === role,
+            }"
+          >
+            <span class="material-symbols-outlined text-sm">
+              {{ getRoleIcon(role) }}
+            </span>
             <span
-              class="material-symbols-outlined transition-transform duration-200"
-              :class="{ 
-                'text-yellow-400': isActive(item.path),
-                'scale-110': isHovered === item.path
-              }"
-              aria-hidden="true"
-            >
-              {{ item.icon }}
-            </span>
-            <span 
-              class="text-sm font-medium whitespace-nowrap transition-opacity duration-200"
+              class="text-sm whitespace-nowrap transition-opacity duration-200"
               :class="{
-                'opacity-100': navHovered || isHovered === item.path,
-                'opacity-0': !navHovered && isHovered !== item.path,
-                'text-yellow-400': (navHovered || isHovered === item.path) && isActive(item.path),
-                'text-white': (navHovered || isHovered === item.path) && !isActive(item.path)
+                'opacity-100': navHovered,
+                'opacity-0': !navHovered,
               }"
             >
-              {{ item.label }}
+              {{ role.toLowerCase() }}
             </span>
-          </router-link>
-        </li>
-      </ul>
+          </button>
+        </div>
+      </div>
     </nav>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import {
+  studentDashboardUrls,
+  facultyDashboardUrls,
+  supportDashboardUrls,
+} from '@/AppConstants/sideNavBarUrls'
+import useAuthStore from '@/stores/useAuthStore'
+import { ROLE } from '@/AppConstants/globalConstants'
+import { LAYOUT_CONFIG, ICON_CONFIG, ROLE_ICONS } from '@/config/layout.config'
 
-// Get the current route for active link detection.
+// Development mode check using Vite environment variable
+const isDevelopment = computed(() => import.meta.env.VITE_NODE_ENV === 'development')
+
+// Get the current route for active link detection
 const route = useRoute()
 
-// Tracks which individual nav item is hovered.
+// State management
 const isHovered = ref(null)
-
-// Tracks whether the entire navigation bar is hovered.
 const navHovered = ref(false)
+const showRoleSwitcher = ref(false)
+let collapseTimeout = null
 
-// Define the navigation items.
-const navItems = [
-  {
-    path: '/user/dashboard',
-    icon: 'dashboard',
-    label: 'Dashboard'
-  },
-  {
-    path: '/user/courses', 
-    icon: 'auto_stories',
-    label: 'Courses'
-  },
-  {
-    path: '/user/course-history',
-    icon: 'history', 
-    label: 'History'
+// Mouse event handlers with auto-collapse
+const handleMouseEnter = () => {
+  if (collapseTimeout) {
+    clearTimeout(collapseTimeout)
+    collapseTimeout = null
   }
-]
+  navHovered.value = true
+}
 
-// Helper function to check if a nav item is active.
+const handleMouseLeave = () => {
+  collapseTimeout = setTimeout(() => {
+    navHovered.value = false
+    showRoleSwitcher.value = false
+  }, 300) // Match transition duration
+}
+
+// Helper function to check if a nav item is active
 const isActive = (path) => route.path === path
+
+// Get User Store
+const userStore = useAuthStore()
+const userRole = computed(() => userStore.userRole)
+const currentRole = computed(() => userStore.userRole)
+const roles = Object.values(ROLE)
+
+const getRoleIcon = (role) => {
+  return ROLE_ICONS[role] || ROLE_ICONS.DEFAULT
+}
+
+// Navigation items based on role
+const navItems = computed(() => {
+  const roleUrls = {
+    [ROLE.STUDENT]: studentDashboardUrls,
+    [ROLE.FACULTY]: facultyDashboardUrls,
+    [ROLE.SUPPORT]: supportDashboardUrls
+  }
+  return roleUrls[userRole.value] || []
+})
+
+const toggleRoleSwitcher = () => {
+  showRoleSwitcher.value = !showRoleSwitcher.value
+}
+
+const switchRole = (role) => {
+  userStore.switchRole(role)
+  showRoleSwitcher.value = false
+}
+
+// Cleanup on component unmount
+onUnmounted(() => {
+  if (collapseTimeout) {
+    clearTimeout(collapseTimeout)
+  }
+})
 </script>
 
 <style>
 .material-symbols-outlined {
   font-variation-settings:
-    'FILL' 0,
-    'wght' 400,
-    'GRAD' 0,
-    'opsz' 24;
-  font-size: 24px;
+    'FILL' v-bind('ICON_CONFIG.VARIATION_SETTINGS.FILL'),
+    'wght' v-bind('ICON_CONFIG.VARIATION_SETTINGS.WEIGHT'),
+    'GRAD' v-bind('ICON_CONFIG.VARIATION_SETTINGS.GRADE'),
+    'opsz' v-bind('ICON_CONFIG.VARIATION_SETTINGS.OPTICAL_SIZE');
+  font-size: v-bind('ICON_CONFIG.DEFAULT_SIZE');
 }
 
 /* Pulse animation for icons on hover */
 @keyframes iconPulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(v-bind('LAYOUT_CONFIG.ANIMATIONS.HOVER_SCALE'));
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .material-symbols-outlined:hover {
-  animation: iconPulse 0.3s ease-in-out;
+  animation: iconPulse v-bind('LAYOUT_CONFIG.SIDEBAR.TRANSITION_DURATION') v-bind('LAYOUT_CONFIG.ANIMATIONS.TRANSITION_TIMING');
+}
+
+/* Custom scrollbar styles */
+.custom-scrollbar {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
 }
 </style>

@@ -4,6 +4,7 @@ import UserDetails from '../views/user/UserDetails.vue'
 import ProfilePage from '../views/user/ProfilePage.vue'
 import CourseHistory from '../views/user/CourseHistory.vue'
 import RoadmapView from '../views/user/RoadmapView.vue'
+import CourseLectureView from '../views/user/CourseLectureView.vue'
 
 // Base64 dummy image
 const dummyAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=="
@@ -109,6 +110,17 @@ const userRoutes = {
                 hideNavbar: true,
                 hideFooter: true,
                 isProfilePage: true
+            }
+        },
+        {
+            path: 'courses/:courseId/lecture',
+            name: 'CourseLectureView',
+            component: CourseLectureView,
+            meta: {
+                title: 'Course Lecture',
+                hideNavbar: false,
+                hideFooter: true,
+                hideUserNavbar: false
             }
         }
     ]
