@@ -23,13 +23,18 @@ const facultyDashboardUrls = [
     },
     {
         path: '/faculty/notifications',
-        icon: 'campaign',
-        label: 'Send Notifications'
+        icon: 'notifications',
+        label: 'Notifications'
     },
     {
         path: '/faculty/content-upload',
         icon: 'upload',
         label: 'Upload Content'
+    },
+    {
+        path: '/faculty/academic-integrity',
+        icon: 'gavel',
+        label: 'Academic Integrity'
     },
     {
         path: '/faculty/course/1/enrollment',
