@@ -277,24 +277,89 @@
           <!-- Notes Panel -->
           <div 
             v-if="showNotes"
-            class="w-96 border-l border-gray-200 bg-white overflow-hidden flex flex-col transition-all duration-300"
+            class="w-96 border-l border-slate-200 bg-white overflow-hidden flex flex-col transition-all duration-300"
           >
-            <div class="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-gray-900">Lecture Notes</h2>
+            <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div class="flex items-center space-x-3">
+                <h2 class="text-lg font-semibold text-slate-900">Lecture Notes</h2>
+                <span class="text-xs text-slate-500 bg-slate-200 px-2 py-1 rounded-full" v-if="noteSaveStatus">
+                  {{ noteSaveStatus }}
+                </span>
+              </div>
               <button 
                 @click="toggleNotes"
-                class="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                class="p-2 hover:bg-slate-200 rounded-lg transition-colors"
               >
-                <span class="material-icons">close</span>
+                <span class="material-symbols-outlined">close</span>
               </button>
             </div>
+
+            <!-- Formatting Toolbar -->
+            <div class="border-b border-slate-200 p-2 bg-white">
+              <div class="flex items-center space-x-1">
+                <button 
+                  v-for="tool in formattingTools" 
+                  :key="tool.command"
+                  @click="formatText(tool.command)"
+                  class="p-2 rounded hover:bg-slate-100 transition-colors"
+                  :class="{ 'bg-maroon-50 text-maroon-600': tool.isActive }"
+                  :title="tool.label"
+                >
+                  <span class="material-symbols-outlined text-sm">{{ tool.icon }}</span>
+                </button>
+                <div class="h-4 w-px bg-slate-200 mx-1"></div>
+                <button 
+                  @click="insertTimestamp"
+                  class="p-2 rounded hover:bg-slate-100 transition-colors flex items-center space-x-1"
+                  title="Insert current video timestamp"
+                >
+                  <span class="material-symbols-outlined text-sm">timer</span>
+                  <span class="text-xs font-medium">{{ formatTime(videoProgress) }}</span>
+                </button>
+              </div>
+            </div>
+
             <div class="flex-1 overflow-y-auto p-4">
               <textarea
                 v-model="currentNotes"
-                placeholder="Take notes for this lecture..."
-                class="w-full h-full p-4 border rounded-lg resize-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-                @input="autoSaveNotes"
+                placeholder="Take notes for this lecture...
+
+Tips:
+• Use the formatting toolbar above
+• Click the timestamp button to mark important moments
+• Notes are automatically saved as you type
+• Use Ctrl/Cmd + B for bold, Ctrl/Cmd + I for italic"
+                class="w-full h-full p-4 border border-slate-200 rounded-lg resize-none 
+                       focus:ring-2 focus:ring-maroon-500 focus:border-transparent
+                       transition-all duration-300 font-mono text-slate-700 leading-relaxed"
+                @input="handleNotesInput"
+                @keydown="handleKeyboardShortcuts"
               ></textarea>
+            </div>
+
+            <!-- Footer -->
+            <div class="border-t border-slate-200 p-3 bg-slate-50">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                  <button 
+                    @click="downloadNotes"
+                    class="flex items-center space-x-1 text-sm text-slate-600 hover:text-maroon-600 transition-colors"
+                  >
+                    <span class="material-symbols-outlined text-sm">download</span>
+                    <span>Download</span>
+                  </button>
+                  <button 
+                    @click="clearNotes"
+                    class="flex items-center space-x-1 text-sm text-slate-600 hover:text-maroon-600 transition-colors"
+                  >
+                    <span class="material-symbols-outlined text-sm">delete</span>
+                    <span>Clear</span>
+                  </button>
+                </div>
+                <span class="text-xs text-slate-500">
+                  {{ getWordCount }} words
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -350,13 +415,12 @@ export default {
       totalLectures,
       weeks,
       selectLecture,
-      toggleBookmark,
-      toggleNotes,
       markAsComplete,
       getWeekProgress,
       getFileIcon,
       saveNotes,
-      completedLecturesCount
+      completedLecturesCount,
+      fetchNotes
     } = useCourse(courseId)
 
     // Computed Properties
@@ -416,6 +480,17 @@ export default {
     const isLectureCompleted = computed(() => {
       return completedLectures.value.includes(selectedLecture.value?.id)
     })
+
+    // Notes State
+    const noteSaveStatus = ref('')
+    const noteSaveTimeout = ref(null)
+    const formattingTools = ref([
+      { icon: 'format_bold', command: 'bold', label: 'Bold (Ctrl+B)', isActive: false },
+      { icon: 'format_italic', command: 'italic', label: 'Italic (Ctrl+I)', isActive: false },
+      { icon: 'format_list_bulleted', command: 'bullet', label: 'Bullet List', isActive: false },
+      { icon: 'format_list_numbered', command: 'number', label: 'Numbered List', isActive: false },
+      { icon: 'code', command: 'code', label: 'Code Block', isActive: false },
+    ])
 
     // Methods
     const loadCourseData = async () => {
@@ -511,6 +586,182 @@ export default {
       return icons[type] || { icon: 'insert_drive_file', color: 'text-slate-500' };
     }
 
+    // Notes Methods
+    const handleNotesInput = () => {
+      if (noteSaveTimeout.value) {
+        clearTimeout(noteSaveTimeout.value)
+      }
+      
+      noteSaveStatus.value = 'Saving...'
+      
+      noteSaveTimeout.value = setTimeout(async () => {
+        try {
+          if (!selectedLecture.value?.id) {
+            throw new Error('No lecture selected')
+          }
+          await saveNotes(selectedLecture.value.id, currentNotes.value)
+          noteSaveStatus.value = 'Saved'
+          setTimeout(() => {
+            noteSaveStatus.value = ''
+          }, 2000)
+        } catch (err) {
+          console.error('Failed to save notes:', err)
+          noteSaveStatus.value = 'Failed to save'
+          notify.error('Failed to save notes. Please try again.')
+        }
+      }, 1000)
+    }
+
+    const formatText = (command) => {
+      const textarea = document.querySelector('textarea')
+      const start = textarea.selectionStart
+      const end = textarea.selectionEnd
+      const selectedText = currentNotes.value.substring(start, end)
+      
+      let formattedText = ''
+      switch (command) {
+        case 'bold':
+          formattedText = `**${selectedText}**`
+          break
+        case 'italic':
+          formattedText = `_${selectedText}_`
+          break
+        case 'bullet':
+          formattedText = `• ${selectedText}`
+          break
+        case 'number':
+          formattedText = `1. ${selectedText}`
+          break
+        case 'code':
+          formattedText = `\`${selectedText}\``
+          break
+      }
+      
+      currentNotes.value = 
+        currentNotes.value.substring(0, start) +
+        formattedText +
+        currentNotes.value.substring(end)
+        
+      // Update cursor position
+      textarea.focus()
+      textarea.selectionStart = start + formattedText.length
+      textarea.selectionEnd = start + formattedText.length
+    }
+
+    const insertTimestamp = () => {
+      const timestamp = formatTime(videoProgress.value)
+      const textarea = document.querySelector('textarea')
+      const cursorPos = textarea.selectionStart
+      
+      currentNotes.value = 
+        currentNotes.value.substring(0, cursorPos) +
+        `[${timestamp}] ` +
+        currentNotes.value.substring(cursorPos)
+        
+      textarea.focus()
+      textarea.selectionStart = cursorPos + timestamp.length + 3
+      textarea.selectionEnd = cursorPos + timestamp.length + 3
+    }
+
+    const handleKeyboardShortcuts = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault()
+        formatText('bold')
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+        e.preventDefault()
+        formatText('italic')
+      }
+    }
+
+    const downloadNotes = () => {
+      try {
+        const blob = new Blob([currentNotes.value], { type: 'text/plain' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${selectedLecture.value?.title || 'lecture'}_notes.txt`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        notify.success('Notes downloaded successfully')
+      } catch (err) {
+        notify.error('Failed to download notes')
+      }
+    }
+
+    const clearNotes = () => {
+      if (confirm('Are you sure you want to clear all notes? This cannot be undone.')) {
+        currentNotes.value = ''
+        handleNotesInput()
+        notify.success('Notes cleared')
+      }
+    }
+
+    const getWordCount = computed(() => {
+      return currentNotes.value.trim().split(/\s+/).filter(Boolean).length
+    })
+
+    // Course Navigation Methods
+    const toggleBookmark = async () => {
+      try {
+        isBookmarked.value = !isBookmarked.value
+        // API call to update bookmark status
+        await updateBookmarkStatus(selectedLecture.value?.id, isBookmarked.value)
+        notify.success(isBookmarked.value ? 'Lecture bookmarked' : 'Bookmark removed')
+      } catch (err) {
+        isBookmarked.value = !isBookmarked.value // Revert on error
+        notify.error('Failed to update bookmark')
+      }
+    }
+
+    const toggleNotes = () => {
+      showNotes.value = !showNotes.value
+      if (showNotes.value) {
+        // Load notes when panel is opened
+        loadNotes(selectedLecture.value?.id)
+      }
+    }
+
+    // Helper Methods
+    const loadNotes = async (lectureId) => {
+      if (!lectureId) return
+      
+      try {
+        noteSaveStatus.value = 'Loading...'
+        const notes = await fetchNotes(lectureId)
+        currentNotes.value = notes || ''
+        noteSaveStatus.value = ''
+      } catch (err) {
+        noteSaveStatus.value = 'Failed to load'
+        notify.error('Failed to load notes. Please try again.')
+        console.error('Error loading notes:', err)
+      }
+    }
+
+    const updateBookmarkStatus = async (lectureId, status) => {
+      if (!lectureId) return
+      
+      // Implement API call to update bookmark status
+      // This is a placeholder for the actual API implementation
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve()
+        }, 500)
+      })
+    }
+
+    // Watch for lecture changes to load notes
+    watch(
+      () => selectedLecture.value?.id,
+      (newId) => {
+        if (newId && showNotes.value) {
+          loadNotes(newId)
+        }
+      }
+    )
+
     // Lifecycle Hooks
     onMounted(() => {
       loadCourseData()
@@ -572,7 +823,16 @@ export default {
       navigateBack,
       getFileIcon,
       markAsComplete,
-      getResourceIcon
+      getResourceIcon,
+      noteSaveStatus,
+      formattingTools,
+      handleNotesInput,
+      formatText,
+      insertTimestamp,
+      handleKeyboardShortcuts,
+      downloadNotes,
+      clearNotes,
+      getWordCount
     }
   }
 }
@@ -808,5 +1068,54 @@ export default {
 /* Transitions */
 .transition-smooth {
   @apply transition-all duration-300 ease-in-out;
+}
+
+/* Notes Panel Styles */
+.notes-panel-enter-active,
+.notes-panel-leave-active {
+  transition: transform 0.3s ease-in-out;
+}
+
+.notes-panel-enter-from,
+.notes-panel-leave-to {
+  transform: translateX(100%);
+}
+
+textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  line-height: 1.6;
+  tab-size: 4;
+}
+
+/* Add these to your existing styles */
+.formatting-button {
+  @apply p-2 rounded hover:bg-slate-100 transition-colors;
+}
+
+.formatting-button.active {
+  @apply bg-maroon-50 text-maroon-600;
+}
+
+.notes-footer-button {
+  @apply flex items-center space-x-1 text-sm text-slate-600 hover:text-maroon-600 transition-colors;
+}
+
+/* Add these styles for bookmark animation */
+.material-symbols-outlined.bookmark {
+  transition: transform 0.2s ease-in-out;
+}
+
+.material-symbols-outlined.bookmark:hover {
+  transform: scale(1.1);
+}
+
+.material-symbols-outlined.bookmark.filled {
+  animation: bookmark-pulse 0.4s ease-in-out;
+}
+
+@keyframes bookmark-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
 }
 </style>

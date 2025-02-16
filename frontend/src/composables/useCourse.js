@@ -1,11 +1,13 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { getCourseById, getLectureById } from '../mock-data/courses'
 import { useNotification } from './useNotification'
+import { useCourseState } from './useCourseState'
 
 const STORAGE_KEY = 'course_progress'
 
 export function useCourse(courseId) {
   const { notify } = useNotification()
+  const { saveNote, getNote } = useCourseState()
   const currentCourse = ref(null)
   const selectedLecture = ref(null)
   const isBookmarked = ref(false)
@@ -180,6 +182,27 @@ export function useCourse(courseId) {
     return icons[type] || icons.default
   }
 
+  const saveNotes = async (lectureId, notes) => {
+    if (!lectureId) return
+    try {
+      saveNote(courseId, lectureId, notes)
+      return true
+    } catch (err) {
+      console.error('Failed to save notes:', err)
+      throw err
+    }
+  }
+
+  const fetchNotes = async (lectureId) => {
+    if (!lectureId) return ''
+    try {
+      return getNote(courseId, lectureId)
+    } catch (err) {
+      console.error('Failed to fetch notes:', err)
+      throw err
+    }
+  }
+
   // Initialize with first lecture if none selected
   if (currentCourse.value && !selectedLecture.value && weeks.value.length > 0) {
     const firstWeek = weeks.value[0]
@@ -217,6 +240,8 @@ export function useCourse(courseId) {
     getWeekProgress,
     getFileIcon,
     saveProgress,
-    loadProgress
+    loadProgress,
+    saveNotes,
+    fetchNotes
   }
 } 

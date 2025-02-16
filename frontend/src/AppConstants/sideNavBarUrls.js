@@ -30,6 +30,11 @@ const facultyDashboardUrls = [
         path: '/faculty/content-upload',
         icon: 'upload',
         label: 'Upload Content'
+    },
+    {
+        path: '/faculty/course/1/enrollment',
+        icon: 'group',
+        label: 'Course Enrollment'
     }
 ]
 const supportDashboardUrls = [

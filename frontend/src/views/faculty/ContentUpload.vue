@@ -1,162 +1,450 @@
 <template>
-  <div class="flex items-center justify-center min-h-screen bg-gray-50">
-    <div class="w-full max-w-2xl bg-white p-8 rounded-xl shadow-lg space-y-6 transition-all duration-300">
-      <!-- Form Header -->
-      <div class="space-y-2 border-b border-gray-200 pb-6">
-        <h1 class="text-2xl font-bold text-maroon-800">Course Content Upload</h1>
-        <p class="text-gray-600">Upload lecture materials and manage course content</p>
-      </div>
-
-      <!-- Selection Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="space-y-1">
-          <label class="block text-sm font-medium text-gray-700">Course</label>
-          <select v-model="selectedCourse" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 transition">
-            <option disabled value="">Select course</option>
-            <option v-for="course in courses" :key="course.id" :value="course.id">{{ course.name }}</option>
-          </select>
+  <div class="flex h-screen bg-gray-50">
+    <SideNavBar />
+    <div class="flex-1 overflow-y-auto p-6">
+      <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+          <h1 class="text-2xl font-bold text-gray-900">Course Content Management</h1>
+          <p class="text-gray-800 mt-2">Create and manage your course materials</p>
         </div>
 
-        <div class="space-y-1">
-          <label class="block text-sm font-medium text-gray-700">Week</label>
-          <select v-model="selectedWeek" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 transition">
-            <option disabled value="">Select week</option>
-            <option v-for="week in 12" :key="week" :value="week">Week {{ week }}</option>
-          </select>
-        </div>
-
-        <div class="space-y-1">
-          <label class="block text-sm font-medium text-gray-700">Lecture</label>
-          <select v-model="selectedLecture" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 transition">
-            <option disabled value="">Select lecture</option>
-            <option v-for="num in 12" :key="num" :value="num">Lecture {{ num }}</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Form Fields -->
-      <div class="space-y-4">
-        <div class="space-y-1">
-          <label class="block text-sm font-medium text-gray-700">Lecture Title</label>
-          <input type="text" v-model="title" placeholder="Enter lecture title" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 placeholder-gray-400 transition">
-        </div>
-
-        <div class="space-y-1">
-          <label class="block text-sm font-medium text-gray-700">Description</label>
-          <textarea v-model="description" placeholder="Add lecture description" rows="3" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 placeholder-gray-400 transition"></textarea>
-        </div>
-
-        <div class="space-y-1">
-          <label class="block text-sm font-medium text-gray-700">YouTube URL</label>
-          <div class="relative">
-            <input type="url" v-model="videoUrl" placeholder="https://youtube.com/..." class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 placeholder-gray-400 transition pr-12">
-            <span class="absolute right-3 top-3 text-gray-400">
-              <i class="fab fa-youtube text-xl"></i>
-            </span>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Course Selection & Module Management -->
+          <div class="lg:col-span-1">
+            <ModuleManager
+              :courses="courses"
+              @course-selected="handleCourseSelected"
+              @module-selected="handleModuleSelected"
+              @module-updated="handleModuleUpdated"
+            />
           </div>
-        </div>
 
-        <!-- File Upload -->
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-gray-700">Course Materials</label>
-          <div @click="uploadFile" class="border-2 border-dashed border-gray-300 p-6 text-center rounded-xl cursor-pointer hover:border-maroon-500 hover:bg-maroon-50 transition-colors group">
-            <div class="flex flex-col items-center space-y-2">
-              <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 group-hover:text-maroon-600 transition"></i>
-              <p class="text-sm text-gray-600 group-hover:text-maroon-800 transition">
-                <span class="font-medium">Click to upload</span> or drag and drop
-              </p>
-              <p class="text-xs text-gray-500">PDF, DOCX, PPTX (max 50MB)</p>
+          <!-- Content Upload & Preview -->
+          <div class="lg:col-span-2 space-y-6">
+            <!-- Content Form -->
+            <div class="bg-white rounded-lg shadow p-6">
+              <h2 class="text-lg font-semibold text-gray-900">Content Details</h2>
+              
+              <div class="space-y-4">
+                <!-- Content Type Selection with Preview Toggle -->
+                <div class="flex justify-between items-center">
+                  <div class="flex-1 mr-4">
+                    <label class="block text-sm font-medium text-gray-900 mb-1">Content Type</label>
+                    <select
+                      v-model="contentForm.type"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500"
+                    >
+                      <option value="video">Video Lecture</option>
+                      <option value="document">Document</option>
+                      <option value="quiz">Quiz</option>
+                      <option value="assignment">Assignment</option>
+                    </select>
+                  </div>
+                  <button
+                    @click="togglePreview"
+                    class="px-4 py-2 text-maroon-600 hover:bg-maroon-50 rounded-lg flex items-center gap-2"
+                  >
+                    <span class="material-icons">{{ previewMode ? 'edit' : 'visibility' }}</span>
+                    {{ previewMode ? 'Edit Mode' : 'Preview' }}
+                  </button>
+                </div>
+
+                <!-- Basic Content Form -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-900 mb-1">Title</label>
+                  <input
+                    v-model="contentForm.title"
+                    type="text"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500"
+                    placeholder="Enter content title"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-gray-900 mb-1">Description</label>
+                  <textarea
+                    v-model="contentForm.description"
+                    rows="3"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500"
+                    placeholder="Add content description"
+                  ></textarea>
+                </div>
+
+                <!-- Video URL Input -->
+                <div v-if="contentForm.type === 'video'">
+                  <label class="block text-sm font-medium text-gray-900 mb-1">Video URL</label>
+                  <div class="relative">
+                    <input
+                      v-model="contentForm.videoUrl"
+                      type="url"
+                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 pr-12"
+                      placeholder="https://youtube.com/..."
+                    />
+                    <span class="absolute right-3 top-2.5 text-gray-400">
+                      <span class="material-icons">smart_display</span>
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Document Upload -->
+                <div v-if="contentForm.type === 'document'">
+                  <FileUploader
+                    :content-type="'document'"
+                    @file-selected="handleFileSelected"
+                    @file-removed="handleFileRemoved"
+                  />
+                </div>
+
+                <!-- Quiz Builder -->
+                <div v-if="contentForm.type === 'quiz'">
+                  <QuizBuilder
+                    :preview-mode="previewMode"
+                    @update:quiz="handleQuizUpdate"
+                  />
+                </div>
+
+                <!-- Assignment Builder -->
+                <div v-if="contentForm.type === 'assignment'">
+                  <AssignmentBuilder
+                    :preview-mode="previewMode"
+                    @update:assignment="handleAssignmentUpdate"
+                  />
+                </div>
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="flex justify-between mt-6">
+                <button
+                  @click="saveAsDraft"
+                  class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Save as Draft
+                </button>
+                <button
+                  @click="publishContent"
+                  class="px-6 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700"
+                  :disabled="!isFormValid"
+                >
+                  Publish
+                </button>
+              </div>
+            </div>
+
+            <!-- Video Preview -->
+            <div v-if="contentForm.type === 'video' && contentForm.videoUrl" class="bg-white rounded-lg shadow p-6">
+              <h2 class="text-lg font-semibold text-gray-900">Video Preview</h2>
+              <div class="aspect-w-16">
+                <iframe
+                  :src="getEmbedUrl(contentForm.videoUrl)"
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen
+                  class="w-full h-full rounded-lg"
+                ></iframe>
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      <!-- Submit Button -->
-      <button @click="saveForm" :disabled="isSaving" class="w-full py-3 px-6 bg-maroon-600 hover:bg-maroon-700 text-white font-medium rounded-lg transition-all duration-300 flex items-center justify-center">
-        <i v-if="isSaving" class="fas fa-spinner fa-spin mr-2"></i>
-        {{ isSaving ? 'Saving...' : 'Publish Content' }}
-      </button>
-
-      <!-- Success/Error Messages -->
-      <div v-if="successMessage" class="p-4 bg-green-50 text-green-700 rounded-lg">
-        <i class="fas fa-check-circle mr-2"></i>{{ successMessage }}
-      </div>
-      <div v-if="errorMessage" class="p-4 bg-red-50 text-red-700 rounded-lg">
-        <i class="fas fa-exclamation-circle mr-2"></i>{{ errorMessage }}
-      </div>
     </div>
+
+    <!-- Loading Overlay -->
+    <div v-if="isLoading" class="loading-overlay">
+      <LoadingSpinner />
+    </div>
+
+    <!-- Confirm Dialog -->
+    <ConfirmDialog
+      v-if="showConfirmDialog"
+      :message="confirmMessage"
+      @confirm="confirmAction"
+      @cancel="showConfirmDialog = false"
+    />
   </div>
 </template>
 
 <script>
+import { ref, computed, onMounted, watch } from 'vue'
+import { useToast } from 'vue-toastification'
+import SideNavBar from '@/layouts/SideNavBar.vue'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import ModuleManager from '@/components/content/ModuleManager.vue'
+import FileUploader from '@/components/content/FileUploader.vue'
+import QuizBuilder from '@/components/content/QuizBuilder.vue'
+import AssignmentBuilder from '@/components/content/AssignmentBuilder.vue'
+import { useContentStore } from '@/stores/contentStore'
+import { useCourseStore } from '@/stores/courseStore'
+import { useQuizStore } from '@/stores/quizStore'
+import { useAssignmentStore } from '@/stores/assignmentStore'
+
 export default {
-  data() {
-    return {
-      courses: [
-        { id: 'math101', name: 'Mathematics Fundamentals' },
-        { id: 'ct201', name: 'Computational Thinking' },
-        { id: 'stats301', name: 'Applied Statistics' },
-        { id: 'python401', name: 'Python Programming' }
-      ],
-      selectedCourse: '',
-      selectedWeek: '',
-      selectedLecture: '',
+  name: 'ContentUpload',
+  components: {
+    SideNavBar,
+    LoadingSpinner,
+    ConfirmDialog,
+    ModuleManager,
+    FileUploader,
+    QuizBuilder,
+    AssignmentBuilder
+  },
+  setup() {
+    const toast = useToast()
+    const contentStore = useContentStore()
+    const courseStore = useCourseStore()
+    const quizStore = useQuizStore()
+    const assignmentStore = useAssignmentStore()
+    
+    // State Management
+    const isLoading = ref(false)
+    const showConfirmDialog = ref(false)
+    const confirmAction = ref(null)
+    const confirmMessage = ref('')
+    const unsavedChanges = ref(false)
+    const selectedModule = ref(null)
+    const previewMode = ref(false)
+    const courses = ref([])
+
+    // Form State
+    const contentForm = ref({
       title: '',
       description: '',
+      type: 'video',
       videoUrl: '',
-      isSaving: false,
-      successMessage: '',
-      errorMessage: ''
-    };
-  },
-  methods: {
-    async uploadFile() {
-      try {
-        // Implement actual file upload logic
-        const file = await this.$refs.fileInput.files[0];
-        if (file) {
-          // Handle file upload
-        }
-      } catch (error) {
-        this.errorMessage = 'Error uploading file: ' + error.message;
+      status: 'draft',
+      moduleId: null,
+      order: 0,
+      metadata: {
+        duration: '',
+        difficulty: 'intermediate',
+        prerequisites: [],
+        learningObjectives: [],
+        visibility: 'hidden'
       }
-    },
-    async saveForm() {
-      try {
-        this.isSaving = true;
-        // Implement form validation and submission
-        if (!this.validateForm()) return;
+    })
 
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        this.successMessage = 'Content published successfully!';
-        this.resetForm();
+    // Computed Properties
+    const isFormValid = computed(() => {
+      if (!contentForm.value.title || !contentForm.value.description) return false
+      if (!selectedModule.value) return false
+      
+      switch (contentForm.value.type) {
+        case 'video':
+          return isValidVideoUrl(contentForm.value.videoUrl)
+        case 'document':
+          return !!contentForm.value.file
+        case 'quiz':
+          return contentForm.value.questions?.length > 0
+        case 'assignment':
+          return contentForm.value.metadata?.dueDate && contentForm.value.metadata?.points > 0
+        default:
+          return false
+      }
+    })
+
+    // Event Handlers
+    const handleCourseSelected = (courseId) => {
+      contentForm.value.courseId = courseId
+      selectedModule.value = null
+    }
+
+    const handleModuleSelected = (module) => {
+      selectedModule.value = module
+      contentForm.value.moduleId = module.id
+    }
+
+    const handleModuleUpdated = () => {
+      // Refresh content if needed
+    }
+
+    const handleFileSelected = (file) => {
+      contentForm.value.file = file
+    }
+
+    const handleFileRemoved = () => {
+      contentForm.value.file = null
+    }
+
+    const handleQuizUpdate = (quizData) => {
+      contentForm.value.questions = quizData.questions
+      contentForm.value.metadata = {
+        ...contentForm.value.metadata,
+        ...quizData.settings
+      }
+    }
+
+    const handleAssignmentUpdate = (assignmentData) => {
+      contentForm.value.metadata = {
+        ...contentForm.value.metadata,
+        ...assignmentData.settings
+      }
+      contentForm.value.file = assignmentData.file
+    }
+
+    // Actions
+    const togglePreview = () => {
+      previewMode.value = !previewMode.value
+    }
+
+    const saveAsDraft = async () => {
+      try {
+        contentForm.value.status = 'draft'
+        await saveContent()
+        toast.success('Content saved as draft')
       } catch (error) {
-        this.errorMessage = 'Error saving content: ' + error.message;
+        handleError(error, 'Failed to save draft')
+      }
+    }
+
+    const publishContent = async () => {
+      if (!isFormValid.value) return
+      
+      showConfirmDialog.value = true
+      confirmMessage.value = 'Are you sure you want to publish this content? Published content will be immediately visible to students.'
+      confirmAction.value = async () => {
+        try {
+          contentForm.value.status = 'published'
+          await saveContent()
+          toast.success('Content published successfully')
+          resetForm()
+        } catch (error) {
+          handleError(error, 'Failed to publish content')
+        }
+      }
+    }
+
+    const saveContent = async () => {
+      isLoading.value = true
+      try {
+        const contentData = {
+          ...contentForm.value,
+          moduleId: selectedModule.value.id
+        }
+
+        if (contentForm.value.type === 'quiz') {
+          await quizStore.createQuiz(contentData)
+        } else if (contentForm.value.type === 'assignment') {
+          await assignmentStore.createAssignment(contentData)
+        } else {
+          await contentStore.createContent(contentData)
+        }
       } finally {
-        this.isSaving = false;
+        isLoading.value = false
       }
-    },
-    validateForm() {
-      if (!this.selectedCourse || !this.selectedWeek || !this.selectedLecture) {
-        this.errorMessage = 'Please select course, week, and lecture';
-        return false;
+    }
+
+    // Utility Functions
+    const isValidVideoUrl = (url) => {
+      return url?.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/)
+    }
+
+    const getEmbedUrl = (url) => {
+      if (url.includes('youtube.com') || url.includes('youtu.be')) {
+        const videoId = url.split('v=')[1] || url.split('/').pop()
+        return `https://www.youtube.com/embed/${videoId}`
       }
-      if (!this.title.trim()) {
-        this.errorMessage = 'Lecture title is required';
-        return false;
+      return url
+    }
+
+    const resetForm = () => {
+      contentForm.value = {
+        title: '',
+        description: '',
+        type: 'video',
+        videoUrl: '',
+        status: 'draft',
+        moduleId: selectedModule.value?.id,
+        order: 0,
+        metadata: {
+          duration: '',
+          difficulty: 'intermediate',
+          prerequisites: [],
+          learningObjectives: [],
+          visibility: 'hidden'
+        }
       }
-      return true;
-    },
-    resetForm() {
-      this.selectedCourse = '';
-      this.selectedWeek = '';
-      this.selectedLecture = '';
-      this.title = '';
-      this.description = '';
-      this.videoUrl = '';
+      unsavedChanges.value = false
+    }
+
+    const handleError = (error, defaultMessage) => {
+      console.error(error)
+      const message = error.response?.data?.message || defaultMessage
+      toast.error(message)
+    }
+
+    // Lifecycle Hooks
+    onMounted(async () => {
+      try {
+        isLoading.value = true
+        const response = await courseStore.getFacultyCourses()
+        courses.value = response.data
+      } catch (error) {
+        handleError(error, 'Failed to load courses')
+      } finally {
+        isLoading.value = false
+      }
+    })
+
+    // Watch for Changes
+    watch([contentForm], () => {
+      unsavedChanges.value = true
+    }, { deep: true })
+
+    return {
+      isLoading,
+      showConfirmDialog,
+      confirmAction,
+      confirmMessage,
+      courses,
+      contentForm,
+      selectedModule,
+      previewMode,
+      isFormValid,
+      handleCourseSelected,
+      handleModuleSelected,
+      handleModuleUpdated,
+      handleFileSelected,
+      handleFileRemoved,
+      handleQuizUpdate,
+      handleAssignmentUpdate,
+      togglePreview,
+      saveAsDraft,
+      publishContent,
+      getEmbedUrl
     }
   }
-};
+}
 </script>
+
+<style>
+.aspect-w-16 {
+  position: relative;
+  padding-bottom: 56.25%;
+}
+
+.aspect-w-16 iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.loading-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+}
+
+.form-input {
+  @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 transition-all duration-200;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-900 mb-1;
+}
+
+.preview-mode {
+  @apply bg-gray-100 p-4 rounded-lg border border-gray-300;
+}
+</style>
