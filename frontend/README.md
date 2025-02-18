@@ -177,5 +177,5 @@ For support and questions:
 
 ---
 
-Last Updated: January 2024
+Last Updated: February 2025
 Version: 1.0.0
