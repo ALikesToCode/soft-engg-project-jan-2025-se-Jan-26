@@ -23,8 +23,8 @@ const facultyDashboardUrls = [
     },
     {
         path: '/faculty/notifications',
-        icon: 'notifications',
-        label: 'Notifications'
+        icon: 'campaign',
+        label: 'Send Notifications'
     },
     {
         path: '/faculty/content-upload',
