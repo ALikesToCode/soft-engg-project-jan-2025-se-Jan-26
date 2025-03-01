@@ -80,9 +80,17 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     Get the current user from the provided JWT token.
     Raises a 401 HTTPException if the token is invalid or expired.
     """
+    # Handle case where token includes 'Bearer ' prefix
+    if token.startswith('Bearer '):
+        token = token[7:]
+        
     payload = decode_access_token(token)
     if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(
+            status_code=401, 
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return payload # this returns the payload of the token containing email and role
 
 def require_auth(token: str = Depends(oauth2_scheme)):

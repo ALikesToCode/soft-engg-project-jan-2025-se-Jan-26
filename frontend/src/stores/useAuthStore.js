@@ -9,7 +9,19 @@ import { APP_BASE_URL, ROLE } from '@/AppConstants/globalConstants';
 const DEV_MODE = import.meta.env.VITE_NODE_ENV === 'development';
 
 export default defineStore('auth', () => {
-    const token = ref(JSON.parse(localStorage.getItem('token')));
+    // Parse token from localStorage, handling both string and JSON string formats
+    const storedToken = localStorage.getItem('token');
+    let parsedToken = null;
+    
+    try {
+        // Try to parse as JSON first
+        parsedToken = storedToken ? JSON.parse(storedToken) : null;
+    } catch (e) {
+        // If not valid JSON, use as is
+        parsedToken = storedToken;
+    }
+    
+    const token = ref(parsedToken);
     const returnUrl = ref(null);
     const user = ref(new User(null, "", "", ""));
     const userRole = ref(localStorage.getItem('userRole') || ROLE.STUDENT);

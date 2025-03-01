@@ -1,6 +1,7 @@
 <script>
 import SideNavBar from '@/layouts/SideNavBar.vue'
 import ChatBotWrapper from '@/components/ChatBotWrapper.vue'
+import TokenDebugger from '@/components/TokenDebugger.vue'
 
 export default {
   name: 'DashboardView',
@@ -88,11 +89,13 @@ export default {
           dateBookmarked: '2024-01-20',
         },
       ],
+      isDevelopment: import.meta.env.VITE_NODE_ENV === 'development',
     }
   },
   components: {
     SideNavBar,
     ChatBotWrapper,
+    TokenDebugger,
   },
   computed: {
     mainContentClass() {
@@ -122,123 +125,128 @@ export default {
 </script>
 
 <template>
-  <div class="flex h-screen">
-    <div>
-      <SideNavBar />
-    </div>
-    <div class="flex-1 p-6 overflow-y-auto bg-gray-50">
-      <div class="max-w-7xl mx-auto">
-        <!-- Recommended Section -->
-        <div class="mb-8">
-          <h2 class="text-2xl font-bold text-gray-800 mb-4">Recommended for You</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <div
-              v-for="material in recommendedMaterials"
-              :key="material.id"
-              class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
-            >
-              <div class="flex items-start space-x-4">
-                <img
-                  :src="material.thumbnail"
-                  :alt="material.title"
-                  class="w-16 h-16 rounded-lg object-cover"
-                />
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-start justify-between">
-                    <div class="min-w-0">
-                      <h3 class="font-semibold text-gray-800 truncate">{{ material.title }}</h3>
-                      <span class="text-sm text-gray-500">{{ material.type }}</span>
+  <div>
+    <!-- Add the TokenDebugger at the top of the dashboard (only in development mode) -->
+    <TokenDebugger v-if="isDevelopment" />
+    
+    <div class="flex h-screen">
+      <div>
+        <SideNavBar />
+      </div>
+      <div class="flex-1 p-6 overflow-y-auto bg-gray-50">
+        <div class="max-w-7xl mx-auto">
+          <!-- Recommended Section -->
+          <div class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">Recommended for You</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div
+                v-for="material in recommendedMaterials"
+                :key="material.id"
+                class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
+              >
+                <div class="flex items-start space-x-4">
+                  <img
+                    :src="material.thumbnail"
+                    :alt="material.title"
+                    class="w-16 h-16 rounded-lg object-cover"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-start justify-between">
+                      <div class="min-w-0">
+                        <h3 class="font-semibold text-gray-800 truncate">{{ material.title }}</h3>
+                        <span class="text-sm text-gray-500">{{ material.type }}</span>
+                      </div>
                     </div>
+                    <p class="text-sm text-gray-600 mt-2 line-clamp-2">{{ material.reason }}</p>
+                    <button
+                      @click="startMaterial(material)"
+                      class="mt-3 text-sm text-maroon-600 hover:text-maroon-700 font-medium inline-flex items-center"
+                    >
+                      Start Learning
+                      <span class="material-icons text-sm ml-1">arrow_forward</span>
+                    </button>
                   </div>
-                  <p class="text-sm text-gray-600 mt-2 line-clamp-2">{{ material.reason }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid" :class="mainContentClass" gap-6>
+            <!-- Personalized Roadmaps -->
+            <div class="space-y-6">
+              <h2 class="text-2xl font-bold text-gray-800">Your Learning Paths</h2>
+              <div class="space-y-4">
+                <div
+                  v-for="roadmap in personalizedRoadmaps"
+                  :key="roadmap.id"
+                  class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
+                >
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-semibold text-gray-800 truncate">{{ roadmap.title }}</h3>
+                    <span class="text-sm text-gray-500 whitespace-nowrap ml-2">
+                      {{ roadmap.completedSteps }}/{{ roadmap.totalSteps }} steps
+                    </span>
+                  </div>
+                  <div class="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      class="bg-maroon-600 h-2 rounded-full transition-all duration-500"
+                      :style="{ width: `${roadmap.progress}%` }"
+                    ></div>
+                  </div>
                   <button
-                    @click="startMaterial(material)"
+                    @click="viewRoadmap(roadmap)"
                     class="mt-3 text-sm text-maroon-600 hover:text-maroon-700 font-medium inline-flex items-center"
                   >
-                    Start Learning
+                    Continue Path
                     <span class="material-icons text-sm ml-1">arrow_forward</span>
                   </button>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <div class="grid" :class="mainContentClass" gap-6>
-          <!-- Personalized Roadmaps -->
-          <div class="space-y-6">
-            <h2 class="text-2xl font-bold text-gray-800">Your Learning Paths</h2>
-            <div class="space-y-4">
-              <div
-                v-for="roadmap in personalizedRoadmaps"
-                :key="roadmap.id"
-                class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow"
-              >
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="font-semibold text-gray-800 truncate">{{ roadmap.title }}</h3>
-                  <span class="text-sm text-gray-500 whitespace-nowrap ml-2">
-                    {{ roadmap.completedSteps }}/{{ roadmap.totalSteps }} steps
-                  </span>
-                </div>
-                <div class="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    class="bg-maroon-600 h-2 rounded-full transition-all duration-500"
-                    :style="{ width: `${roadmap.progress}%` }"
-                  ></div>
-                </div>
-                <button
-                  @click="viewRoadmap(roadmap)"
-                  class="mt-3 text-sm text-maroon-600 hover:text-maroon-700 font-medium inline-flex items-center"
+            <!-- Bookmarked Materials -->
+            <div class="space-y-6 sm:space-x-4">
+              <h2 class="text-2xl font-bold text-gray-800 sm:ml-4">Bookmarked Materials</h2>
+              <div class="space-y-4">
+                <div
+                  v-for="material in bookmarkedMaterials"
+                  :key="material.id"
+                  class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow group"
                 >
-                  Continue Path
-                  <span class="material-icons text-sm ml-1">arrow_forward</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Bookmarked Materials -->
-          <div class="space-y-6 sm:space-x-4">
-            <h2 class="text-2xl font-bold text-gray-800 sm:ml-4">Bookmarked Materials</h2>
-            <div class="space-y-4">
-              <div
-                v-for="material in bookmarkedMaterials"
-                :key="material.id"
-                class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow group"
-              >
-                <div class="flex items-start justify-between">
-                  <div class="min-w-0 flex-1">
-                    <h3 class="font-semibold text-gray-800 truncate">{{ material.title }}</h3>
-                    <div class="flex items-center space-x-2 mt-1">
-                      <span class="text-sm text-gray-500">{{ material.type }}</span>
-                      <span class="text-gray-300">•</span>
-                      <span class="text-sm text-gray-500 truncate">{{ material.author }}</span>
+                  <div class="flex items-start justify-between">
+                    <div class="min-w-0 flex-1">
+                      <h3 class="font-semibold text-gray-800 truncate">{{ material.title }}</h3>
+                      <div class="flex items-center space-x-2 mt-1">
+                        <span class="text-sm text-gray-500">{{ material.type }}</span>
+                        <span class="text-gray-300">•</span>
+                        <span class="text-sm text-gray-500 truncate">{{ material.author }}</span>
+                      </div>
+                      <div class="text-sm text-gray-500 mt-1">
+                        Bookmarked on {{ new Date(material.dateBookmarked).toLocaleDateString() }}
+                      </div>
                     </div>
-                    <div class="text-sm text-gray-500 mt-1">
-                      Bookmarked on {{ new Date(material.dateBookmarked).toLocaleDateString() }}
-                    </div>
+                    <button
+                      @click="removeBookmark(material)"
+                      class="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <span class="material-icons">bookmark_remove</span>
+                    </button>
                   </div>
-                  <button
-                    @click="removeBookmark(material)"
-                    class="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <span class="material-icons">bookmark_remove</span>
-                  </button>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- AI Chatbot (Split Screen Mode) -->
-          <div v-if="showSplitScreen" class="h-[calc(100vh-12rem)]">
-            <ChatBotWrapper />
+            <!-- AI Chatbot (Split Screen Mode) -->
+            <div v-if="showSplitScreen" class="h-[calc(100vh-12rem)]">
+              <ChatBotWrapper />
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Floating Chat Bot (when not in split screen) -->
-    <ChatBotWrapper v-if="!showSplitScreen" />
+      <!-- Floating Chat Bot (when not in split screen) -->
+      <ChatBotWrapper v-if="!showSplitScreen" />
+    </div>
   </div>
 </template>
 
