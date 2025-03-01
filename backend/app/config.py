@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     ENV: str = "development"
 
+    # LLM
+    LANGSMITH_TRACING:str
+    LANGSMITH_ENDPOINT:str
+    LANGSMITH_API_KEY:str
+    LANGSMITH_PROJECT:str
+    GOOGLE_API_KEY:str
+
     class Config:
         env_file = ".env"
         case_sensitive = True
