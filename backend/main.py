@@ -4,6 +4,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from fastapi.responses import JSONResponse
+from app.services.auth_service import create_default_users
+from app.database import get_db, async_session
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -58,6 +60,10 @@ app.include_router(chat, prefix=settings.API_PREFIX, tags=["Chat"])
 @app.on_event("startup")
 async def startup():
     await init_db()
+    
+    # Create default users
+    async with async_session() as session:
+        await create_default_users(session)
 
 if __name__ == "__main__":
     import uvicorn

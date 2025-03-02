@@ -74,3 +74,5 @@ uvloop==0.21.0
 watchfiles==1.0.4
 websockets==14.2
 zstandard==0.23.0
+pyjwt==2.10.0
+redis==5.0.0
