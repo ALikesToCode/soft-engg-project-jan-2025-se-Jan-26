@@ -42,7 +42,17 @@ export default {
 </template>
 
 <style>
-@import './assets/main.css';
+/* Import base styles first */
+@import './assets/base.css';
+
+/* Then import Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Then import our custom styles to override Tailwind */
+@import './assets/text-colors.css';
+@import './assets/hero-styles.css';
 
 /* Base styles */
 body {

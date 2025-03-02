@@ -1,4 +1,4 @@
-from app.services.auth_service import authenticate_user, get_or_create_user, get_current_user, oauth2_scheme
+from app.services.auth_service import authenticate_user, get_or_create_user, get_current_user, oauth2_scheme, set_user_password
 from app.database import get_db
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.security import OAuth2PasswordRequestForm
@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 from starlette.responses import RedirectResponse
 import jwt
+from pydantic import BaseModel
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -105,11 +106,27 @@ oauth.register(
 # such users can only be added by support
 @router.post("/auth/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    logger.info(f"Login attempt for user: {form_data.username}")
     user = await authenticate_user(db, email=form_data.username, password=form_data.password)
     if not user:
+        logger.warning(f"Failed login attempt for user: {form_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
-    access_token = create_access_token(data={"email": user.email, "role": user.role})
-    return {"access_token": access_token, "token_type": "bearer"}
+    
+    logger.info(f"Successful login for user: {form_data.username}, role: {user.role}")
+    access_token = create_access_token(data={"email": user.email, "role": user.role, "sub": str(user.id)})
+    
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer",
+        "user": {
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "is_google_user": user.is_google_user,
+            "has_password": bool(user.hashed_password)
+        }
+    }
 
 # google login
 @router.get("/auth/login/google")
@@ -136,18 +153,22 @@ async def auth_callback(request: Request, db=Depends(get_db)):
 
         # Check if user is already stored in db
         user = await get_or_create_user(db, user_data)
-        logger.info(f"User retrieved/created: {user.email}")
+        logger.info(f"User retrieved/created: {user.email}, role: {user.role}")
 
         if not user_data:
             logger.error("Invalid token or user data")
             raise HTTPException(status_code=400, detail="Invalid token")
 
         # Create JWT token
-        access_token = create_access_token(data={"email": user.email, "role": user.role})
+        access_token = create_access_token(data={"email": user.email, "role": user.role, "sub": str(user.id)})
         logger.info(f"Created JWT token")
         
+        # Check if user has a password set
+        has_password = bool(user.hashed_password)
+        password_notification = "" if has_password else "&password_needed=true"
+        
         # Redirect to frontend with token
-        frontend_callback_url = f"{settings.FRONTEND_URL}/auth/callback?access_token={access_token}"
+        frontend_callback_url = f"{settings.FRONTEND_URL}/auth/callback?access_token={access_token}{password_notification}"
         logger.info(f"Redirecting to frontend callback")
         return RedirectResponse(url=frontend_callback_url)
     except Exception as e:
@@ -292,3 +313,49 @@ def require_role(role: str):
 #     return {"message": "You have access!"}
 
 # roles list : student, faculty, support
+
+class PasswordUpdate(BaseModel):
+    password: str
+
+@router.post("/auth/set-password")
+async def set_password(
+    password_data: PasswordUpdate, 
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
+):
+    logger.info("Password update request received")
+    
+    if not token:
+        logger.error("No token provided for password update")
+        raise HTTPException(
+            status_code=401, 
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not is_token_valid(token):
+        logger.error("Invalid token for password update")
+        raise HTTPException(
+            status_code=401, 
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Decode token to get user ID
+    payload = decode_access_token(token)
+    if not payload or "sub" not in payload:
+        logger.error("Token does not contain user ID")
+        raise HTTPException(status_code=400, detail="Invalid token payload")
+    
+    user_id = payload["sub"]
+    logger.info(f"Setting password for user ID: {user_id}")
+    
+    # Set the password
+    success = await set_user_password(db, user_id, password_data.password)
+    
+    if not success:
+        logger.error(f"Failed to set password for user ID: {user_id}")
+        raise HTTPException(status_code=400, detail="Failed to set password")
+    
+    logger.info(f"Password successfully set for user ID: {user_id}")
+    return {"message": "Password set successfully"}

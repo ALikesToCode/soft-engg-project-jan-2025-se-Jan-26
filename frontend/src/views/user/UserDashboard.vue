@@ -1,7 +1,6 @@
 <script>
 import SideNavBar from '@/layouts/SideNavBar.vue'
 import ChatBotWrapper from '@/components/ChatBotWrapper.vue'
-import TokenDebugger from '@/components/TokenDebugger.vue'
 
 export default {
   name: 'DashboardView',
@@ -95,7 +94,6 @@ export default {
   components: {
     SideNavBar,
     ChatBotWrapper,
-    TokenDebugger,
   },
   computed: {
     mainContentClass() {
@@ -126,9 +124,6 @@ export default {
 
 <template>
   <div>
-    <!-- Add the TokenDebugger at the top of the dashboard (only in development mode) -->
-    <TokenDebugger v-if="isDevelopment" />
-    
     <div class="flex h-screen">
       <div>
         <SideNavBar />

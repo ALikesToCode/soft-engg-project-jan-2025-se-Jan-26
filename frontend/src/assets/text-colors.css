@@ -1,0 +1,252 @@
+/* Text color overrides to ensure readability */
+
+/* Base text colors */
+body {
+  color: #1f2937; /* Default text color - dark enough to be readable */
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  color: #111827; /* Dark gray, almost black */
+}
+
+/* Paragraph text */
+p {
+  color: #374151; /* Dark gray */
+}
+
+/* Links */
+a {
+  color: #722b2b; /* Maroon-600 */
+}
+
+a:hover {
+  color: #591f1f; /* Maroon-700 */
+}
+
+/* Tailwind text color overrides */
+.text-gray-400 {
+  color: #9fa6b2 !important;
+}
+
+.text-gray-500 {
+  color: #6b7280 !important;
+}
+
+.text-gray-600 {
+  color: #4b5563 !important;
+}
+
+.text-gray-700 {
+  color: #374151 !important;
+}
+
+.text-gray-800 {
+  color: #1f2937 !important;
+}
+
+.text-gray-900 {
+  color: #111827 !important;
+}
+
+/* Maroon text colors */
+.text-maroon-500 {
+  color: #8b4444 !important;
+}
+
+.text-maroon-600 {
+  color: #722b2b !important;
+}
+
+.text-maroon-700 {
+  color: #591f1f !important;
+}
+
+/* Ensure buttons have readable text */
+button, .btn {
+  color: inherit;
+}
+
+/* Force light text */
+.text-white {
+  color: #ffffff !important;
+}
+
+/* Force dark text */
+.text-black {
+  color: #000000 !important;
+}
+
+/* Yellow text */
+.text-yellow-400 {
+  color: #FACC15 !important;
+}
+
+/* Gold text for hero section */
+.hero-section .text-yellow-400,
+.hero-section .text-yellow-400.block,
+.hero-section .text-yellow-400.sm\:inline {
+  color: #FFD700 !important; /* Pure gold color for maximum visibility */
+}
+
+/* Fix for sidebar and landing page elements */
+/* Ensure dark backgrounds have light text */
+.bg-gray-800, .bg-gray-900, 
+.bg-maroon-600, .bg-maroon-700, .bg-maroon-800, .bg-maroon-900,
+.from-maroon-600, .from-maroon-700, .from-maroon-800,
+.to-maroon-600, .to-maroon-700, .to-maroon-800,
+.via-maroon-600, .via-maroon-700, .via-maroon-800 {
+  color: #ffffff !important;
+}
+
+/* Button text fixes */
+.bg-white.text-maroon-600, 
+.bg-white .text-maroon-600 {
+  color: #722b2b !important;
+}
+
+/* Hover state for buttons */
+.hover\:bg-white:hover .text-white,
+.hover\:bg-white:hover .material-icons {
+  color: #722b2b !important;
+  transition: color 0.2s ease;
+}
+
+/* Ensure icons in buttons have proper hover states */
+.hover\:bg-white:hover .material-icons {
+  color: #722b2b !important;
+}
+
+/* Ensure proper text color on dark backgrounds */
+.bg-maroon-600, .bg-maroon-700, .bg-maroon-800, .bg-maroon-900,
+.bg-gray-700, .bg-gray-800, .bg-gray-900 {
+  color: white !important;
+}
+
+.bg-maroon-600 *, .bg-maroon-700 *, .bg-maroon-800 *, .bg-maroon-900 *,
+.bg-gray-700 *, .bg-gray-800 *, .bg-gray-900 * {
+  color: white !important;
+}
+
+/* Exception for specific elements that need their own colors */
+.bg-maroon-600 .text-yellow-400, .bg-maroon-700 .text-yellow-400, 
+.bg-maroon-800 .text-yellow-400, .bg-maroon-900 .text-yellow-400,
+.bg-gray-700 .text-yellow-400, .bg-gray-800 .text-yellow-400, 
+.bg-gray-900 .text-yellow-400 {
+  color: #FFD700 !important;
+}
+
+/* Ensure proper hover effects for all buttons */
+.hover\:text-maroon-600:hover {
+  color: #722b2b !important;
+}
+
+/* Fix for Learn More button hover effect */
+.border-white.hover\:bg-white:hover span {
+  color: #722b2b !important;
+}
+
+/* Ensure proper text color for all buttons */
+.text-white {
+  color: white !important;
+}
+
+/* Ensure proper text color for all buttons on hover */
+.hover\:bg-white:hover .hover\:text-maroon-600:hover {
+  color: #722b2b !important;
+}
+
+/* Specific selectors for navigation components */
+nav.bg-gradient-to-b, 
+.bg-gradient-to-br,
+[class*="from-maroon-"][class*="to-maroon-"],
+[class*="from-maroon-"][class*="via-maroon-"][class*="to-maroon-"] {
+  color: #ffffff !important;
+}
+
+/* Ensure text within dark backgrounds is white */
+.bg-gray-800 *, .bg-gray-900 *, 
+.bg-maroon-600 *, .bg-maroon-700 *, .bg-maroon-800 *, .bg-maroon-900 *,
+.from-maroon-600 *, .from-maroon-700 *, .from-maroon-800 *,
+.to-maroon-600 *, .to-maroon-700 *, .to-maroon-800 *,
+.via-maroon-600 *, .via-maroon-700 *, .via-maroon-800 * {
+  color: #ffffff;
+}
+
+/* Exception for nested elements that should maintain their own colors */
+.bg-gray-800 .bg-white *, .bg-gray-900 .bg-white *,
+.bg-maroon-600 .bg-white *, .bg-maroon-700 .bg-white *,
+.bg-maroon-800 .bg-white *, .bg-maroon-900 .bg-white *,
+.from-maroon-600 .bg-white *, .from-maroon-700 .bg-white *, .from-maroon-800 .bg-white *,
+.to-maroon-600 .bg-white *, .to-maroon-700 .bg-white *, .to-maroon-800 .bg-white *,
+.via-maroon-600 .bg-white *, .via-maroon-700 .bg-white *, .via-maroon-800 .bg-white * {
+  color: #1f2937 !important;
+}
+
+/* Hero section specific overrides */
+.hero-section h1 {
+  color: #ffffff !important;
+}
+
+.hero-section h1 .text-yellow-400 {
+  color: #facc15 !important;
+}
+
+.hero-section p {
+  color: #f9fafb !important;
+}
+
+/* Override for hero section buttons */
+.bg-gradient-to-br.from-maroon-600.via-maroon-700.to-maroon-800 .bg-white {
+  color: #722b2b !important;
+}
+
+.bg-gradient-to-br.from-maroon-600.via-maroon-700.to-maroon-800 .border-white {
+  color: #ffffff !important;
+}
+
+/* Hover states for hero buttons */
+.bg-gradient-to-br.from-maroon-600.via-maroon-700.to-maroon-800 .hover\:bg-white:hover {
+  color: #722b2b !important;
+}
+
+.bg-gradient-to-br.from-maroon-600.via-maroon-700.to-maroon-800 .hover\:text-maroon-600:hover {
+  color: #722b2b !important;
+}
+
+/* Specific fix for the sidebar navigation */
+.bg-gradient-to-b.from-maroon-800.to-maroon-600,
+.bg-gradient-to-b.from-maroon-800.to-maroon-600 * {
+  color: #ffffff !important;
+}
+
+/* Fix for landing page hero sections */
+.bg-gradient-to-br.from-maroon-600.via-maroon-700.to-maroon-800,
+.bg-gradient-to-br.from-maroon-600.via-maroon-700.to-maroon-800 * {
+  color: #ffffff !important;
+}
+
+/* Specific fix for material icons in dark backgrounds */
+.bg-maroon-600 .material-icons, .bg-maroon-700 .material-icons, .bg-maroon-800 .material-icons,
+.bg-gray-800 .material-icons, .bg-gray-900 .material-icons,
+.from-maroon-600 .material-icons, .from-maroon-700 .material-icons, .from-maroon-800 .material-icons,
+.to-maroon-600 .material-icons, .to-maroon-700 .material-icons, .to-maroon-800 .material-icons,
+.via-maroon-600 .material-icons, .via-maroon-700 .material-icons, .via-maroon-800 .material-icons,
+.material-symbols-outlined {
+  color: #ffffff !important;
+}
+
+/* Specific fix for the sidebar navigation text */
+.text-white, .text-white * {
+  color: #ffffff !important;
+}
+
+/* Specific fix for yellow accents in dark backgrounds */
+.text-yellow-400, .text-yellow-400 * {
+  color: #FFD700 !important;
+}
+
+/* Ensure the hero section yellow text is always visible */
+.bg-gradient-to-br.from-maroon-600.via-maroon-700.to-maroon-800 .text-yellow-400 {
+  color: #FFD700 !important;
+} 

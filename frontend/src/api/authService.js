@@ -182,6 +182,31 @@ export const authService = {
         }
     },
 
+    // Set password for user
+    async setPassword(password) {
+        try {
+            logger.log('Setting user password...');
+            const response = await this.axiosInstance.post('/auth/set-password', { password });
+            
+            if (response.status === 200) {
+                logger.log('Password set successfully');
+                return { success: true, message: 'Password set successfully' };
+            }
+            return { success: false, message: 'Failed to set password' };
+        } catch (error) {
+            logger.error('Error setting password:', error.message);
+            if (error.response) {
+                logger.error(`Status: ${error.response.status}, Data:`, error.response.data);
+                return { 
+                    success: false, 
+                    message: error.response.data?.detail || 'Failed to set password',
+                    status: error.response.status
+                };
+            }
+            return { success: false, message: 'Network error while setting password' };
+        }
+    },
+
     // Debug token status - useful for troubleshooting
     debugTokenStatus() {
         const token = localStorage.getItem('token');
