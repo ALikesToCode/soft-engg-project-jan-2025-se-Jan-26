@@ -166,6 +166,32 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         )
     return payload # this returns the payload of the token containing email and role
 
+def get_current_faculty(token: str = Depends(oauth2_scheme)) -> dict:
+    """
+    Get the current user and verify they have faculty role.
+    
+    This function extends get_current_user by adding a role check to ensure
+    the authenticated user has faculty privileges. It's used as a dependency
+    in routes that should only be accessible to faculty members.
+    
+    Args:
+        token: The JWT token from the Authorization header
+        
+    Returns:
+        Dictionary containing the user information from the token
+        
+    Raises:
+        HTTPException: If the token is invalid or the user is not a faculty member
+    """
+    user = get_current_user(token)
+    if user.get("role") != "faculty":
+        raise HTTPException(
+            status_code=403,
+            detail="Faculty privileges required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
 def require_auth(token: str = Depends(oauth2_scheme)) -> dict:
     """
     Dependency that enforces authentication by ensuring a valid JWT token.
