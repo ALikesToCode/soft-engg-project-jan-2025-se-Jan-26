@@ -72,10 +72,48 @@ async def add_missing_columns():
         logger.error(f"Error adding columns: {e}")
         raise
 
+async def create_faq_table():
+    """Create the FAQs table if it doesn't exist."""
+    try:
+        async with engine.begin() as conn:
+            # Check if the table exists
+            result = await conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'faqs'
+                );
+            """))
+            exists = result.scalar()
+            
+            if not exists:
+                # Create the uuid extension first
+                await conn.execute(text("""
+                    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+                """))
+                
+                # Then create the table
+                await conn.execute(text("""
+                    CREATE TABLE faqs (
+                        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                        question VARCHAR(500) NOT NULL,
+                        answer TEXT NOT NULL,
+                        category_id VARCHAR(50) NOT NULL,
+                        priority INTEGER DEFAULT 0,
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP WITH TIME ZONE
+                    );
+                """))
+                logging.info("FAQs table created successfully.")
+            else:
+                logging.info("FAQs table already exists.")
+    except Exception as e:
+        logging.error(f"Error creating FAQs table: {e}")
+
 async def main():
-    logger.info("Starting database migration...")
+    """Run all migration functions"""
     await add_missing_columns()
-    logger.info("Database migration completed successfully")
+    await create_faq_table()
+    logger.info("All migrations completed successfully.")
 
 if __name__ == "__main__":
     asyncio.run(main()) 
