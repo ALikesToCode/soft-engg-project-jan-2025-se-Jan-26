@@ -1,9 +1,9 @@
+import uuid
 from sqlalchemy import Column, String, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base, engine
-from app.models.course import Course, user_courses  # Import both Course and junction table
-from app.models.role import user_roles  # Import junction table
+from app.models.course import Course
 import uuid
 from datetime import datetime
 
@@ -58,9 +58,6 @@ class User(Base):
     roles = relationship("Role", secondary=user_roles, back_populates="users")  # Many-to-Many with Role
     courses_taught = relationship("Course", foreign_keys="[Course.faculty_id]", back_populates="faculty")
     course_enrollments = relationship("CourseEnrollment", back_populates="student")
-
-    def __repr__(self):
-        return f"<User(email={self.email}, roles={[role.name for role in self.roles]}, courses={[course.title for course in self.courses]})>"
 
 # Create the table in the database
 async def init_db():

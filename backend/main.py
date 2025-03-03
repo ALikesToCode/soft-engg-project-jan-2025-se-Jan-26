@@ -1,4 +1,6 @@
-from app.models.user import init_db
+from app.models.user import User
+from app.models.course import Course
+from app.database import init_db
 from fastapi import FastAPI, Depends
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware

@@ -45,3 +45,23 @@ async def get_db():
             raise
         finally:
             await session.close()
+
+# Initialize the database tables
+async def init_db():
+    """
+    Initialize the database tables.
+    
+    This function creates all tables defined in the models if they don't already exist.
+    It should be called during application startup to ensure the database schema is properly set up.
+    
+    Returns:
+        None
+    """
+    # Import models here to ensure they are registered with Base
+    # but avoid circular imports
+    from app.models.user import User
+    from app.models.course import Course, CourseEnrollment
+    from app.models.assignment import Assignment, Submission
+    
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)

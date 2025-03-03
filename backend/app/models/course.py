@@ -1,5 +1,4 @@
-from sqlalchemy import Column, String, Integer, \
-    DateTime, ForeignKey, Text, Table, UniqueConstraint, LargeBinary, Enum
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base, engine
