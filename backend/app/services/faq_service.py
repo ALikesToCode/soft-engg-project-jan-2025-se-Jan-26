@@ -24,7 +24,7 @@ async def get_faqs(db: AsyncSession, category_id: Optional[str] = None, skip: in
     query = select(FAQ).order_by(desc(FAQ.priority), FAQ.created_at)
     
     if category_id and category_id != "all":
-        query = query.filter(FAQ.category_id == category_id)
+        query = query.filter(FAQ.category_id == str(category_id))
     
     result = await db.execute(query.offset(skip).limit(limit))
     return result.scalars().all()

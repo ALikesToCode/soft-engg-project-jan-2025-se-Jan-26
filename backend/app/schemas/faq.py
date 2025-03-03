@@ -47,4 +47,5 @@ class FAQRating(BaseModel):
 
 class FAQSearchQuery(BaseModel):
     """Schema for searching FAQs."""
-    query: str = Field(..., description="Search query string", min_length=2) 
+    query: str = Field(..., description="Search query string", min_length=2)
+    limit: int = Field(20, description="Maximum number of results to return") 
