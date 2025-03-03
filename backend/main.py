@@ -11,6 +11,13 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.security import OAuth2PasswordBearer
 from app.services.auth_service import oauth2_scheme
 from starlette.requests import Request
+from app.routes.auth import router as auth_router
+from app.routes.user import router as user_router
+from app.routes.llm import router as chat
+from app.routes.assignment import router as assignment_router
+from app.routes.faq import router as faq_router
+from app.routes.system_settings import router as system_settings_router
+from app.routes.courses import router as courses_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -251,14 +258,6 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# Import and include your authentication routes
-from app.routes.auth import router as auth_router
-from app.routes.user import router as user_router
-from app.routes.llm import router as chat
-from app.routes.assignment import router as assignment_router
-from app.routes.faq import router as faq_router
-from app.routes.system_settings import router as system_settings_router
-
 # Add routers with API prefix
 app.include_router(auth_router, prefix=settings.API_PREFIX, tags=["Authentication"])
 app.include_router(user_router, prefix=settings.API_PREFIX, tags=["User"])
@@ -266,6 +265,7 @@ app.include_router(chat, prefix=settings.API_PREFIX, tags=["Chat"])
 app.include_router(assignment_router, prefix=settings.API_PREFIX, tags=["Assignments"])
 app.include_router(faq_router, tags=["FAQs"])
 app.include_router(system_settings_router, prefix=settings.API_PREFIX, tags=["System Settings"])
+app.include_router(courses_router, prefix=settings.API_PREFIX, tags=["Courses"])
 
 @app.on_event("startup")
 async def startup():

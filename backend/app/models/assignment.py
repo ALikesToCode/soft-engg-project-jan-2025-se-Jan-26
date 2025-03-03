@@ -45,7 +45,7 @@ class Assignment(Base):
                   comment="Assignment title")
     description = Column(Text, nullable=False, 
                         comment="Assignment description")
-    course_id = Column(UUID(as_uuid=True), nullable=False, 
+    course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id"), nullable=False, 
                       comment="Foreign key to the course this assignment belongs to")
     module_id = Column(UUID(as_uuid=True), nullable=True, 
                       comment="Foreign key to the module this assignment belongs to (optional)")
@@ -89,6 +89,7 @@ class Assignment(Base):
     # Relationships
     submissions = relationship("Submission", back_populates="assignment", cascade="all, delete-orphan")
     creator = relationship("User", foreign_keys=[created_by])
+    course = relationship("Course", back_populates="assignments")
 
 
 class Submission(Base):

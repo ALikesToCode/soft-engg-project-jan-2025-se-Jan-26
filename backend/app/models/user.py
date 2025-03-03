@@ -1,6 +1,8 @@
 from sqlalchemy import Column, String, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 from app.database import Base, engine
+from app.models.course import Course
 import uuid
 from datetime import datetime
 
@@ -25,6 +27,8 @@ class User(Base):
         created_at: Timestamp when the user record was created
         updated_at: Timestamp when the user record was last updated
         role: User's role in the system (student, faculty, or support)
+        courses_taught: List of courses taught by the user (faculty only)
+        course_enrollments: List of course enrollments (student only)
     """
     __tablename__ = "users"
 
@@ -47,6 +51,10 @@ class User(Base):
     # three roles are defined: student, faculty, support
     role = Column(String, default="student", 
                  comment="User's role in the system: student, faculty, or support")
+
+    # Course relationships
+    courses_taught = relationship("Course", foreign_keys="[Course.faculty_id]", back_populates="faculty")
+    course_enrollments = relationship("CourseEnrollment", back_populates="student")
 
 # Create the table in the database
 async def init_db():

@@ -6,10 +6,11 @@ from typing import Optional
 from app.database import get_db
 from app.models.user import User
 from app.utils.jwt_utils import create_access_token, decode_access_token
-import bcrypt
+from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 async def get_user(db: AsyncSession, email: str) -> Optional[User]:
     """
@@ -56,8 +57,8 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> Opti
         if not user.hashed_password:
             return False
             
-        # Check if the password is correct
-        if not bcrypt.checkpw(password.encode("utf-8"), user.hashed_password.encode("utf-8")):
+        # Check if the password is correct using passlib
+        if not pwd_context.verify(password, user.hashed_password):
             return False
             
         return user
@@ -254,7 +255,7 @@ async def set_user_password(db: AsyncSession, user_id: str, password: str) -> bo
             return False
             
         # Hash the password
-        hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        hashed_password = pwd_context.hash(password)
         
         # Update the user's password
         user.hashed_password = hashed_password
@@ -296,7 +297,7 @@ async def create_default_users(db: AsyncSession) -> None:
             support_user = User(
                 email=support_email,
                 name="Support Admin",
-                hashed_password=bcrypt.hashpw("support123".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+                hashed_password=pwd_context.hash("support123"),
                 is_google_user=False,
                 role="support"
             )
@@ -312,7 +313,7 @@ async def create_default_users(db: AsyncSession) -> None:
             faculty_user = User(
                 email=faculty_email,
                 name="Faculty Admin",
-                hashed_password=bcrypt.hashpw("faculty123".encode("utf-8"), bcrypt.gensalt()).decode("utf-8"),
+                hashed_password=pwd_context.hash("faculty123"),
                 is_google_user=False,
                 role="faculty"
             )
