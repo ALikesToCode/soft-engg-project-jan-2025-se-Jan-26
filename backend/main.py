@@ -49,11 +49,13 @@ async def root():
 from app.routes.auth import router as auth_router
 from app.routes.user import router as user_router
 from app.routes.llm import router as chat
+from app.routes.course_routes import course_router
 
 # Add routers with API prefix
 app.include_router(auth_router, prefix=settings.API_PREFIX, tags=["Authentication"])
 app.include_router(user_router, prefix=settings.API_PREFIX, tags=["User"])
 app.include_router(chat, prefix=settings.API_PREFIX, tags=["Chat"])
+app.include_router(course_router, prefix=settings.API_PREFIX, tags=["Course"])
 
 @app.on_event("startup")
 async def startup():

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
+import api from '@/utils/api'
 
 export const useContentStore = defineStore('content', () => {
   // State
@@ -13,7 +14,7 @@ export const useContentStore = defineStore('content', () => {
   const getModuleById = computed(() => (id) => {
     return modules.value.find(module => module.id === id)
   })
-  
+
   const getContentByModule = computed(() => (moduleId) => {
     return modules.value.find(m => m.id === moduleId)?.contents || []
   })
@@ -25,11 +26,33 @@ export const useContentStore = defineStore('content', () => {
   // Actions
   async function getModules(courseId) {
     try {
-      const response = await axios.get(`/api/v1/courses/${courseId}/modules`)
+      const response = await api.get(`courses/module/${courseId}`)
       modules.value = response.data
       return response
     } catch (error) {
       console.error('Error fetching modules:', error)
+      throw error
+    }
+  }
+
+  async function createContent(contentData, url) {
+    try {
+      const response = await api.post(url, { ...contentData })
+      return response
+    }
+    catch (error) {
+      console.error('Error creating content:', error)
+      throw error
+    }
+  }
+
+  async function updateContent(contentData, url) {
+    try {
+      const response = await api.put(url, { ...contentData })
+      return response
+    }
+    catch (error) {
+      console.error('Error updating content:', error)
       throw error
     }
   }
@@ -61,7 +84,7 @@ export const useContentStore = defineStore('content', () => {
 
   async function deleteModule(moduleId) {
     try {
-      await axios.delete(`/api/v1/modules/${moduleId}`)
+      await api.delete(`/courses/module/${moduleId}`)
       modules.value = modules.value.filter(m => m.id !== moduleId)
     } catch (error) {
       console.error('Error deleting module:', error)
@@ -75,13 +98,13 @@ export const useContentStore = defineStore('content', () => {
         ...contentData,
         status: 'published'
       })
-      
+
       // Update module contents
       const moduleIndex = modules.value.findIndex(m => m.id === contentData.moduleId)
       if (moduleIndex !== -1) {
         modules.value[moduleIndex].contents.push(response.data)
       }
-      
+
       lastSavedContent.value = response.data
       return response
     } catch (error) {
@@ -105,7 +128,7 @@ export const useContentStore = defineStore('content', () => {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      
+
       const response = await axios.post(
         `/api/v1/content/${contentId}/file`,
         formData,
@@ -157,6 +180,8 @@ export const useContentStore = defineStore('content', () => {
     saveDraft,
     uploadFile,
     setCurrentContent,
-    addToHistory
+    addToHistory,
+    createContent,
+    updateContent
   }
 }) 

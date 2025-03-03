@@ -17,6 +17,8 @@
               @course-selected="handleCourseSelected"
               @module-selected="handleModuleSelected"
               @module-updated="handleModuleUpdated"
+              @course-selected-data="handleCourseDataSelected"
+              @lecture-data-content="handleLectureContentData"
             />
           </div>
 
@@ -25,17 +27,18 @@
             <!-- Content Form -->
             <div class="bg-white rounded-lg shadow p-6">
               <h2 class="text-lg font-semibold text-gray-900">Content Details</h2>
-              
+
               <div class="space-y-4">
                 <!-- Content Type Selection with Preview Toggle -->
                 <div class="flex justify-between items-center">
                   <div class="flex-1 mr-4">
                     <label class="block text-sm font-medium text-gray-900 mb-1">Content Type</label>
                     <select
+                      :disabled="isExistingData"
                       v-model="contentForm.type"
                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500"
                     >
-                      <option value="video">Video Lecture</option>
+                      <option value="lecture">Video Lecture</option>
                       <option value="document">Document</option>
                       <option value="quiz">Quiz</option>
                       <option value="assignment">Assignment</option>
@@ -45,8 +48,8 @@
                     @click="togglePreview"
                     class="px-4 py-2 text-maroon-600 hover:bg-maroon-50 rounded-lg flex items-center gap-2"
                   >
-                    <span class="material-icons">{{ previewMode ? 'edit' : 'visibility' }}</span>
-                    {{ previewMode ? 'Edit Mode' : 'Preview' }}
+                    <span class="material-icons">{{ previewMode ? 'visibility' : 'edit' }}</span>
+                    {{ previewMode ? 'Preview' : 'Edit Mode' }}
                   </button>
                 </div>
 
@@ -54,6 +57,7 @@
                 <div>
                   <label class="block text-sm font-medium text-gray-900 mb-1">Title</label>
                   <input
+                    :disabled="!previewMode"
                     v-model="contentForm.title"
                     type="text"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500"
@@ -64,6 +68,7 @@
                 <div>
                   <label class="block text-sm font-medium text-gray-900 mb-1">Description</label>
                   <textarea
+                    :disabled="!previewMode"
                     v-model="contentForm.description"
                     rows="3"
                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500"
@@ -72,10 +77,11 @@
                 </div>
 
                 <!-- Video URL Input -->
-                <div v-if="contentForm.type === 'video'">
+                <div v-if="contentForm.type === 'lecture'">
                   <label class="block text-sm font-medium text-gray-900 mb-1">Video URL</label>
                   <div class="relative">
                     <input
+                      :disabled="!previewMode"
                       v-model="contentForm.videoUrl"
                       type="url"
                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 pr-12"
@@ -98,10 +104,7 @@
 
                 <!-- Quiz Builder -->
                 <div v-if="contentForm.type === 'quiz'">
-                  <QuizBuilder
-                    :preview-mode="previewMode"
-                    @update:quiz="handleQuizUpdate"
-                  />
+                  <QuizBuilder :preview-mode="previewMode" @update:quiz="handleQuizUpdate" />
                 </div>
 
                 <!-- Assignment Builder -->
@@ -122,17 +125,30 @@
                   Save as Draft
                 </button>
                 <button
+                  v-if="!isExistingData"
                   @click="publishContent"
-                  class="px-6 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700"
+                  class="px-6 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 hover:cursor-pointer"
                   :disabled="!isFormValid"
                 >
                   Publish
+                </button>
+                <button
+                  :disabled="!previewMode"
+                  v-if="isExistingData"
+                  @click="updatePublishedContent"
+                  class="px-6 py-2 bg-maroon-600 text-white rounded-lg"
+                  :class="{ 'hover:bg-maroon-700 hover:cursor-pointer': previewMode }"
+                >
+                  Update
                 </button>
               </div>
             </div>
 
             <!-- Video Preview -->
-            <div v-if="contentForm.type === 'video' && contentForm.videoUrl" class="bg-white rounded-lg shadow p-6">
+            <div
+              v-if="contentForm.type === 'lecture' && contentForm.videoUrl"
+              class="bg-white rounded-lg shadow p-6"
+            >
               <h2 class="text-lg font-semibold text-gray-900">Video Preview</h2>
               <div class="aspect-w-16">
                 <iframe
@@ -150,7 +166,7 @@
     </div>
 
     <!-- Loading Overlay -->
-    <div v-if="isLoading" class="loading-overlay">
+    <div v-if="isLoading || isSavingData" class="loading-overlay">
       <LoadingSpinner />
     </div>
 
@@ -188,7 +204,7 @@ export default {
     ModuleManager,
     FileUploader,
     QuizBuilder,
-    AssignmentBuilder
+    AssignmentBuilder,
   },
   setup() {
     const toast = useToast()
@@ -196,8 +212,9 @@ export default {
     const courseStore = useCourseStore()
     const quizStore = useQuizStore()
     const assignmentStore = useAssignmentStore()
-    
+
     // State Management
+    const isSavingData = ref(false)
     const isLoading = ref(false)
     const showConfirmDialog = ref(false)
     const confirmAction = ref(null)
@@ -207,11 +224,17 @@ export default {
     const previewMode = ref(false)
     const courses = ref([])
 
+    const selectedCourseId = ref(null)
+    const selectedWeek_ = ref(null)
+    const selectedModuleId = ref(null)
+    const selectedLectureId = ref(null)
+    const isExistingData = ref(false)
+
     // Form State
     const contentForm = ref({
       title: '',
       description: '',
-      type: 'video',
+      type: 'lecture',
       videoUrl: '',
       status: 'draft',
       moduleId: null,
@@ -221,17 +244,17 @@ export default {
         difficulty: 'intermediate',
         prerequisites: [],
         learningObjectives: [],
-        visibility: 'hidden'
-      }
+        visibility: 'hidden',
+      },
     })
 
     // Computed Properties
     const isFormValid = computed(() => {
       if (!contentForm.value.title || !contentForm.value.description) return false
-      if (!selectedModule.value) return false
-      
+      if (!selectedModuleId.value) return false
+
       switch (contentForm.value.type) {
-        case 'video':
+        case 'lecture':
           return isValidVideoUrl(contentForm.value.videoUrl)
         case 'document':
           return !!contentForm.value.file
@@ -245,6 +268,39 @@ export default {
     })
 
     // Event Handlers
+    const handleCourseDataSelected = ({ courseId, selectedWeek, moduleId }) => {
+      isExistingData.value = false
+      selectedCourseId.value = courseId
+      selectedWeek_.value = selectedWeek
+      selectedModuleId.value = moduleId
+      contentForm.value = {
+        title: '',
+        description: '',
+        type: 'lecture',
+        videoUrl: '',
+        status: 'draft',
+        moduleId: null,
+        order: 0,
+        metadata: {
+          duration: '',
+          difficulty: 'intermediate',
+          prerequisites: [],
+          learningObjectives: [],
+          visibility: 'hidden',
+        },
+      }
+    }
+
+    const handleLectureContentData = (data) => {
+      selectedLectureId.value = data.id
+      isExistingData.value = data.isExistingData
+      previewMode.value = false
+      contentForm.value.title = data.lecture_title
+      contentForm.value.videoUrl = data.content_url
+      contentForm.value.description = data.content_desc
+
+      contentForm.value.type = 'lecture' //when user has selected some other type
+    }
     const handleCourseSelected = (courseId) => {
       contentForm.value.courseId = courseId
       selectedModule.value = null
@@ -256,7 +312,7 @@ export default {
     }
 
     const handleModuleUpdated = () => {
-      // Refresh content if needed
+      toast.success('Module has been deleted!')
     }
 
     const handleFileSelected = (file) => {
@@ -271,14 +327,14 @@ export default {
       contentForm.value.questions = quizData.questions
       contentForm.value.metadata = {
         ...contentForm.value.metadata,
-        ...quizData.settings
+        ...quizData.settings,
       }
     }
 
     const handleAssignmentUpdate = (assignmentData) => {
       contentForm.value.metadata = {
         ...contentForm.value.metadata,
-        ...assignmentData.settings
+        ...assignmentData.settings,
       }
       contentForm.value.file = assignmentData.file
     }
@@ -300,17 +356,25 @@ export default {
 
     const publishContent = async () => {
       if (!isFormValid.value) return
-      
+
       showConfirmDialog.value = true
-      confirmMessage.value = 'Are you sure you want to publish this content? Published content will be immediately visible to students.'
+      confirmMessage.value =
+        'Are you sure you want to publish this content? Published content will be immediately visible to students.'
       confirmAction.value = async () => {
         try {
           contentForm.value.status = 'published'
+          showConfirmDialog.value = false
+          isSavingData.value = true
           await saveContent()
           toast.success('Content published successfully')
+          isSavingData.value = false
           resetForm()
         } catch (error) {
           handleError(error, 'Failed to publish content')
+          showConfirmDialog.value = false
+        } finally {
+          showConfirmDialog.value = false
+          isSavingData.value = false
         }
       }
     }
@@ -320,21 +384,65 @@ export default {
       try {
         const contentData = {
           ...contentForm.value,
-          moduleId: selectedModule.value.id
+          moduleId: selectedModuleId.value,
         }
-
         if (contentForm.value.type === 'quiz') {
           await quizStore.createQuiz(contentData)
         } else if (contentForm.value.type === 'assignment') {
           await assignmentStore.createAssignment(contentData)
         } else {
-          await contentStore.createContent(contentData)
+          const url = '/courses/module/content/lecture' //for content type = video/lecture
+          await contentStore.createContent(contentData, url)
         }
+      } catch (error) {
+        isLoading.value = false
       } finally {
         isLoading.value = false
       }
     }
 
+    const updatePublishedContent = async () => {
+      console.log(contentForm.value)
+      // if (!isFormValid.value) return
+      showConfirmDialog.value = true
+      confirmMessage.value =
+        'Are you sure you want to update this content? Updated content will be immediately visible to students.'
+      confirmAction.value = async () => {
+        try {
+          contentForm.value.status = 'updated'
+          showConfirmDialog.value = false
+          isSavingData.value = true
+          await updateContent()
+          toast.success('Content Updated successfully')
+          isSavingData.value = false
+          resetForm()
+        } catch (error) {
+          handleError(error, 'Failed to updated content')
+          showConfirmDialog.value = false
+        } finally {
+          showConfirmDialog.value = false
+          isSavingData.value = false
+        }
+      }
+    }
+
+    const updateContent = async () => {
+      isLoading.value = true
+      try {
+        contentForm.value.moduleId = '0'
+        const contentData = {
+          ...contentForm.value,
+          lectureId: selectedLectureId.value,
+        }
+        console.log({ ...contentData })
+        const url = '/courses/module/content/lecture' //for content type = video/lecture
+        await contentStore.updateContent(contentData, url)
+      } catch (error) {
+        isLoading.value = false
+      } finally {
+        isLoading.value = false
+      }
+    }
     // Utility Functions
     const isValidVideoUrl = (url) => {
       return url?.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/)
@@ -352,7 +460,7 @@ export default {
       contentForm.value = {
         title: '',
         description: '',
-        type: 'video',
+        type: 'lecture',
         videoUrl: '',
         status: 'draft',
         moduleId: selectedModule.value?.id,
@@ -362,8 +470,8 @@ export default {
           difficulty: 'intermediate',
           prerequisites: [],
           learningObjectives: [],
-          visibility: 'hidden'
-        }
+          visibility: 'hidden',
+        },
       }
       unsavedChanges.value = false
     }
@@ -388,9 +496,13 @@ export default {
     })
 
     // Watch for Changes
-    watch([contentForm], () => {
-      unsavedChanges.value = true
-    }, { deep: true })
+    watch(
+      [contentForm],
+      () => {
+        unsavedChanges.value = true
+      },
+      { deep: true },
+    )
 
     return {
       isLoading,
@@ -412,9 +524,18 @@ export default {
       togglePreview,
       saveAsDraft,
       publishContent,
-      getEmbedUrl
+      getEmbedUrl,
+      selectedCourseId,
+      selectedModuleId,
+      selectedWeek_,
+      handleCourseDataSelected,
+      isSavingData,
+      handleLectureContentData,
+      isExistingData,
+      updatePublishedContent,
+      selectedLectureId,
     }
-  }
+  },
 }
 </script>
 
