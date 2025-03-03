@@ -172,8 +172,21 @@ export default {
       await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000))
     },
     async getAIResponse(message) {
-      // TODO: Replace with actual AI API call
-      return `This is a simulated response to: "${message}"\n\nI can help you with:\n- Programming questions\n- Course materials\n- Learning paths`
+      // TODO: Further Improvements needed.
+
+      const response = await fetch("http://localhost:8000/api/v1/chat",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({"query":message})
+      });
+
+      if (!response.ok){
+        throw new Error(`Error: ${response.status}`)
+      }
+
+      const data = await response.json();
+      return data
+      
     },
     generateChatTitle(message) {
       // Generate a title based on the first message

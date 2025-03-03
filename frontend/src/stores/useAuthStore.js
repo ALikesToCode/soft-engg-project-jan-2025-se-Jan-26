@@ -4,17 +4,31 @@ import FetchFunction from '../utils/FetchFunction';
 import router from '../router/index';
 import { User } from '@/models/User';
 import { APP_BASE_URL, ROLE } from '@/AppConstants/globalConstants';
+import { authService } from '@/api/authService';
 
 // For development only - remove in production
 const DEV_MODE = import.meta.env.VITE_NODE_ENV === 'development';
 
 export default defineStore('auth', () => {
-    const token = ref(JSON.parse(localStorage.getItem('token')));
+    // Parse token from localStorage, handling both string and JSON string formats
+    const storedToken = localStorage.getItem('token');
+    let parsedToken = null;
+    
+    try {
+        // Try to parse as JSON first
+        parsedToken = storedToken ? JSON.parse(storedToken) : null;
+    } catch (e) {
+        // If not valid JSON, use as is
+        parsedToken = storedToken;
+    }
+    
+    const token = ref(parsedToken);
     const returnUrl = ref(null);
     const user = ref(new User(null, "", "", ""));
     const userRole = ref(localStorage.getItem('userRole') || ROLE.STUDENT);
     const isAdmin = ref(false);
     const isDevelopment = ref(DEV_MODE);
+    const hasPassword = ref(false);
 
     // Development only - helper to switch roles
     function switchRole(role) {
@@ -91,6 +105,7 @@ export default defineStore('auth', () => {
         user.value.name = userData.name;
         user.value.email = userData.email;
         user.value.role = userData.role;
+        hasPassword.value = userData.has_password || false;
         setUserRole(userData.role);
     }
 
@@ -108,7 +123,37 @@ export default defineStore('auth', () => {
     function clearUser() {
         user.value = new User(null, "", "", "");
         userRole.value = ROLE.STUDENT;
+        hasPassword.value = false;
         localStorage.removeItem('userRole');
+    }
+
+    // Check if the current user needs to set a password
+    async function checkPasswordStatus() {
+        try {
+            const userData = await authService.getCurrentUser();
+            if (userData) {
+                hasPassword.value = userData.has_password || false;
+                return hasPassword.value;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error checking password status:', error);
+            return false;
+        }
+    }
+
+    // Set password for the current user
+    async function setPassword(password) {
+        try {
+            const result = await authService.setPassword(password);
+            if (result.success) {
+                hasPassword.value = true;
+            }
+            return result;
+        } catch (error) {
+            console.error('Error setting password:', error);
+            return { success: false, message: 'Failed to set password' };
+        }
     }
 
     return {
@@ -118,12 +163,15 @@ export default defineStore('auth', () => {
         userRole,
         isAdmin,
         isDevelopment,
+        hasPassword,
         switchRole,
         login,
         logout,
         setUser,
         setUserRole,
         clearUser,
-        navigateToRoleDashboard
+        navigateToRoleDashboard,
+        checkPasswordStatus,
+        setPassword
     };
 });

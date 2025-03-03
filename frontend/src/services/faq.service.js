@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// Mock data for development
+// Mock data for development or fallback
 const mockFaqs = [
   {
     id: 1,
@@ -60,77 +60,101 @@ const mockFaqs = [
   }
 ]
 
-// Force development mode for now until backend is ready
-const isDevelopment = true
+// Check if we're in development mode
+const isDevelopment = import.meta.env.MODE === 'development';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 class FAQService {
   async getAllFaqs() {
-    // Always return mock data for now
-    return Promise.resolve(mockFaqs)
+    try {
+      const response = await axios.get(`${API_URL}/api/v1/faqs`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching FAQs:', error);
+      // Fallback to mock data in case of error
+      return mockFaqs;
+    }
   }
 
   async getFaqsByCategory(category) {
-    // Filter mock data by category
-    const filteredFaqs = category === 'all' 
-      ? mockFaqs 
-      : mockFaqs.filter(faq => faq.categoryId === category)
-    return Promise.resolve(filteredFaqs)
+    try {
+      const url = category === 'all' 
+        ? `${API_URL}/api/v1/faqs` 
+        : `${API_URL}/api/v1/faqs?category_id=${category}`;
+      
+      const response = await axios.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching FAQs by category:', error);
+      // Fallback to mock data in case of error
+      const filteredFaqs = category === 'all' 
+        ? mockFaqs 
+        : mockFaqs.filter(faq => faq.categoryId === category);
+      return filteredFaqs;
+    }
   }
 
   async createFaq(faqData) {
-    const newFaq = {
-      id: mockFaqs.length + 1,
-      ...faqData
+    try {
+      const response = await axios.post(`${API_URL}/api/v1/faqs`, faqData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating FAQ:', error);
+      throw error;
     }
-    mockFaqs.push(newFaq)
-    return Promise.resolve({ data: newFaq })
   }
 
   async updateFaq(faqId, faqData) {
-    const index = mockFaqs.findIndex(f => f.id === faqId)
-    if (index !== -1) {
-      mockFaqs[index] = { ...mockFaqs[index], ...faqData }
-      return Promise.resolve({ data: mockFaqs[index] })
+    try {
+      const response = await axios.put(`${API_URL}/api/v1/faqs/${faqId}`, faqData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating FAQ:', error);
+      throw error;
     }
-    throw new Error('FAQ not found')
   }
 
   async deleteFaq(faqId) {
-    const index = mockFaqs.findIndex(f => f.id === faqId)
-    if (index !== -1) {
-      mockFaqs.splice(index, 1)
-      return Promise.resolve()
+    try {
+      await axios.delete(`${API_URL}/api/v1/faqs/${faqId}`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting FAQ:', error);
+      throw error;
     }
-    throw new Error('FAQ not found')
   }
 
   async rateFaq(faqId, isHelpful) {
-    const faq = mockFaqs.find(f => f.id === faqId)
-    if (faq) {
-      faq.ratings = faq.ratings || { helpful: 0, unhelpful: 0 }
-      if (isHelpful) {
-        faq.ratings.helpful++
-      } else {
-        faq.ratings.unhelpful++
-      }
-      return Promise.resolve({ data: { ratings: faq.ratings } })
+    try {
+      const response = await axios.post(`${API_URL}/api/v1/faqs/${faqId}/rate`, { isHelpful });
+      return response.data;
+    } catch (error) {
+      console.error('Error rating FAQ:', error);
+      throw error;
     }
-    throw new Error('FAQ not found')
   }
 
   async searchFaqs(query) {
-    const lowercaseQuery = query.toLowerCase()
-    const results = mockFaqs.filter(
-      faq =>
-        faq.question.toLowerCase().includes(lowercaseQuery) ||
-        faq.answer.toLowerCase().includes(lowercaseQuery)
-    )
-    return Promise.resolve(results)
+    try {
+      const response = await axios.post(`${API_URL}/api/v1/faqs/search`, { query });
+      return response.data;
+    } catch (error) {
+      console.error('Error searching FAQs:', error);
+      // Fallback to client-side search in case of error
+      const lowercaseQuery = query.toLowerCase();
+      return mockFaqs.filter(
+        faq =>
+          faq.question.toLowerCase().includes(lowercaseQuery) ||
+          faq.answer.toLowerCase().includes(lowercaseQuery)
+      );
+    }
   }
 
   async submitSupportRequest(requestData) {
-    console.log('Support request submitted:', requestData)
-    return Promise.resolve({ success: true })
+    // This would typically send the support request to a backend endpoint
+    // For now, just log it and return a success message
+    console.log('Support request submitted:', requestData);
+    return { success: true };
   }
 }
 

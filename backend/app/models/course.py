@@ -1,60 +1,106 @@
 from sqlalchemy import Column, String, Integer, \
-    DateTime, ForeignKey, Text, Table, UniqueConstraint, LargeBinary
+    DateTime, ForeignKey, Text, Table, UniqueConstraint, LargeBinary, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base, engine
+from app.models.assignment import Assignment
 from datetime import datetime
+import enum
+
+# Enums for course and enrollment status
+class CourseStatus(str, enum.Enum):
+    DRAFT = "draft"
+    ACTIVE = "active" 
+    ARCHIVED = "archived"
+
+class EnrollmentStatus(str, enum.Enum):
+    ENROLLED = "enrolled"
+    COMPLETED = "completed"
+    DROPPED = "dropped"
+    WAITLISTED = "waitlisted"
 
 # Many-to-Many: Users & Courses
 user_courses = Table(
     "user_courses",
     Base.metadata,
     Column("user_id", UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("course_id", Integer, ForeignKey("course.id", ondelete="CASCADE"), primary_key=True)
+    Column("course_id", UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True)
 )
 
 # Course Model
 class Course(Base):
-    __tablename__ = "course"
+    __tablename__ = "courses"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    code = Column(String, nullable=False, unique=True)
     title = Column(String, nullable=False)
     syllabus = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     credits = Column(Integer, nullable=False)
     duration = Column(Integer, nullable=False)  # e.g., Weeks or Months
+    semester = Column(String, nullable=False)
+    year = Column(Integer, nullable=False)
+    status = Column(Enum(CourseStatus), nullable=False, default=CourseStatus.DRAFT)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    faculty_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
-    users = relationship("User", secondary=user_courses, back_populates="courses")  # Many-to-Many with Users
-    modules = relationship("Module", back_populates="course", cascade="all, delete-orphan")  # One-to-Many
+    # Relationships
+    faculty = relationship("User", foreign_keys=[faculty_id], back_populates="courses_taught")
+    creator = relationship("User", foreign_keys=[created_by])
+    users = relationship("User", secondary=user_courses, back_populates="courses")
+    modules = relationship("Module", back_populates="course", cascade="all, delete-orphan")
+    enrollments = relationship("CourseEnrollment", back_populates="course")
+    assignments = relationship("Assignment", back_populates="course")
 
     def to_dict(self):
         return {
             "id": str(self.id),
+            "name": self.name,
+            "code": self.code,
             "title": self.title,
             "syllabus": self.syllabus,
             "description": self.description,
             "credits": self.credits,
             "duration": self.duration,
+            "semester": self.semester,
+            "year": self.year,
+            "status": self.status.value,
             "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat(),
-            # "users": [user.id for user in self.users]  # Only storing user IDs
+            "updated_at": self.updated_at.isoformat()
         }
+
+class CourseEnrollment(Base):
+    __tablename__ = "course_enrollments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id"), nullable=False)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    status = Column(Enum(EnrollmentStatus), nullable=False, default=EnrollmentStatus.ENROLLED)
+    enrollment_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    completion_date = Column(DateTime)
+    grade = Column(String)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    course = relationship("Course", back_populates="enrollments")
+    student = relationship("User", back_populates="course_enrollments")
 
 # Module Model (Course → Modules)
 class Module(Base):
     __tablename__ = "module"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    course_id = Column(Integer, ForeignKey("course.id", ondelete="CASCADE"), nullable=False)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False)  # e.g., "Week 1"
     position = Column(Integer, nullable=False)  # Ordering field
     course = relationship("Course", back_populates="modules")
     lectures = relationship("Lecture", back_populates="module", cascade="all, delete-orphan")
 
     __table_args__ = (UniqueConstraint("course_id", "position", name="module_position_unique"),)
-
 
     def to_dict(self):
         return {
@@ -123,12 +169,9 @@ class LectureContentDoc(Base):
             "id": str(self.id),
             "lecture_id": str(self.lecture_id),
             "lecture_title": self.title,
-            "file_name": self.file_name,  # Returning file name instead of binary content
             "file_type": self.file_type,
             "content_desc": self.content_desc,
         }
-
-
 
 # Initialize Database Tables
 async def init_db():

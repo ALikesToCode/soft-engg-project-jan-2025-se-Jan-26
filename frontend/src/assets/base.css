@@ -36,6 +36,8 @@
   --section-gap: 160px;
 }
 
+/* Remove dark mode media query to ensure consistent text colors */
+/* 
 @media (prefers-color-scheme: dark) {
   :root {
     --color-background: var(--vt-c-black);
@@ -49,6 +51,7 @@
     --color-text: var(--vt-c-text-dark-2);
   }
 }
+*/
 
 *,
 *::before,
@@ -83,4 +86,34 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure text is always readable on various backgrounds */
+.text-dark {
+  color: var(--vt-c-black) !important;
+}
+
+.text-light {
+  color: var(--vt-c-white) !important;
+}
+
+/* Override Tailwind text colors to ensure readability */
+.text-gray-500 {
+  color: #6b7280 !important;
+}
+
+.text-gray-600 {
+  color: #4b5563 !important;
+}
+
+.text-gray-700 {
+  color: #374151 !important;
+}
+
+.text-gray-800 {
+  color: #1f2937 !important;
+}
+
+.text-gray-900 {
+  color: #111827 !important;
 }

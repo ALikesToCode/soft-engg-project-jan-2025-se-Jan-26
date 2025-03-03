@@ -1,0 +1,23 @@
+/* Hero section specific styles */
+.hero-section h1 .text-yellow-400,
+.hero-section h1 .text-yellow-400.block,
+.hero-section h1 .text-yellow-400.sm\:inline {
+  color: #FFD700 !important; /* Pure gold color */
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.2); /* Add text shadow for better visibility */
+}
+
+.hero-section h1 {
+  color: #FFFFFF !important;
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Ensure the hero section yellow text is always visible */
+.bg-gradient-to-br.from-maroon-600.via-maroon-700.to-maroon-800 .text-yellow-400 {
+  color: #FFD700 !important;
+}
+
+/* Hero section paragraph text */
+.hero-section p {
+  color: #f9fafb !important;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.1);
+} 

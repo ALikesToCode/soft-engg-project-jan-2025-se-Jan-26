@@ -3,7 +3,7 @@ import { API_ROUTES } from '@/config/api.routes'
 
 export const AssignmentService = {
   async fetchAssignments(courseId) {
-    return axios.get(`${API_ROUTES.COURSES}/${courseId}/assignments`)
+    return axios.get(`${API_ROUTES.ASSIGNMENTS}?course_id=${courseId}`)
   },
 
   async createAssignment(assignmentData) {
@@ -42,15 +42,25 @@ export const AssignmentService = {
     )
   },
 
-  async gradeSubmission(submissionId, gradingData) {
-    return axios.post(`${API_ROUTES.SUBMISSIONS}/${submissionId}/grade`, gradingData)
+  async gradeSubmission(assignmentId, submissionId, gradingData) {
+    return axios.put(`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/grade/${submissionId}`, gradingData)
   },
 
   async fetchSubmissions(assignmentId) {
     return axios.get(`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/submissions`)
   },
 
-  async getSubmissionDetails(submissionId) {
-    return axios.get(`${API_ROUTES.SUBMISSIONS}/${submissionId}`)
+  async getSubmissionDetails(assignmentId, submissionId) {
+    return axios.get(`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/submissions/${submissionId}`)
+  },
+  
+  async downloadSubmissionFile(assignmentId, submissionId) {
+    return axios.get(`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/submissions/${submissionId}/download`, {
+      responseType: 'blob'
+    })
+  },
+  
+  async getPlagiarismReport(assignmentId, submissionId) {
+    return axios.get(`${API_ROUTES.ASSIGNMENTS}/${assignmentId}/submissions/${submissionId}/plagiarism`)
   }
 } 

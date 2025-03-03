@@ -221,6 +221,8 @@
 </template>
 
 <script>
+import { authService } from '@/api/authService';
+
 export default {
   name: 'LoginView',
   data() {
@@ -282,10 +284,13 @@ export default {
     },
     async handleGoogleSignIn() {
       try {
-        // Implement Google Sign In
-        console.log('Google Sign In clicked')
+        this.loading = true;
+        // Use our authService to handle Google Sign In
+        await authService.loginWithGoogle();
       } catch (error) {
-        console.error('Google Sign In error:', error)
+        console.error('Google Sign In error:', error);
+      } finally {
+        this.loading = false;
       }
     },
   },

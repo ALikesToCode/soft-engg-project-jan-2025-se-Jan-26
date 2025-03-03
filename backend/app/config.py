@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import List
+from datetime import timedelta
 
 class Settings(BaseSettings):
     # Database
@@ -9,6 +10,16 @@ class Settings(BaseSettings):
     SESSION_SECRET: str
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
+
+    # JWT Settings
+    JWT_SECRET: str
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
+    # Redis Settings
+    REDIS_HOST: str = "127.0.0.1"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
 
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
@@ -26,6 +37,13 @@ class Settings(BaseSettings):
     PORT: int = 8000
     HOST: str = "0.0.0.0"
     ENV: str = "development"
+
+    # LLM
+    LANGSMITH_TRACING:str
+    LANGSMITH_ENDPOINT:str
+    LANGSMITH_API_KEY:str
+    LANGSMITH_PROJECT:str
+    GOOGLE_API_KEY:str
 
     class Config:
         env_file = ".env"
