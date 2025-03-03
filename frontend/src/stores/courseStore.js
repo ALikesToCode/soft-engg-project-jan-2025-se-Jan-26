@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
+import api from '@/utils/api'
 
 export const useCourseStore = defineStore('course', () => {
   // State
@@ -8,16 +9,17 @@ export const useCourseStore = defineStore('course', () => {
   const currentCourse = ref(null)
   const loading = ref(false)
   const error = ref(null)
+  const course_id = ref(null)
 
   // Getters
   const getCourseById = computed(() => (id) => {
     return courses.value.find(course => course.id === id)
   })
-  
+
   const facultyCourses = computed(() => {
     return courses.value.filter(course => course.role === 'faculty')
   })
-  
+
   const activeCourses = computed(() => {
     return courses.value.filter(course => course.status === 'active')
   })
@@ -26,7 +28,7 @@ export const useCourseStore = defineStore('course', () => {
   async function fetchCourses() {
     try {
       loading.value = true
-      const response = await axios.get('/api/v1/courses')
+      const response = await axios.get('/courses')
       courses.value = response.data
       return response
     } catch (err) {
@@ -40,7 +42,8 @@ export const useCourseStore = defineStore('course', () => {
   async function getFacultyCourses() {
     try {
       loading.value = true
-      const response = await axios.get('/api/v1/faculty/courses')
+      const response = await api.get("/courses")
+      console.log(response.data)
       courses.value = response.data
       return response
     } catch (err) {

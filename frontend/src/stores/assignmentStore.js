@@ -116,10 +116,10 @@ export const useAssignmentStore = defineStore('assignment', () => {
     }
   }
 
-  async function gradeSubmission(submissionId, gradingData) {
+  async function gradeSubmission(assignmentId, submissionId, gradingData) {
     try {
       loading.value = true
-      const response = await AssignmentService.gradeSubmission(submissionId, gradingData)
+      const response = await AssignmentService.gradeSubmission(assignmentId, submissionId, gradingData)
       
       const submissionIndex = submissions.value.findIndex(s => s.id === submissionId)
       if (submissionIndex !== -1) {
@@ -149,10 +149,36 @@ export const useAssignmentStore = defineStore('assignment', () => {
     }
   }
 
-  async function getSubmissionDetails(submissionId) {
+  async function getSubmissionDetails(assignmentId, submissionId) {
     try {
       loading.value = true
-      const response = await AssignmentService.getSubmissionDetails(submissionId)
+      const response = await AssignmentService.getSubmissionDetails(assignmentId, submissionId)
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+  
+  async function downloadSubmissionFile(assignmentId, submissionId) {
+    try {
+      loading.value = true
+      const response = await AssignmentService.downloadSubmissionFile(assignmentId, submissionId)
+      return response
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+  
+  async function getPlagiarismReport(assignmentId, submissionId) {
+    try {
+      loading.value = true
+      const response = await AssignmentService.getPlagiarismReport(assignmentId, submissionId)
       return response
     } catch (err) {
       error.value = err.message
@@ -192,6 +218,8 @@ export const useAssignmentStore = defineStore('assignment', () => {
     gradeSubmission,
     fetchSubmissions,
     getSubmissionDetails,
+    downloadSubmissionFile,
+    getPlagiarismReport,
     setCurrentAssignment,
     clearError
   }

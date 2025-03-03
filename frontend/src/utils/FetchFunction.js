@@ -13,11 +13,11 @@ async function fetchFunction({ url, init_obj, authTokenReq }) {
         const token = localStorage.getItem('token');
         if (init_obj.headers === undefined) {
             init_obj.headers = {
-                'Authentication': `Bearer ${token}`,
+                'Authorization': `Bearer ${token}`,
             }
         }
         else {
-            init_obj.headers['Authentication'] = `Bearer ${token}`
+            init_obj.headers['Authorization'] = `Bearer ${token}`
         }
     }
     const response = await fetch(url, init_obj).catch(() => { 

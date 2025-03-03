@@ -50,6 +50,15 @@ const routes = [
     }
   },
   {
+    path: '/auth/callback',
+    name: 'auth-callback',
+    component: () => import('../views/AuthCallback.vue'),
+    meta: {
+      title: 'Authentication | Cognitum',
+      hideUserNavbar: true
+    }
+  },
+  {
     path: '/faq',
     name: 'faq',
     component: () => import('../views/FAQView.vue'),
