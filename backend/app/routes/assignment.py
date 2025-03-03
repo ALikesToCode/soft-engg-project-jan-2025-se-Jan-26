@@ -12,7 +12,7 @@ import json
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-router = APIRouter(prefix="/api/v1", tags=["assignments"])
+router = APIRouter(tags=["assignments"])
 
 # Pydantic models for request/response validation
 class AssignmentCreate(BaseModel):
