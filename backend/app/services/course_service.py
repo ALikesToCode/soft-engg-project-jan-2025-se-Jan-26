@@ -12,9 +12,13 @@ from typing import List, Dict, Any
 
 # Course Content Management Functions
 async def get_all_courses(db: AsyncSession):
-    result = await db.execute(select(Course))
-    courses = result.scalars().all()  # Fetch all course objects
-    return [courses.to_dict() for courses in courses] 
+    try:
+        result = await db.execute(select(Course))
+        courses = result.scalars().all()  # Fetch all course objects
+        return [course.to_dict() for course in courses]
+    except Exception as e:
+        print(f"Error fetching courses: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching courses")
 
 async def get_modules_by_course(course_id: str, db: AsyncSession):
     result = await db.execute(

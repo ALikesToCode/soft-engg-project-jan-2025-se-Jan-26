@@ -62,6 +62,42 @@ async def init_db():
     from app.models.user import User
     from app.models.course import Course, CourseEnrollment
     from app.models.assignment import Assignment, Submission
+    from app.models.role import Role
+    from datetime import datetime
+    import uuid
     
     async with engine.begin() as conn:
+        # Drop all tables first to ensure clean state
+        await conn.run_sync(Base.metadata.drop_all)
+        # Create all tables
         await conn.run_sync(Base.metadata.create_all)
+    
+    # Create default users
+    async with async_session() as session:
+        try:
+            # Create default faculty user
+            faculty_user = User(
+                id=uuid.UUID('123e4567-e89b-12d3-a456-426614174000'),
+                email="faculty@study.iitm.ac.in",
+                name="Default Faculty",
+                role="faculty",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            session.add(faculty_user)
+            
+            # Create default support user
+            support_user = User(
+                id=uuid.UUID('234f5678-f90a-23e4-b567-537725285111'),
+                email="support@study.iitm.ac.in",
+                name="Default Support",
+                role="support",
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            session.add(support_user)
+            
+            await session.commit()
+        except Exception as e:
+            await session.rollback()
+            raise e

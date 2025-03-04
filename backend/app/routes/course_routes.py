@@ -3,6 +3,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.services.course_service import *
 from app.utils.helpers import LectureContentData, ModuleCreate, UpdateLectureContentData
+from app.models.course import Course, CourseStatus
+from uuid import UUID
+from pydantic import BaseModel
+
+class CourseCreate(BaseModel):
+    name: str
+    code: str
+    title: str
+    credits: int
+    duration: int
+    semester: str
+    year: int
+    faculty_id: UUID
+    created_by: UUID
+    syllabus: str | None = None
+    description: str | None = None
 
 course_router = APIRouter()
 
@@ -94,6 +110,38 @@ async def delete_module(module_id: str, db: AsyncSession = Depends(get_db)):
         else:
             raise HTTPException(status_code=404, detail="Module not found")
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@course_router.post("/courses", response_model=dict)
+async def create_course(course_data: CourseCreate, db: AsyncSession = Depends(get_db)):
+    """
+    Create a new course
+    """
+    try:
+        # Create new course object
+        new_course = Course(
+            name=course_data.name,
+            code=course_data.code,
+            title=course_data.title,
+            credits=course_data.credits,
+            duration=course_data.duration,
+            semester=course_data.semester,
+            year=course_data.year,
+            faculty_id=course_data.faculty_id,
+            created_by=course_data.created_by,
+            syllabus=course_data.syllabus,
+            description=course_data.description,
+            status=CourseStatus.DRAFT
+        )
+        
+        # Add to database
+        db.add(new_course)
+        await db.commit()
+        await db.refresh(new_course)
+        
+        return new_course.to_dict()
+    except Exception as e:
+        await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
