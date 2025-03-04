@@ -1,10 +1,11 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base, engine
 from app.models.assignment import Assignment
 from datetime import datetime
 import enum
+import uuid
 
 # Enums for course and enrollment status
 class CourseStatus(str, enum.Enum):
