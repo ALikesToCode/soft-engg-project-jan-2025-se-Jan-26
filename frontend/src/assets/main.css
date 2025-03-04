@@ -1,16 +1,12 @@
-/* Import base styles first */
+/* Import all CSS files first */
 @import './base.css';
-
-/* Then import Tailwind */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Then import our custom styles to override Tailwind */
 @import './text-colors.css';
 @import './hero-styles.css';
 
-/* Your custom styles below */
+/* Then Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 /* Custom scrollbar styles */
 @layer utilities {
