@@ -1,3 +1,10 @@
 .venv
 __pycache__
 my_venv
+app.log
+*.log
+*.log.*
+*.log.*.*
+*.log.*.*.*
+*.log.*.*.*.*
+*.log.*.*.*.*.*

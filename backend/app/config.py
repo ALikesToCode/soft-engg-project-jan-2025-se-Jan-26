@@ -49,7 +49,6 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str
 
     # Monitoring Settings
-    MONITORING_LOG_FILE: str = "app.log"
     MONITORING_METRICS_HISTORY_SIZE: int = 1000
     MONITORING_HEALTH_CHECK_INTERVAL: int = 60  # seconds
     MONITORING_METRICS_COLLECTION_INTERVAL: int = 30  # seconds

@@ -304,17 +304,18 @@ class MonitoringService:
 
     async def get_system_logs(self, level: str = "INFO", limit: int = 100) -> List[Dict]:
         """
-        Get system logs
+        Get system logs.
+        
         Args:
-            level: Log level filter
-            limit: Maximum number of logs to return
+            level: The minimum log level to include
+            limit: The maximum number of logs to return
+            
         Returns:
-            List of log entries
+            A list of log entries
         """
         try:
-            # Check if we're using Logflare
+            # If Logflare is enabled, return a message about logs being in Logflare
             if settings.USE_LOGFLARE:
-                # When using Logflare, we'll return a message directing to the Logflare dashboard
                 return [{
                     "timestamp": datetime.now().isoformat(),
                     "level": "INFO",
@@ -328,20 +329,41 @@ class MonitoringService:
             if not log_file.exists():
                 return []
             
+            # Read the log file
             logs = []
-            with open(log_file, 'r') as f:
-                for line in f.readlines()[-limit:]:
-                    if level.upper() in line:  # Simple filtering by log level
-                        logs.append({
-                            "timestamp": line.split(' - ')[0],
-                            "level": line.split(' - ')[2],
-                            "message": line.split(' - ')[3].strip()
-                        })
+            level_value = get_log_level(level)
             
-            return logs
+            with open(log_file, "r") as f:
+                for line in f:
+                    try:
+                        # Parse the log line
+                        parts = line.strip().split(" - ", 3)
+                        if len(parts) < 4:
+                            continue
+                            
+                        timestamp_str, logger_name, level_str, message = parts
+                        log_level_value = get_log_level(level_str)
+                        
+                        # Skip logs below the requested level
+                        if log_level_value < level_value:
+                            continue
+                            
+                        logs.append({
+                            "timestamp": timestamp_str,
+                            "logger": logger_name,
+                            "level": level_str,
+                            "message": message
+                        })
+                    except Exception as e:
+                        continue
+                        
+            # Sort logs by timestamp (newest first) and limit
+            logs.sort(key=lambda x: x["timestamp"], reverse=True)
+            return logs[:limit]
+            
         except Exception as e:
             logger.error(f"Error getting system logs: {str(e)}")
-            raise HTTPException(status_code=500, detail="Error getting system logs")
+            return []
 
     async def create_alert(self, alert_type: str, severity: str, message: str) -> Alert:
         """

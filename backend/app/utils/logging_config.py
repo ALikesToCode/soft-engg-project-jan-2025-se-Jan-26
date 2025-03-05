@@ -44,9 +44,6 @@ def configure_logging():
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
     
-    # Determine log file path
-    log_file = log_dir / "app.log"
-    
     # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
@@ -57,20 +54,6 @@ def configure_logging():
     
     # Create formatter
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    
-    # Add file handler
-    file_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=10 * 1024 * 1024,  # 10 MB
-        backupCount=5
-    )
-    file_handler.setFormatter(formatter)
-    root_logger.addHandler(file_handler)
-    
-    # Add console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    root_logger.addHandler(console_handler)
     
     # Add Logflare handler if enabled
     if settings.USE_LOGFLARE and LOGFLARE_AVAILABLE:
@@ -88,6 +71,24 @@ def configure_logging():
         
         # Log that Logflare is enabled
         root_logger.info("Logflare logging enabled")
+    else:
+        # Only add file handler if Logflare is not enabled
+        # Determine log file path
+        log_file = log_dir / "app.log"
+        
+        # Add file handler
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=10 * 1024 * 1024,  # 10 MB
+            backupCount=5
+        )
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+    
+    # Add console handler (always add this regardless of Logflare)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
     
     # Configure specific loggers
     configure_specific_loggers()

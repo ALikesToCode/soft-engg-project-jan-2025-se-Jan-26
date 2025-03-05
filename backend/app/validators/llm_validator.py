@@ -97,7 +97,7 @@ class LLMInputValidator(BaseModel):
         """Pydantic model configuration"""
         validate_assignment = True
         extra = "forbid"  # Forbid extra attributes
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "query": "What courses are available in the IITM program?",
                 "max_tokens": 1024
