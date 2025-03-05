@@ -1,36 +1,72 @@
 from app.models.user import User
 from app.models.course import Course
 from app.database import init_db
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException, Request, status
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, Response
 from app.services.auth_service import create_default_users
 from app.database import get_db, async_session
-from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html
+from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
 from fastapi.security import OAuth2PasswordBearer
 from app.services.auth_service import oauth2_scheme
 from starlette.requests import Request
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from app.routes.auth import router as auth_router
 from app.routes.user import router as user_router
 from app.routes.llm import router as chat
 from app.routes.assignment import router as assignment_router
 from app.routes.faq import router as faq_router
 from app.routes.system_settings import router as system_settings_router
-from app.routes.courses import router as courses_router1
-from app.routes.course_routes import course_router as course_router2
+from app.routes.courses import router as courses_router
+from app.routes.course_routes import course_router
+from app.routes.academic_integrity import router as academic_integrity_router
+from app.services.api_functions import *  # Import all API function declarations
+from app.routes import monitoring
+from app.services.monitoring_service import monitoring_service
+import logging
+from app.utils.logging_config import configure_logging
+from app.middleware import LoggingMiddleware
+from contextlib import asynccontextmanager
 
+# Configure logging
+logger = configure_logging()
+logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+
+# Get the absolute path to the static directory
+STATIC_DIR = Path(__file__).parent / "static"
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for application startup and shutdown"""
+    # Initialize database on startup
+    await init_db()
+    
+    # Create default users
+    async with async_session() as session:
+        await create_default_users(session)
+    
+    # Start monitoring service background tasks
+    await monitoring_service.start_background_tasks()
+    
+    yield
+    
+    # Stop monitoring service background tasks on shutdown
+    await monitoring_service.stop_background_tasks()
+
+# Replace the FastAPI app instance with one that uses the lifespan handler
 app = FastAPI(
-    title=settings.APP_NAME,
-    description=settings.APP_DESCRIPTION,
-    version=settings.APP_VERSION,
-    # Disable default docs to use custom endpoints
-    docs_url=None,
+    title="Support Dashboard API",
+    description="API for the support dashboard monitoring system",
+    version="1.0.0",
+    docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json",
-    swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect"
+    swagger_js_url="/static/swagger-ui-bundle.js",
+    swagger_css_url="/static/swagger-ui.css",
+    lifespan=lifespan
 )
 
 # Secret key for session middleware
@@ -52,6 +88,12 @@ app.add_middleware(
 # Add Session Middleware
 app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
 
+# Add Logging Middleware
+app.add_middleware(LoggingMiddleware)
+
+# Mount static files directory
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
 @app.get("/")
 async def root():
     return JSONResponse({
@@ -61,6 +103,7 @@ async def root():
         "redoc": "/redoc",
         "openapi_json": "/openapi.json",
         "openapi_yaml": "/openapi.yaml",
+        "download_yaml": "/openapi.yaml?download=true",
         "status": "operational",
         "environment": settings.ENV,
         "api_prefix": settings.API_PREFIX
@@ -69,12 +112,12 @@ async def root():
 # Custom Swagger UI with OAuth2 support
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
-    return get_swagger_ui_html(
+    swagger_ui_html = get_swagger_ui_html(
         openapi_url=app.openapi_url,
-        title=f"{app.title} - Swagger UI",
+        title=f"{settings.APP_NAME} - Swagger UI",
         oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
-        swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
-        swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
+        swagger_js_url="/static/swagger-ui-bundle.js",
+        swagger_css_url="/static/swagger-ui.css",
         swagger_favicon_url="https://fastapi.tiangolo.com/img/favicon.png",
         init_oauth={
             "clientId": settings.GOOGLE_CLIENT_ID,
@@ -83,22 +126,99 @@ async def custom_swagger_ui_html():
             "usePkceWithAuthorizationCodeGrant": True,
             "scopes": ["openid", "email", "profile"],
             "useBasicAuthenticationWithAccessCodeGrant": True
-        },
-        swagger_ui_parameters={
-            "persistAuthorization": True,
-            "displayRequestDuration": True,
-            "filter": True,
-            "tryItOutEnabled": True,
-            "syntaxHighlight": {
-                "activate": True,
-                "theme": "agate"
-            },
-            "oauth2RedirectUrl": f"{settings.FRONTEND_URL}/docs/oauth2-redirect"
         }
     )
+    
+    # Convert to string and add our custom button
+    content = swagger_ui_html.body.decode("utf-8")
+    
+    # Add CSS for download button
+    download_button_css = """
+    <style>
+        .download-yaml-btn {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white !important;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            z-index: 1000;
+            font-size: 14px;
+            font-family: sans-serif;
+        }
+        .download-yaml-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+    """
+    
+    # Add download button
+    download_button = """
+    <a href="/openapi.yaml?download=true" class="download-yaml-btn">Download YAML</a>
+    """
+    
+    # Insert CSS in head
+    content = content.replace("</head>", f"{download_button_css}</head>")
+    
+    # Insert button after body tag
+    content = content.replace("<body>", f"<body>{download_button}")
+    
+    return HTMLResponse(content=content)
+
+# Custom ReDoc UI with YAML download button
+@app.get("/redoc", include_in_schema=False)
+async def custom_redoc_html():
+    redoc_html = get_redoc_html(
+        openapi_url=app.openapi_url,
+        title=f"{settings.APP_NAME} - ReDoc",
+        redoc_favicon_url="https://fastapi.tiangolo.com/img/favicon.png",
+        with_google_fonts=True
+    )
+    
+    # Convert to string and add our custom button
+    content = redoc_html.body.decode("utf-8")
+    
+    # Add CSS for download button
+    download_button_css = """
+    <style>
+        .download-yaml-btn {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white !important;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: bold;
+            z-index: 1000;
+            font-size: 14px;
+            font-family: sans-serif;
+        }
+        .download-yaml-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+    """
+    
+    # Add download button
+    download_button = """
+    <a href="/openapi.yaml?download=true" class="download-yaml-btn">Download YAML</a>
+    """
+    
+    # Insert CSS in head
+    content = content.replace("</head>", f"{download_button_css}</head>")
+    
+    # Insert button after body tag
+    content = content.replace("<body>", f"<body>{download_button}")
+    
+    return HTMLResponse(content=content)
 
 # OAuth2 redirect endpoint for Swagger UI
-@app.get("/docs/oauth2-redirect", include_in_schema=False)
+@app.get(app.swagger_ui_oauth2_redirect_url, include_in_schema=False)
 async def swagger_ui_redirect():
     return get_swagger_ui_oauth2_redirect_html()
 
@@ -211,8 +331,7 @@ def custom_openapi():
         
         1. Use the `/api/v1/auth/login` endpoint with your email and password
         2. Copy the returned access token
-        3. Click the "Authorize" button and enter the token in the format: `Bearer your_token`
-        
+        3. Click the "Authorize" button and enter the token in the format: `Bearer your_token`        
         ### Google OAuth Authentication
         
         1. Click the "Authorize" button
@@ -256,28 +375,40 @@ def custom_openapi():
         {"googleOAuth2": ["openid", "email", "profile"]}
     ]
     
+    # Add function declarations to the schema
+    openapi_schema["x-function-declarations"] = {
+        "functions": function_router.get_function_declarations()
+    }
+    
+    # Add tags with descriptions and ordering
+    openapi_schema["tags"] = [
+        {"name": "Authentication", "description": "Authentication and user session management endpoints"},
+        {"name": "User", "description": "User profile and account management endpoints"},
+        {"name": "Monitoring", "description": "System monitoring and health check endpoints"},
+        {"name": "Courses", "description": "Course management and enrollment endpoints"},
+        {"name": "Assignments", "description": "Assignment creation, submission, and grading endpoints"},
+        {"name": "Chat", "description": "AI chat and conversation endpoints"},
+        {"name": "FAQs", "description": "Frequently asked questions management endpoints"},
+        {"name": "System Settings", "description": "System configuration and settings endpoints"}
+    ]
+    
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
 app.openapi = custom_openapi
 
 # Add routers with API prefix
-app.include_router(auth_router, prefix=settings.API_PREFIX, tags=["Authentication"])
-app.include_router(user_router, prefix=settings.API_PREFIX, tags=["User"])
-app.include_router(chat, prefix=settings.API_PREFIX, tags=["Chat"])
-app.include_router(assignment_router, prefix=settings.API_PREFIX, tags=["Assignments"])
+app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
+app.include_router(user_router, prefix="/api/v1", tags=["User"])
+app.include_router(chat, prefix="/api/v1", tags=["Chat"])
+app.include_router(assignment_router, prefix="/api/v1", tags=["Assignments"])
 app.include_router(faq_router, tags=["FAQs"])
-app.include_router(system_settings_router, prefix=settings.API_PREFIX, tags=["System Settings"])
-app.include_router(courses_router1, prefix=settings.API_PREFIX, tags=["User Courses"])
-app.include_router(course_router2, prefix=settings.API_PREFIX, tags=["Faculty Courses"])
-
-@app.on_event("startup")
-async def startup():
-    await init_db()
-    
-    # Create default users
-    async with async_session() as session:
-        await create_default_users(session)
+app.include_router(system_settings_router, prefix="/api/v1", tags=["System Settings"])
+# Include both course routers with appropriate tags
+app.include_router(courses_router, prefix="/api/v1", tags=["User Courses"])
+app.include_router(course_router, prefix="/api/v1", tags=["Faculty Courses"])
+app.include_router(academic_integrity_router, prefix="/api/v1", tags=["Academic Integrity"])
+app.include_router(monitoring.router, prefix="/api/v1", tags=["Monitoring"])
 
 if __name__ == "__main__":
     import uvicorn

@@ -2,7 +2,7 @@ from fastapi import HTTPException, Depends
 from starlette.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from typing import Optional
+from typing import Optional, Callable
 from app.database import get_db
 from app.models.user import User
 from app.utils.jwt_utils import create_access_token, decode_access_token
@@ -193,7 +193,7 @@ def get_current_faculty(token: str = Depends(oauth2_scheme)) -> dict:
         )
     return user
 
-def require_auth(token: str = Depends(oauth2_scheme)) -> dict:
+async def require_auth(token: str = Depends(oauth2_scheme)) -> dict:
     """
     Dependency that enforces authentication by ensuring a valid JWT token.
     
@@ -210,7 +210,7 @@ def require_auth(token: str = Depends(oauth2_scheme)) -> dict:
     Raises:
         HTTPException: If authentication fails or the token is invalid
     """
-    user = get_current_user(token)
+    user = await get_current_user(token)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     return user
@@ -324,3 +324,31 @@ async def create_default_users(db: AsyncSession) -> None:
     except Exception as e:
         await db.rollback()
         print(f"Error creating default users: {str(e)}")
+
+def require_role(required_role: str) -> Callable:
+    """
+    Create a dependency that requires a specific role.
+    
+    This function returns a dependency that checks if the current user has
+    the required role. It's used to protect routes that should only be
+    accessible to users with specific roles.
+    
+    Args:
+        required_role: The role required to access the route
+        
+    Returns:
+        A dependency function that validates the user's role
+        
+    Raises:
+        HTTPException: If the user doesn't have the required role
+    """
+    async def role_checker(token: str = Depends(oauth2_scheme)) -> dict:
+        user = await get_current_user(token)
+        if user.get("role") != required_role:
+            raise HTTPException(
+                status_code=403,
+                detail=f"{required_role} role required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return user
+    return role_checker

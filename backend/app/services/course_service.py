@@ -16,23 +16,33 @@ import json
 import shutil
 import uuid
 
-async def get_all_courses(db: AsyncSession, user_id: uuid.UUID):
+# Course Content Management Functions
+async def get_all_courses(db: AsyncSession, user_id: uuid.UUID = None):
     """
-        Get all Courses for a specific faculty user.
+    Get all Courses for a specific faculty user or all courses if no user_id is provided.
+    
+    Args:
+        db: Database session
+        user_id: user id of the faculty (optional)
         
-        Args:
-            db: Database session
-            user_id: user id of the faculty
+    Returns:
+        List of Courses with their details
+    """
+    try:
+        if user_id:
+            # Fetch all course objects for a specific faculty
+            result = await db.execute(
+                select(Course).where(Course.faculty_id == user_id)
+            )
+        else:
+            # Fetch all course objects
+            result = await db.execute(select(Course))
             
-        Returns:
-            List of Courses with their details
-        """
-    # Fetch all course objects
-    result = await db.execute(
-        select(Course).where(Course.faculty_id == user_id)
-    )
-    courses = result.scalars().all()
-    return [courses.to_dict() for courses in courses] 
+        courses = result.scalars().all()
+        return [course.to_dict() for course in courses]
+    except Exception as e:
+        print(f"Error fetching courses: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching courses")
 
 async def get_modules_by_course(course_id: str, db: AsyncSession, user_id: uuid.UUID):
     """

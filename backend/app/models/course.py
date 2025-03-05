@@ -1,5 +1,4 @@
-from sqlalchemy import Column, String, Integer,\
-    ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base, engine
@@ -69,8 +68,8 @@ class Course(Base):
             "semester": self.semester,
             "year": self.year,
             "status": self.status.value,
-            "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat()
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
 
 class CourseEnrollment(Base):
@@ -179,4 +178,7 @@ class LectureContentDoc(Base):
 async def init_db():
     """Initialize the database tables asynchronously."""
     async with engine.begin() as conn:
+        # Drop all tables first to ensure clean state
+        await conn.run_sync(Base.metadata.drop_all)
+        # Create all tables
         await conn.run_sync(Base.metadata.create_all)

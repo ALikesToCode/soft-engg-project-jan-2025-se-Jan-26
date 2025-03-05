@@ -1,11 +1,10 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Boolean
+from sqlalchemy import Column, String, DateTime, Boolean, Table, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base, engine
 from app.models.course import Course, user_courses
-from .role import Role, user_roles
-import uuid
+from app.models.role import Role, user_roles
 from datetime import datetime
 
 class User(Base):

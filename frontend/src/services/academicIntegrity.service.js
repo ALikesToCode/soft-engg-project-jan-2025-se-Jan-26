@@ -28,5 +28,23 @@ export const AcademicIntegrityService = {
   // Get audit trail for a flag
   async getFlagAuditTrail(flagId) {
     return axios.get(`${API_ROUTES.ACADEMIC_INTEGRITY}/flags/${flagId}/audit`)
+  },
+
+  // Validate LLM request for academic integrity concerns
+  async validateLLMRequest(requestContent) {
+    try {
+      const response = await axios.post(`${API_ROUTES.ACADEMIC_INTEGRITY}/validate-llm-request`, {
+        content: requestContent
+      })
+      return response.data
+    } catch (error) {
+      console.error('Error validating LLM request:', error)
+      // Return a safe default that blocks the request if validation fails
+      return {
+        isValid: false,
+        reason: 'Validation service error. Request blocked for safety.',
+        containsSensitiveContent: true
+      }
+    }
   }
 } 
