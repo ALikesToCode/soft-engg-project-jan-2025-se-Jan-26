@@ -61,7 +61,19 @@ async def lifespan(app: FastAPI):
 # Replace the FastAPI app instance with one that uses the lifespan handler
 app = FastAPI(
     title="Support Dashboard API",
-    description="API for the support dashboard monitoring system",
+    description="""
+# API for the support dashboard monitoring system
+
+This API provides endpoints for managing the support dashboard, including user authentication, course management, and more.
+
+## Features
+
+- User authentication and management
+- Course enrollment and management
+- Assignment submission and grading
+- AI-powered chat assistance
+- System monitoring and health checks
+    """,
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
@@ -155,28 +167,9 @@ async def custom_swagger_ui_html():
             background-color: #45a049;
         }
         
-        .auth-helper {
-            position: fixed;
-            top: 120px;
-            right: 20px;
-            background-color: #2196F3;
-            color: white !important;
-            padding: 8px 16px;
-            text-decoration: none;
-            border-radius: 4px;
-            font-weight: bold;
-            z-index: 1000;
-            font-size: 14px;
-            font-family: sans-serif;
-            cursor: pointer;
-        }
-        .auth-helper:hover {
-            background-color: #0b7dda;
-        }
-        
         .login-btn {
             position: fixed;
-            top: 170px;
+            top: 120px;
             right: 20px;
             background-color: #9C27B0;
             color: white !important;
@@ -221,163 +214,117 @@ async def custom_swagger_ui_html():
     </style>
     """
     
-    # Add download button and auth helper button
-    custom_buttons = """
-    <a href="/openapi.yaml?download=true" class="download-yaml-btn">Download YAML</a>
-    <a id="auth-helper-btn" class="auth-helper">Auto-Authenticate</a>
-    <a href="/api-login" class="login-btn">Login Page</a>
-    <div id="auth-status" class="auth-status not-authenticated">Not authenticated</div>
+    # Add download YAML button
+    download_button = """
+    <a href="/openapi.yaml?download=true" class="download-yaml-btn" target="_blank">Download OpenAPI Spec</a>
     """
     
-    # Add JavaScript to handle auto-authentication
-    auth_script = """
+    # Add login button
+    login_button = """
+    <a href="/api/v1/auth/login/google" class="login-btn" target="_blank">Login with Google</a>
+    """
+    
+    # Add auth status display
+    auth_status = """
+    <div id="auth-status" class="auth-status not-authenticated">
+        Not authenticated
+    </div>
+    """
+    
+    # Add JavaScript for auth helper
+    auth_helper_js = """
     <script>
-        window.addEventListener('load', function() {
-            const authStatus = document.getElementById('auth-status');
-            
-            // Check if token exists and update status
-            function updateAuthStatus() {
+        // Function to check if user is authenticated
+        async function checkAuthStatus() {
+            try {
+                // Get the token from localStorage
                 const token = localStorage.getItem('token');
-                if (token) {
-                    authStatus.textContent = 'Authenticated';
-                    authStatus.className = 'auth-status authenticated';
-                } else {
-                    authStatus.textContent = 'Not authenticated';
-                    authStatus.className = 'auth-status not-authenticated';
-                }
-            }
-            
-            // Initial status check
-            updateAuthStatus();
-            
-            // Add click handler for the auto-authenticate button
-            document.getElementById('auth-helper-btn').addEventListener('click', function() {
-                // Try to get token from localStorage
-                const token = localStorage.getItem('token');
-                if (token) {
-                    // Find the authorize button and click it
-                    const authorizeBtn = document.querySelector('.btn.authorize');
-                    if (authorizeBtn) {
-                        authorizeBtn.click();
-                        
-                        // Wait for the modal to appear
-                        setTimeout(function() {
-                            // Find the bearerAuth input and set the value
-                            const inputs = document.querySelectorAll('.auth-container input');
-                            for (let input of inputs) {
-                                if (input.placeholder === 'Bearer <JWT>' || input.placeholder === 'Bearer <token>') {
-                                    input.value = 'Bearer ' + token;
-                                    
-                                    // Find and click the Authorize button in the modal
-                                    const authorizeModalBtn = document.querySelector('.auth-btn-wrapper button.authorize');
-                                    if (authorizeModalBtn) {
-                                        authorizeModalBtn.click();
-                                        
-                                        // Find and click the Close button
-                                        setTimeout(function() {
-                                            const closeBtn = document.querySelector('.btn-done');
-                                            if (closeBtn) {
-                                                closeBtn.click();
-                                                updateAuthStatus();
-                                            }
-                                        }, 500);
-                                    }
-                                    break;
-                                }
-                            }
-                        }, 500);
-                    }
-                } else {
-                    alert('No authentication token found in localStorage. Please login first.');
-                }
-            });
-            
-            // Intercept fetch/XHR requests to capture the token from login responses
-            const originalFetch = window.fetch;
-            window.fetch = async function(url, options) {
-                const response = await originalFetch(url, options);
                 
-                // Clone the response to avoid consuming it
-                const clone = response.clone();
-                
-                // Check if this is a login response
-                if (url.includes('/api/v1/auth/login') && response.ok) {
-                    try {
-                        const data = await clone.json();
-                        if (data && data.access_token) {
-                            localStorage.setItem('token', data.access_token);
-                            console.log('Token saved to localStorage');
-                            updateAuthStatus();
-                        }
-                    } catch (e) {
-                        console.error('Error processing response:', e);
-                    }
+                if (!token) {
+                    document.getElementById('auth-status').className = 'auth-status not-authenticated';
+                    document.getElementById('auth-status').innerText = 'Not authenticated';
+                    return;
                 }
                 
-                return response;
-            };
-            
-            // Add event listener to all operation buttons to ensure they use the latest token
-            const observer = new MutationObserver(function(mutations) {
-                // Look for operation buttons
-                document.querySelectorAll('.opblock-summary-control').forEach(function(button) {
-                    if (!button.hasTokenListener) {
-                        button.hasTokenListener = true;
-                        button.addEventListener('click', function() {
-                            // When an operation is clicked, wait for the "Try it out" button to appear
-                            setTimeout(function() {
-                                const tryItOutBtn = button.closest('.opblock').querySelector('.try-out__btn');
-                                if (tryItOutBtn) {
-                                    tryItOutBtn.addEventListener('click', function() {
-                                        // When "Try it out" is clicked, wait for the Execute button to appear
-                                        setTimeout(function() {
-                                            const executeBtn = button.closest('.opblock').querySelector('.execute');
-                                            if (executeBtn) {
-                                                executeBtn.addEventListener('click', function() {
-                                                    // When Execute is clicked, ensure the latest token is used
-                                                    const token = localStorage.getItem('token');
-                                                    if (token) {
-                                                        // Find the Authorization header input
-                                                        const authHeader = button.closest('.opblock').querySelector('.parameters input[placeholder="Authorization"]');
-                                                        if (authHeader && (!authHeader.value || authHeader.value === 'Bearer ')) {
-                                                            authHeader.value = 'Bearer ' + token;
-                                                        }
-                                                    }
-                                                });
-                                            }
-                                        }, 100);
-                                    });
-                                }
-                            }, 100);
-                        });
+                // Try to fetch user info
+                const response = await fetch('/api/v1/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
                     }
                 });
-            });
-            
-            // Start observing the document for changes
-            observer.observe(document.body, { childList: true, subtree: true });
-            
-            // Auto-authenticate on page load if token exists
-            setTimeout(function() {
-                const token = localStorage.getItem('token');
-                if (token) {
-                    document.getElementById('auth-helper-btn').click();
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    document.getElementById('auth-status').className = 'auth-status authenticated';
+                    document.getElementById('auth-status').innerText = `Authenticated as: ${userData.email} (${userData.role})`;
+                    
+                    // Auto-fill the Authorize dialog
+                    const authorizeBtn = document.querySelector('.btn.authorize');
+                    if (authorizeBtn) {
+                        authorizeBtn.addEventListener('click', () => {
+                            // Wait for the modal to appear
+                            setTimeout(() => {
+                                const tokenInput = document.querySelector('input[type="text"][data-name="bearerAuth"]');
+                                if (tokenInput) {
+                                    tokenInput.value = `Bearer ${token}`;
+                                }
+                            }, 500);
+                        });
+                    }
+                } else {
+                    document.getElementById('auth-status').className = 'auth-status not-authenticated';
+                    document.getElementById('auth-status').innerText = 'Token invalid or expired';
+                    localStorage.removeItem('token');
                 }
-            }, 1000);
+            } catch (error) {
+                console.error('Error checking auth status:', error);
+                document.getElementById('auth-status').className = 'auth-status not-authenticated';
+                document.getElementById('auth-status').innerText = 'Error checking authentication';
+            }
+        }
+        
+        // Check auth status when page loads
+        window.addEventListener('load', checkAuthStatus);
+        
+        // Add listener for message from login page
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.token) {
+                localStorage.setItem('token', event.data.token);
+                checkAuthStatus();
+            }
         });
     </script>
     """
     
-    # Insert CSS in head
-    content = content.replace("</head>", f"{custom_css}</head>")
+    # Add Markdown plugin for Swagger UI
+    markdown_plugin = """
+    <script>
+        window.onload = function() {
+            // Wait for SwaggerUIBundle to be available
+            setTimeout(function() {
+                // Enable Markdown rendering for descriptions
+                const ui = window.ui;
+                if (ui && ui.getConfigs) {
+                    const configs = ui.getConfigs();
+                    configs.useMarkdownInDescription = true;
+                    configs.useMarkdownInResponses = true;
+                    configs.useMarkdownInParameters = true;
+                    
+                    // Force refresh the UI
+                    ui.specActions.updateSpec(ui.specSelectors.specStr());
+                }
+            }, 1000);
+        };
+    </script>
+    """
     
-    # Insert buttons after body tag
-    content = content.replace("<body>", f"<body>{custom_buttons}")
+    # Insert our custom elements before the closing body tag
+    modified_content = content.replace(
+        "</body>",
+        f"{custom_css}{download_button}{login_button}{auth_status}{auth_helper_js}{markdown_plugin}</body>"
+    )
     
-    # Insert auth script before end of body
-    content = content.replace("</body>", f"{auth_script}</body>")
-    
-    return HTMLResponse(content=content)
+    return HTMLResponse(modified_content)
 
 # Custom ReDoc UI with YAML download button
 @app.get("/redoc", include_in_schema=False)
@@ -442,7 +389,30 @@ async def get_openapi_yaml(request: Request):
     openapi_schema = get_openapi(
         title=app.title,
         version=app.version,
-        description=app.description,
+        description=app.description + """
+
+## Authentication
+
+This API supports two authentication methods:
+
+1. **JWT Bearer Token**: Obtain a token via `/api/v1/auth/login` endpoint
+2. **Google OAuth2**: Use the Google login button in the Swagger UI or [login directly](/api/v1/auth/login/google)
+
+### JWT Authentication
+
+1. Use the `/api/v1/auth/login` endpoint with your email and password
+2. Copy the returned access token
+3. Click the "Authorize" button and enter the token in the format: `Bearer your_token`
+4. Or use the "Auto-Authenticate" button after logging in to automatically apply your token
+
+### Google OAuth Authentication
+
+1. Click the "Authorize" button
+2. Select "Google OAuth2" and click "Authorize"
+3. Complete the Google authentication flow
+
+Alternatively, you can [login with Google directly](/api/v1/auth/login/google) and then return to this page.
+""",
         routes=app.routes,
     )
     yaml_content = yaml.dump(openapi_schema)
@@ -529,30 +499,7 @@ def custom_openapi():
     openapi_schema = get_openapi(
         title=app.title,
         version=app.version,
-        description=app.description + """
-        
-        ## Authentication
-        
-        This API supports two authentication methods:
-        
-        1. **JWT Bearer Token**: Obtain a token via `/api/v1/auth/login` endpoint
-        2. **Google OAuth2**: Use the Google login button in the Swagger UI or [login directly](/api/v1/auth/login/google)
-        
-        ### JWT Authentication
-        
-        1. Use the `/api/v1/auth/login` endpoint with your email and password
-        2. Copy the returned access token
-        3. Click the "Authorize" button and enter the token in the format: `Bearer your_token`
-        4. Or use the "Auto-Authenticate" button after logging in to automatically apply your token
-        
-        ### Google OAuth Authentication
-        
-        1. Click the "Authorize" button
-        2. Select "Google OAuth2" and click "Authorize"
-        3. Complete the Google authentication flow
-        
-        Alternatively, you can [login with Google directly](/api/v1/auth/login/google) and then return to this page.
-        """,
+        description=app.description,
         routes=app.routes,
     )
     
@@ -626,6 +573,19 @@ def custom_openapi():
             for method in path_item:
                 if method.lower() in ["get", "post", "put", "delete", "patch"]:
                     path_item[method]["security"] = [{"bearerAuth": []}]
+        
+        # Add x-markdown extension to enable Markdown rendering for all endpoint descriptions
+        for method in path_item:
+            if method.lower() in ["get", "post", "put", "delete", "patch"]:
+                if "description" in path_item[method]:
+                    path_item[method]["x-markdown"] = True
+                if "responses" in path_item[method]:
+                    for status_code, response in path_item[method]["responses"].items():
+                        if "description" in response:
+                            response["x-markdown"] = True
+    
+    # Add x-markdown extension to enable Markdown rendering for the API description
+    openapi_schema["info"]["x-markdown"] = True
     
     # Add function declarations to the schema
     openapi_schema["x-function-declarations"] = {
@@ -634,14 +594,14 @@ def custom_openapi():
     
     # Add tags with descriptions and ordering
     openapi_schema["tags"] = [
-        {"name": "Authentication", "description": "Authentication and user session management endpoints"},
-        {"name": "User", "description": "User profile and account management endpoints"},
-        {"name": "Monitoring", "description": "System monitoring and health check endpoints"},
-        {"name": "Courses", "description": "Course management and enrollment endpoints"},
-        {"name": "Assignments", "description": "Assignment creation, submission, and grading endpoints"},
-        {"name": "Chat", "description": "AI chat and conversation endpoints"},
-        {"name": "FAQs", "description": "Frequently asked questions management endpoints"},
-        {"name": "System Settings", "description": "System configuration and settings endpoints"}
+        {"name": "Authentication", "description": "Authentication and user session management endpoints", "x-markdown": True},
+        {"name": "User", "description": "User profile and account management endpoints", "x-markdown": True},
+        {"name": "Monitoring", "description": "System monitoring and health check endpoints", "x-markdown": True},
+        {"name": "Courses", "description": "Course management and enrollment endpoints", "x-markdown": True},
+        {"name": "Assignments", "description": "Assignment creation, submission, and grading endpoints", "x-markdown": True},
+        {"name": "Chat", "description": "AI chat and conversation endpoints", "x-markdown": True},
+        {"name": "FAQs", "description": "Frequently asked questions management endpoints", "x-markdown": True},
+        {"name": "System Settings", "description": "System configuration and settings endpoints", "x-markdown": True}
     ]
     
     app.openapi_schema = openapi_schema
