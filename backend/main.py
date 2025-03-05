@@ -139,11 +139,15 @@ This API supports two authentication methods:
 
 - **Support User**:
   - Email: support@study.iitm.ac.in
-  - Password: password123
+  - Password: support123
 
 - **Faculty User**:
   - Email: faculty@study.iitm.ac.in
-  - Password: password123
+  - Password: faculty123
+
+- **Student User**:
+  - Email: student@ds.study.iitm.ac.in
+  - Password: student123
     """,
     version="1.0.0",
     docs_url="/docs",
