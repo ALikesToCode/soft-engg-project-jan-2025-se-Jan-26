@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.user_service import get_all_user_courses
 
-router = APIRouter()
+router = APIRouter(tags=["User Courses"])
 
 class UserProfileUpdate(BaseModel):
     """

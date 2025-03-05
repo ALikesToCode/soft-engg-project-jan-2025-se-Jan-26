@@ -7,7 +7,7 @@ from app.utils.helpers import LectureContentData, ModuleCreate, \
     UpdateLectureContentData, DocumentLinkCreate, UpdateDocumentLinkCreate
 import uuid
 
-course_router = APIRouter()
+course_router = APIRouter(tags=["Faculty Courses"])
 
 @course_router.get("/courses", response_model=list[dict],
     summary="Get faculty's courses",
