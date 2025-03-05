@@ -13,6 +13,8 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.security import OAuth2PasswordBearer
 from app.services.auth_service import oauth2_scheme
 from starlette.requests import Request
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from app.routes.auth import router as auth_router
 from app.routes.user import router as user_router
 from app.routes.llm import router as chat
@@ -21,16 +23,21 @@ from app.routes.faq import router as faq_router
 from app.routes.system_settings import router as system_settings_router
 from app.routes.courses import router as courses_router
 from app.routes.course_routes import course_router
+from app.services.api_functions import *  # Import all API function declarations
+from app.routes import monitoring
+from app.services.monitoring_service import monitoring_service
+
+# Get the absolute path to the static directory
+STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(
-    title=settings.APP_NAME,
-    description=settings.APP_DESCRIPTION,
-    version=settings.APP_VERSION,
-    # Disable default docs to use custom endpoints
-    docs_url=None,
+    title="Support Dashboard API",
+    description="API for the support dashboard monitoring system",
+    version="1.0.0",
+    docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json",
-    swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect"
+    swagger_js_url="/static/swagger-ui-bundle.js",
+    swagger_css_url="/static/swagger-ui.css"
 )
 
 # Secret key for session middleware
@@ -52,6 +59,9 @@ app.add_middleware(
 # Add Session Middleware
 app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
 
+# Mount static files directory
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
 @app.get("/")
 async def root():
     return JSONResponse({
@@ -71,10 +81,10 @@ async def root():
 async def custom_swagger_ui_html():
     return get_swagger_ui_html(
         openapi_url=app.openapi_url,
-        title=f"{app.title} - Swagger UI",
+        title=f"{settings.APP_NAME} - Swagger UI",
         oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
-        swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
-        swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
+        swagger_js_url="/static/swagger-ui-bundle.js",
+        swagger_css_url="/static/swagger-ui.css",
         swagger_favicon_url="https://fastapi.tiangolo.com/img/favicon.png",
         init_oauth={
             "clientId": settings.GOOGLE_CLIENT_ID,
@@ -83,22 +93,11 @@ async def custom_swagger_ui_html():
             "usePkceWithAuthorizationCodeGrant": True,
             "scopes": ["openid", "email", "profile"],
             "useBasicAuthenticationWithAccessCodeGrant": True
-        },
-        swagger_ui_parameters={
-            "persistAuthorization": True,
-            "displayRequestDuration": True,
-            "filter": True,
-            "tryItOutEnabled": True,
-            "syntaxHighlight": {
-                "activate": True,
-                "theme": "agate"
-            },
-            "oauth2RedirectUrl": f"{settings.FRONTEND_URL}/docs/oauth2-redirect"
         }
     )
 
 # OAuth2 redirect endpoint for Swagger UI
-@app.get("/docs/oauth2-redirect", include_in_schema=False)
+@app.get(app.swagger_ui_oauth2_redirect_url, include_in_schema=False)
 async def swagger_ui_redirect():
     return get_swagger_ui_oauth2_redirect_html()
 
@@ -256,28 +255,53 @@ def custom_openapi():
         {"googleOAuth2": ["openid", "email", "profile"]}
     ]
     
+    # Add function declarations to the schema
+    openapi_schema["x-function-declarations"] = {
+        "functions": function_router.get_function_declarations()
+    }
+    
+    # Add tags with descriptions and ordering
+    openapi_schema["tags"] = [
+        {"name": "Authentication", "description": "Authentication and user session management endpoints"},
+        {"name": "User", "description": "User profile and account management endpoints"},
+        {"name": "Monitoring", "description": "System monitoring and health check endpoints"},
+        {"name": "Courses", "description": "Course management and enrollment endpoints"},
+        {"name": "Assignments", "description": "Assignment creation, submission, and grading endpoints"},
+        {"name": "Chat", "description": "AI chat and conversation endpoints"},
+        {"name": "FAQs", "description": "Frequently asked questions management endpoints"},
+        {"name": "System Settings", "description": "System configuration and settings endpoints"}
+    ]
+    
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
 app.openapi = custom_openapi
 
 # Add routers with API prefix
-app.include_router(auth_router, prefix=settings.API_PREFIX, tags=["Authentication"])
-app.include_router(user_router, prefix=settings.API_PREFIX, tags=["User"])
-app.include_router(chat, prefix=settings.API_PREFIX, tags=["Chat"])
-app.include_router(assignment_router, prefix=settings.API_PREFIX, tags=["Assignments"])
+app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
+app.include_router(user_router, prefix="/api/v1", tags=["User"])
+app.include_router(chat, prefix="/api/v1", tags=["Chat"])
+app.include_router(assignment_router, prefix="/api/v1", tags=["Assignments"])
 app.include_router(faq_router, tags=["FAQs"])
-app.include_router(system_settings_router, prefix=settings.API_PREFIX, tags=["System Settings"])
-app.include_router(courses_router, prefix=settings.API_PREFIX, tags=["Courses"])
-app.include_router(course_router, prefix=settings.API_PREFIX, tags=["Courses"])
+app.include_router(system_settings_router, prefix="/api/v1", tags=["System Settings"])
+app.include_router(courses_router, prefix="/api/v1", tags=["Courses"])
+app.include_router(course_router, prefix="/api/v1", tags=["Courses"])
+app.include_router(monitoring.router, prefix="/api/v1", tags=["Monitoring"])
 
 @app.on_event("startup")
 async def startup():
+    """Initialize application services on startup"""
+    # Initialize database
     await init_db()
     
-    # Create default users
-    async with async_session() as session:
-        await create_default_users(session)
+    # Start monitoring service background tasks
+    await monitoring_service.start_background_tasks()
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Cleanup application services on shutdown"""
+    # Stop monitoring service background tasks
+    await monitoring_service.stop_background_tasks()
 
 if __name__ == "__main__":
     import uvicorn

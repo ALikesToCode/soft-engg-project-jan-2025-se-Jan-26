@@ -15,7 +15,7 @@ from starlette.responses import RedirectResponse
 import jwt
 from pydantic import BaseModel
 
-router = APIRouter()
+router = APIRouter(tags=["Authentication"])
 logger = logging.getLogger(__name__)
 
 # Use settings for Redis configuration if available, otherwise use defaults

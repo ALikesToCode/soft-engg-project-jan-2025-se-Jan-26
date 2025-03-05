@@ -4,8 +4,9 @@ from app.database import get_db
 from app.services.auth_service import get_current_user
 from app.routes.auth import require_role
 from app.services.course_service import CourseService
-from typing import List
+from typing import List, Optional
 from uuid import UUID
+from app.services.function_router import function_router
 
 router = APIRouter(tags=["courses"])
 
@@ -178,4 +179,120 @@ async def get_all_course_assignments(
         assignments = await CourseService.get_all_course_assignments(db)
         return assignments
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+@function_router.function_declaration(
+    name="get_courses",
+    description="Get a list of available courses, optionally filtered by category",
+    parameters={
+        "type": "object",
+        "properties": {
+            "category": {
+                "type": "string",
+                "description": "Course category (e.g., 'programming', 'data-science', 'all')",
+                "default": "all"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of courses to return",
+                "default": 10
+            }
+        }
+    }
+)
+async def get_courses(category: str = "all", limit: int = 10):
+    """Get available courses with optional category filter"""
+    # This is a mock implementation - replace with actual database query
+    courses = {
+        "programming": [
+            {"id": "cs101", "title": "Introduction to Programming", "description": "Learn programming basics"},
+            {"id": "cs201", "title": "Data Structures", "description": "Advanced programming concepts"},
+        ],
+        "data-science": [
+            {"id": "ds101", "title": "Data Science Fundamentals", "description": "Introduction to data science"},
+            {"id": "ml101", "title": "Machine Learning", "description": "Basic machine learning concepts"},
+        ]
+    }
+    
+    if category == "all":
+        all_courses = []
+        for cat_courses in courses.values():
+            all_courses.extend(cat_courses)
+        return all_courses[:limit]
+    
+    if category not in courses:
+        raise HTTPException(status_code=404, detail=f"Category {category} not found")
+    
+    return courses[category][:limit]
+
+@function_router.function_declaration(
+    name="search_courses",
+    description="Search for courses by keyword",
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Search query string"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of results",
+                "default": 5
+            }
+        },
+        "required": ["query"]
+    }
+)
+async def search_courses(query: str, limit: int = 5):
+    """Search for courses by keyword"""
+    # Mock implementation - replace with actual search logic
+    all_courses = await get_courses(category="all")
+    
+    # Simple search implementation
+    query = query.lower()
+    matches = [
+        course for course in all_courses
+        if query in course["title"].lower() or query in course["description"].lower()
+    ]
+    
+    return matches[:limit]
+
+@function_router.function_declaration(
+    name="get_course_details",
+    description="Get detailed information about a specific course",
+    parameters={
+        "type": "object",
+        "properties": {
+            "course_id": {
+                "type": "string",
+                "description": "The ID of the course"
+            }
+        },
+        "required": ["course_id"]
+    }
+)
+async def get_course_details(course_id: str):
+    """Get detailed information about a specific course"""
+    # Mock implementation - replace with actual database query
+    all_courses = await get_courses(category="all")
+    
+    for course in all_courses:
+        if course["id"] == course_id:
+            # Add more details for the course
+            return {
+                **course,
+                "duration": "12 weeks",
+                "prerequisites": ["None"],
+                "syllabus": [
+                    "Week 1: Introduction",
+                    "Week 2: Basic Concepts",
+                    "Week 3-11: Main Content",
+                    "Week 12: Final Project"
+                ],
+                "instructors": ["Dr. Smith"],
+                "rating": 4.5,
+                "enrolled_students": 150
+            }
+    
+    raise HTTPException(status_code=404, detail=f"Course {course_id} not found") 
