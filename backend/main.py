@@ -667,12 +667,16 @@ def custom_openapi():
     openapi_schema["tags"] = [
         {"name": "Authentication", "description": "Authentication and user session management endpoints", "x-markdown": True},
         {"name": "User", "description": "User profile and account management endpoints", "x-markdown": True},
-        {"name": "Monitoring", "description": "System monitoring and health check endpoints", "x-markdown": True},
+        {"name": "monitoring", "description": "System monitoring and health check endpoints", "x-markdown": True},
         {"name": "Courses", "description": "Course management and enrollment endpoints", "x-markdown": True},
+        {"name": "User Courses", "description": "User course enrollment and management endpoints", "x-markdown": True},
+        {"name": "Faculty Courses", "description": "Faculty course management endpoints", "x-markdown": True},
         {"name": "Assignments", "description": "Assignment creation, submission, and grading endpoints", "x-markdown": True},
         {"name": "Chat", "description": "AI chat and conversation endpoints", "x-markdown": True},
         {"name": "FAQs", "description": "Frequently asked questions management endpoints", "x-markdown": True},
-        {"name": "System Settings", "description": "System configuration and settings endpoints", "x-markdown": True}
+        {"name": "System Settings", "description": "System configuration and settings endpoints", "x-markdown": True},
+        {"name": "academic-integrity", "description": "Academic integrity monitoring and management endpoints", "x-markdown": True},
+        {"name": "Notification", "description": "User notification endpoints", "x-markdown": True}
     ]
     
     app.openapi_schema = openapi_schema
@@ -690,8 +694,8 @@ app.include_router(system_settings_router, prefix="/api/v1", tags=["System Setti
 # Include both course routers with appropriate tags
 app.include_router(courses_router, prefix="/api/v1", tags=["User Courses"])
 app.include_router(course_router, prefix="/api/v1", tags=["Faculty Courses"])
-app.include_router(academic_integrity_router, prefix="/api/v1", tags=["Academic Integrity"])
-app.include_router(monitoring.router, prefix="/api/v1", tags=["Monitoring"])
+app.include_router(academic_integrity_router, prefix="/api/v1")
+app.include_router(monitoring.router, prefix="/api/v1")
 app.include_router(notification, prefix="/api/v1", tags=["Notification"])
 
 @app.get("/api-login", include_in_schema=False)
