@@ -8,6 +8,10 @@ from app.models.user import User
 from app.utils.jwt_utils import create_access_token, decode_access_token
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+import logging
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
@@ -49,8 +53,10 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> Opti
     """
     try:
         # Fetch the user by email
+        logger.info(f"Authenticating user: {email}")
         user = await get_user(db, email)
         if not user:
+            logger.warning(f"User not found: {email}")
             return False
             
         # If user has no password set (Google user without password)
