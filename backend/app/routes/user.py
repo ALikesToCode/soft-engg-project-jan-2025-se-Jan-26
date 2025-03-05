@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.requests import Request
 from app.database import get_db
-from app.services.auth_service import get_current_user, require_auth
+from app.services.auth_service import get_current_user, require_auth, get_user
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.user_service import get_all_user_courses
@@ -189,8 +189,6 @@ async def update_user_profile(
     request.session["user"] = user
     return user
 
-
-
 @router.get("/user/courses",response_model=list[dict],
     summary="Get user courses",
     description="Retrieves all courses enrolled by the current user",
@@ -243,7 +241,13 @@ async def fetch_user_courses(
     current_user: dict = Depends(get_current_user)
     ):  
     try:
-        courses = await get_all_user_courses(db, current_user["id"])  
+        # Get the user from the database based on the email in the token
+        user = await get_user(db, current_user["email"])
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+            
+        # Use the user ID from the database
+        courses = await get_all_user_courses(db, user.id)  
         return courses
     except Exception as e:
         print("Error=> ", e)

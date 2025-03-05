@@ -552,8 +552,8 @@ async def get_user(request: Request):
 
 # Role based access control
 def require_role(role: str):
-    def role_checker(token: str = Depends(oauth2_scheme)):
-        user = get_current_user(token)
+    async def role_checker(token: str = Depends(oauth2_scheme)):
+        user = await get_current_user(token)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid token")
         if user["role"] != role:
