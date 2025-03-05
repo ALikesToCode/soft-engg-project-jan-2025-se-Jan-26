@@ -23,6 +23,10 @@ const axiosInstance = axios.create({
 // Add request interceptor to include the token in every request
 axiosInstance.interceptors.request.use(
     (config) => {
+        // Skip adding token for login requests
+        if (config.url.includes('/auth/login')) {
+            return config;
+        }
         const token = localStorage.getItem('token');
         if (token) {
             // Remove quotes if token is stored as JSON string
@@ -75,6 +79,46 @@ axiosInstance.interceptors.response.use(
 export const authService = {
     // Initialize axios instance with credentials
     axiosInstance,
+
+   // Login with Email & Password  
+    async loginWithEmail(email, password) {
+        try {
+            logger.log('Logging in with email and password...');
+            
+            // Convert to form-urlencoded format
+            const formData = new URLSearchParams();
+            formData.append('username', email);
+            formData.append('password', password);
+            console.log('Login Request Data:', { username: email, password });
+
+            const response = await this.axiosInstance.post(`${API_URL}${API_PREFIX}/auth/login`, new URLSearchParams({ username: email, password }));
+            logger.log('Login successful');
+            logger.debug('User data:', response.data);
+            localStorage.setItem('token', response.data.access_token);
+            return response.data;
+            // window.location.href = '/dashboard';
+
+            // if (response.status === 200) {
+            //     logger.log('Login successful');
+            //     localStorage.setItem('token', response.data.access_token);
+            //     return { success: true, message: 'Login successful' };
+            // }
+            // return { success: false, message: 'Login failed' };
+
+        } catch (error) {
+            logger.error('Error logging in with email and password:', error.message);
+            if (error.response) {
+                logger.error(`Status: ${error.response.status}, Data:`, error.response.data);
+                return {
+                    success: false,
+                    message: error.response.data?.detail || 'Login failed',
+                    status: error.response.status
+                };
+            }
+            return { success: false, message: 'Network error while logging in' };
+        }
+    },
+
 
     // Login with Google
     async loginWithGoogle() {
