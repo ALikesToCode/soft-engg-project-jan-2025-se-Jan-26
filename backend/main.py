@@ -19,7 +19,8 @@ from app.routes.llm import router as chat
 from app.routes.assignment import router as assignment_router
 from app.routes.faq import router as faq_router
 from app.routes.system_settings import router as system_settings_router
-from app.routes.courses import router as courses_router
+from app.routes.courses import router as courses_router1
+from app.routes.course_routes import course_router as course_router2
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -267,7 +268,8 @@ app.include_router(chat, prefix=settings.API_PREFIX, tags=["Chat"])
 app.include_router(assignment_router, prefix=settings.API_PREFIX, tags=["Assignments"])
 app.include_router(faq_router, tags=["FAQs"])
 app.include_router(system_settings_router, prefix=settings.API_PREFIX, tags=["System Settings"])
-app.include_router(courses_router, prefix=settings.API_PREFIX, tags=["Courses"])
+app.include_router(courses_router1, prefix=settings.API_PREFIX, tags=["User Courses"])
+app.include_router(course_router2, prefix=settings.API_PREFIX, tags=["Faculty Courses"])
 
 @app.on_event("startup")
 async def startup():

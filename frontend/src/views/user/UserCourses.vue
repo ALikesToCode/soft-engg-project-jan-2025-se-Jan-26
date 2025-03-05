@@ -2,7 +2,6 @@
 import SideNavBar from '../../layouts/SideNavBar.vue'
 import ChatBotBox from '../../components/ChatBotBox.vue'
 export default {
-    
   data() {
     return {
       searchQuery: '',
@@ -15,7 +14,8 @@ export default {
         {
           id: 1,
           title: 'Introduction to Python Programming',
-          description: 'Learn Python basics and programming fundamentals through hands-on projects and exercises.',
+          description:
+            'Learn Python basics and programming fundamentals through hands-on projects and exercises.',
           image: 'https://placehold.co/400x300',
           level: 'Beginner',
           duration: '8 weeks',
@@ -23,32 +23,32 @@ export default {
           isBookmarked: true,
           instructor: {
             name: 'Dr. Sarah Johnson',
-            avatar: 'https://placehold.co/100x100'
+            avatar: 'https://placehold.co/100x100',
           },
           videoUrl: 'https://www.youtube.com/embed/example',
           learningObjectives: [
             'Understand Python syntax and basic concepts',
             'Work with data structures and algorithms',
             'Build simple applications',
-            'Debug and test code effectively'
+            'Debug and test code effectively',
           ],
           modules: [
             {
               title: 'Getting Started with Python',
               duration: '1h 30m',
-              completed: true
+              completed: true,
             },
             {
               title: 'Data Types and Variables',
               duration: '2h 15m',
-              completed: true
+              completed: true,
             },
             {
               title: 'Control Flow and Functions',
               duration: '2h 45m',
-              completed: false
-            }
-          ]
+              completed: false,
+            },
+          ],
         },
         {
           id: 2,
@@ -61,8 +61,8 @@ export default {
           isBookmarked: false,
           instructor: {
             name: 'Alex Chen',
-            avatar: 'https://placehold.co/100x100'
-          }
+            avatar: 'https://placehold.co/100x100',
+          },
         },
         {
           id: 3,
@@ -75,11 +75,11 @@ export default {
           isBookmarked: true,
           instructor: {
             name: 'Dr. Michael Brown',
-            avatar: 'https://placehold.co/100x100'
-          }
-        }
-      ]
-    };
+            avatar: 'https://placehold.co/100x100',
+          },
+        },
+      ],
+    }
   },
   components: {
     SideNavBar,
@@ -87,108 +87,107 @@ export default {
   },
   computed: {
     filteredCourses() {
-      let filtered = [...this.courses];
-      
+      let filtered = [...this.courses]
+
       // Apply search filter with debouncing
       if (this.searchQuery.trim()) {
-        const query = this.searchQuery.toLowerCase();
-        filtered = filtered.filter(course => {
+        const query = this.searchQuery.toLowerCase()
+        filtered = filtered.filter((course) => {
           const searchableFields = [
             course.title,
             course.description,
             course.instructor.name,
             course.level,
             ...(course.learningObjectives || []),
-            ...(course.modules?.map(m => m.title) || [])
-          ];
-          
-          return searchableFields.some(field => 
-            field.toLowerCase().includes(query)
-          );
-        });
-        
+            ...(course.modules?.map((m) => m.title) || []),
+          ]
+
+          return searchableFields.some((field) => field.toLowerCase().includes(query))
+        })
+
         // Sort results by relevance
         filtered.sort((a, b) => {
-          const aTitle = a.title.toLowerCase();
-          const bTitle = b.title.toLowerCase();
-          const aStartsWithQuery = aTitle.startsWith(query);
-          const bStartsWithQuery = bTitle.startsWith(query);
-          
-          if (aStartsWithQuery && !bStartsWithQuery) return -1;
-          if (!aStartsWithQuery && bStartsWithQuery) return 1;
-          return 0;
-        });
+          const aTitle = a.title.toLowerCase()
+          const bTitle = b.title.toLowerCase()
+          const aStartsWithQuery = aTitle.startsWith(query)
+          const bStartsWithQuery = bTitle.startsWith(query)
+
+          if (aStartsWithQuery && !bStartsWithQuery) return -1
+          if (!aStartsWithQuery && bStartsWithQuery) return 1
+          return 0
+        })
       }
 
       // Apply status filters
       if (!this.activeFilters.includes('All')) {
-        filtered = filtered.filter(course => {
-          const matchesInProgress = this.activeFilters.includes('In Progress') && 
-            course.progress > 0 && course.progress < 100;
-          const matchesCompleted = this.activeFilters.includes('Completed') && 
-            course.progress === 100;
-          const matchesBookmarked = this.activeFilters.includes('Bookmarked') && 
-            course.isBookmarked;
-            
-          return matchesInProgress || matchesCompleted || matchesBookmarked;
-        });
+        filtered = filtered.filter((course) => {
+          const matchesInProgress =
+            this.activeFilters.includes('In Progress') &&
+            course.progress > 0 &&
+            course.progress < 100
+          const matchesCompleted =
+            this.activeFilters.includes('Completed') && course.progress === 100
+          const matchesBookmarked = this.activeFilters.includes('Bookmarked') && course.isBookmarked
+
+          return matchesInProgress || matchesCompleted || matchesBookmarked
+        })
       }
 
-      return filtered;
-    }
+      return filtered
+    },
   },
   watch: {
     searchQuery: {
       handler(newQuery) {
         if (this.searchTimeout) {
-          clearTimeout(this.searchTimeout);
+          clearTimeout(this.searchTimeout)
         }
-        this.isSearching = true;
-        
+        this.isSearching = true
+
         this.searchTimeout = setTimeout(() => {
-          this.isSearching = false;
-        }, 300);
-      }
-    }
+          this.isSearching = false
+        }, 300)
+      },
+    },
   },
   methods: {
     toggleFilter(filter) {
       if (filter === 'All') {
-        this.activeFilters = ['All'];
+        this.activeFilters = ['All']
       } else {
         // Remove 'All' if it exists
-        this.activeFilters = this.activeFilters.filter(f => f !== 'All');
-        
-        const index = this.activeFilters.indexOf(filter);
+        this.activeFilters = this.activeFilters.filter((f) => f !== 'All')
+
+        const index = this.activeFilters.indexOf(filter)
         if (index === -1) {
           // Add the filter
-          this.activeFilters.push(filter);
+          this.activeFilters.push(filter)
         } else {
           // Remove the filter
-          this.activeFilters.splice(index, 1);
+          this.activeFilters.splice(index, 1)
         }
-        
+
         // If no filters selected, default to 'All'
         if (this.activeFilters.length === 0) {
-          this.activeFilters = ['All'];
+          this.activeFilters = ['All']
         }
       }
     },
     toggleBookmark(course) {
-      course.isBookmarked = !course.isBookmarked;
+      course.isBookmarked = !course.isBookmarked
       // If we're filtering by bookmarked, update the view
       if (this.activeFilters.includes('Bookmarked')) {
-        this.$forceUpdate();
+        this.$forceUpdate()
       }
     },
     continueCourse(course) {
       this.$router.push({
         name: 'CourseLectureView',
-        params: { courseId: course.id }
-      });
-    }
-  }
-};
+        params: { courseId: course.id },
+      })
+    },
+  },
+}
 </script>
 
 <template>
@@ -204,23 +203,31 @@ export default {
           </div>
           <div class="flex space-x-4">
             <div class="relative">
-              <input type="text" 
-                     placeholder="Search courses..." 
-                     class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
-                     v-model="searchQuery"
-                     @focus="isSearching = true"
-                     @blur="isSearching = false" />
-              <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-              <div v-if="isSearching && searchQuery" 
-                   class="absolute w-full bg-white mt-1 rounded-lg shadow-lg border border-gray-200 z-10">
+              <input
+                type="text"
+                placeholder="Search courses..."
+                class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
+                v-model="searchQuery"
+                @focus="isSearching = true"
+                @blur="isSearching = false"
+              />
+              <i
+                class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              ></i>
+              <div
+                v-if="isSearching && searchQuery"
+                class="absolute w-full bg-white mt-1 rounded-lg shadow-lg border border-gray-200 z-10"
+              >
                 <div class="p-2 text-sm text-gray-500" v-if="filteredCourses.length === 0">
                   No results found
                 </div>
                 <div v-else class="max-h-64 overflow-y-auto">
-                  <div v-for="course in filteredCourses" 
-                       :key="course.id"
-                       class="p-2 hover:bg-gray-50 cursor-pointer"
-                       @click="selectedCourse = course">
+                  <div
+                    v-for="course in filteredCourses"
+                    :key="course.id"
+                    class="p-2 hover:bg-gray-50 cursor-pointer"
+                    @click="selectedCourse = course"
+                  >
                     <div class="font-medium text-gray-800">{{ course.title }}</div>
                     <div class="text-sm text-gray-500">{{ course.instructor.name }}</div>
                   </div>
@@ -228,16 +235,17 @@ export default {
               </div>
             </div>
             <div class="flex space-x-2">
-              <button 
-                v-for="filter in filters" 
+              <button
+                v-for="filter in filters"
                 :key="filter"
                 @click="toggleFilter(filter)"
                 :class="[
                   'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                   activeFilters.includes(filter)
                     ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                ]">
+                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
+                ]"
+              >
                 {{ filter }}
               </button>
             </div>
@@ -246,23 +254,41 @@ export default {
 
         <!-- Course Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <div v-for="course in filteredCourses" :key="course.id" 
-               class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+          <div
+            v-for="course in filteredCourses"
+            :key="course.id"
+            class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow"
+          >
             <div class="relative">
               <img :src="course.image" :alt="course.title" class="w-full h-48 object-cover" />
               <div class="absolute top-4 right-4">
-                <button @click="toggleBookmark(course)" 
-                        class="p-2 rounded-full bg-white shadow-md hover:bg-gray-50">
-                  <i :class="['fas', course.isBookmarked ? 'fa-bookmark text-blue-600' : 'fa-bookmark text-gray-400']"></i>
+                <button
+                  @click="toggleBookmark(course)"
+                  class="p-2 rounded-full bg-white shadow-md hover:bg-gray-50"
+                >
+                  <i
+                    :class="[
+                      'fas',
+                      course.isBookmarked
+                        ? 'fa-bookmark text-blue-600'
+                        : 'fa-bookmark text-gray-400',
+                    ]"
+                  ></i>
                 </button>
               </div>
             </div>
             <div class="p-6">
               <div class="flex items-center justify-between mb-2">
-                <span :class="['px-3 py-1 rounded-full text-sm font-medium', 
-                  course.level === 'Beginner' ? 'bg-green-100 text-green-800' :
-                  course.level === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800']">
+                <span
+                  :class="[
+                    'px-3 py-1 rounded-full text-sm font-medium',
+                    course.level === 'Beginner'
+                      ? 'bg-green-100 text-green-800'
+                      : course.level === 'Intermediate'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-red-100 text-red-800',
+                  ]"
+                >
                   {{ course.level }}
                 </span>
                 <span class="text-gray-600 text-sm">{{ course.duration }}</span>
@@ -275,18 +301,25 @@ export default {
                   <span class="font-medium">{{ course.progress }}%</span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2">
-                  <div class="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                       :style="{ width: `${course.progress}%` }"></div>
+                  <div
+                    class="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                    :style="{ width: `${course.progress}%` }"
+                  ></div>
                 </div>
               </div>
               <div class="mt-4 flex items-center justify-between">
                 <div class="flex items-center space-x-2">
-                  <img :src="course.instructor.avatar" :alt="course.instructor.name" 
-                       class="w-8 h-8 rounded-full object-cover" />
+                  <img
+                    :src="course.instructor.avatar"
+                    :alt="course.instructor.name"
+                    class="w-8 h-8 rounded-full object-cover"
+                  />
                   <span class="text-sm text-gray-600">{{ course.instructor.name }}</span>
                 </div>
-                <button @click="continueCourse(course)" 
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                <button
+                  @click="continueCourse(course)"
+                  class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
                   Continue
                 </button>
               </div>
@@ -317,12 +350,13 @@ export default {
             <!-- Course Content -->
             <div class="col-span-2">
               <div class="aspect-w-16 aspect-h-9 mb-6">
-                <iframe 
-                  :src="selectedCourse.videoUrl" 
+                <iframe
+                  :src="selectedCourse.videoUrl"
                   class="w-full h-full rounded-lg"
-                  frameborder="0" 
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                  allowfullscreen>
+                  frameborder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowfullscreen
+                >
                 </iframe>
               </div>
               <div class="space-y-4">
@@ -333,9 +367,11 @@ export default {
                 <div>
                   <h3 class="text-lg font-semibold text-gray-800 mb-2">What you'll learn</h3>
                   <ul class="grid grid-cols-2 gap-2">
-                    <li v-for="(objective, index) in selectedCourse.learningObjectives" 
-                        :key="index" 
-                        class="flex items-start space-x-2">
+                    <li
+                      v-for="(objective, index) in selectedCourse.learningObjectives"
+                      :key="index"
+                      class="flex items-start space-x-2"
+                    >
                       <i class="fas fa-check text-green-500 mt-1"></i>
                       <span class="text-gray-600">{{ objective }}</span>
                     </li>
@@ -349,15 +385,24 @@ export default {
               <div class="bg-gray-50 rounded-lg p-4">
                 <h3 class="text-lg font-semibold text-gray-800 mb-4">Course Content</h3>
                 <div class="space-y-2">
-                  <div v-for="(module, index) in selectedCourse.modules" 
-                       :key="index"
-                       class="bg-white rounded-lg p-4 cursor-pointer hover:bg-gray-50">
+                  <div
+                    v-for="(module, index) in selectedCourse.modules"
+                    :key="index"
+                    class="bg-white rounded-lg p-4 cursor-pointer hover:bg-gray-50"
+                  >
                     <div class="flex items-center justify-between mb-2">
                       <h4 class="font-medium text-gray-800">{{ module.title }}</h4>
                       <span class="text-sm text-gray-600">{{ module.duration }}</span>
                     </div>
                     <div class="flex items-center space-x-2 text-sm text-gray-600">
-                      <i :class="['fas', module.completed ? 'fa-check-circle text-green-500' : 'fa-circle text-gray-400']"></i>
+                      <i
+                        :class="[
+                          'fas',
+                          module.completed
+                            ? 'fa-check-circle text-green-500'
+                            : 'fa-circle text-gray-400',
+                        ]"
+                      ></i>
                       <span>{{ module.completed ? 'Completed' : 'Not completed' }}</span>
                     </div>
                   </div>

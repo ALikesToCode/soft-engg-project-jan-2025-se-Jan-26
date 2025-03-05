@@ -3,7 +3,8 @@ from sqlalchemy import Column, String, DateTime, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base, engine
-from app.models.course import Course
+from app.models.course import Course, user_courses
+from .role import Role, user_roles
 import uuid
 from datetime import datetime
 

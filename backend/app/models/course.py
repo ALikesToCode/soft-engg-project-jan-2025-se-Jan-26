@@ -1,10 +1,12 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, String, Integer,\
+    ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base, engine
 from app.models.assignment import Assignment
 from datetime import datetime
 import enum
+import uuid
 
 # Enums for course and enrollment status
 class CourseStatus(str, enum.Enum):
@@ -158,7 +160,7 @@ class LectureContentDoc(Base):
     lecture_id = Column(Integer, ForeignKey("lecture.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False)  # e.g., "Introduction to Python"
     content_desc = Column(Text, nullable=True)
-    content_doc = Column(LargeBinary, nullable=False)  # Stores actual file content (PDF, DOC, PPT, PPTX)
+    content_doc = Column(String, nullable=False)  # Stores path of the file content (PDF, DOC, PPT, PPTX)
     file_type = Column(String, nullable=False)  # Stores MIME type (e.g., application/pdf, application/vnd.ms-powerpoint)
 
     lecture = relationship("Lecture", back_populates="contents_doc")
@@ -169,6 +171,7 @@ class LectureContentDoc(Base):
             "lecture_id": str(self.lecture_id),
             "lecture_title": self.title,
             "file_type": self.file_type,
+            "driveLink": self.content_doc,
             "content_desc": self.content_desc,
         }
 
