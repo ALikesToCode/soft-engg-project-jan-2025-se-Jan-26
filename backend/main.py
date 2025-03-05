@@ -73,6 +73,77 @@ This API provides endpoints for managing the support dashboard, including user a
 - Assignment submission and grading
 - AI-powered chat assistance
 - System monitoring and health checks
+
+## Running the Application
+
+### Prerequisites
+- Python 3.10+
+- PostgreSQL database
+- Redis server (for token management)
+
+### Setup Instructions
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/soft-engg-project-jan-2025-se-Jan-26.git
+   cd soft-engg-project-jan-2025-se-Jan-26
+   ```
+
+2. Create and activate a virtual environment:
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\\Scripts\\activate
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Configure environment variables:
+   - Create a `.env` file in the backend directory
+   - Set required variables (see `.env.example` for reference)
+
+### Running the Server
+```bash
+# From the backend directory
+python -m uvicorn main:app --reload --port 8002 --host 0.0.0.0
+```
+
+The API will be available at:
+- API Documentation: http://localhost:8002/docs
+- ReDoc Documentation: http://localhost:8002/redoc
+- API Endpoints: http://localhost:8002/api/v1/...
+
+## Authentication
+
+This API supports two authentication methods:
+
+1. **JWT Bearer Token**: Obtain a token via `/api/v1/auth/login` endpoint
+2. **Google OAuth2**: Use the Google login button in the Swagger UI or [login directly](/api/v1/auth/login/google)
+
+### JWT Authentication
+
+1. Use the `/api/v1/auth/login` endpoint with your email and password
+2. Copy the returned access token
+3. Click the "Authorize" button and enter the token in the format: `Bearer your_token`
+4. Or use the "Auto-Authenticate" button after logging in to automatically apply your token
+
+### Google OAuth Authentication
+
+1. Click the "Authorize" button
+2. Select "Google OAuth2" and click "Authorize"
+3. Complete the Google authentication flow
+
+### Default Test Accounts
+
+- **Support User**:
+  - Email: support@study.iitm.ac.in
+  - Password: password123
+
+- **Faculty User**:
+  - Email: faculty@study.iitm.ac.in
+  - Password: password123
     """,
     version="1.0.0",
     docs_url="/docs",
