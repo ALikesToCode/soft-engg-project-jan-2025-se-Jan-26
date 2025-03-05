@@ -95,10 +95,16 @@
 
                 <!-- Document Upload -->
                 <div v-if="contentForm.type === 'document'">
-                  <FileUploader
-                    :content-type="'document'"
-                    @file-selected="handleFileSelected"
-                    @file-removed="handleFileRemoved"
+                  <label for="driveLink" class="block text-sm font-medium text-gray-900 mb-1"
+                    >Google Drive Link for Document:</label
+                  >
+                  <input
+                    :disabled="!previewMode"
+                    id="driveLink"
+                    v-model="driveLink"
+                    type="url"
+                    placeholder="Enter Google Drive link"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 pr-12"
                   />
                 </div>
 
@@ -194,6 +200,7 @@ import { useContentStore } from '@/stores/contentStore'
 import { useCourseStore } from '@/stores/courseStore'
 import { useQuizStore } from '@/stores/quizStore'
 import { useAssignmentStore } from '@/stores/assignmentStore'
+import api from '@/utils/api'
 
 export default {
   name: 'ContentUpload',
@@ -229,6 +236,7 @@ export default {
     const selectedModuleId = ref(null)
     const selectedLectureId = ref(null)
     const isExistingData = ref(false)
+    const driveLink = ref('')
 
     // Form State
     const contentForm = ref({
@@ -257,7 +265,7 @@ export default {
         case 'lecture':
           return isValidVideoUrl(contentForm.value.videoUrl)
         case 'document':
-          return !!contentForm.value.file
+          return true //!!contentForm.value.file
         case 'quiz':
           return contentForm.value.questions?.length > 0
         case 'assignment':
@@ -300,6 +308,12 @@ export default {
       contentForm.value.description = data.content_desc
 
       contentForm.value.type = 'lecture' //when user has selected some other type
+      if (data.file_type) {
+        contentForm.value.type = data.file_type
+      }
+      if (data.driveLink) {
+        driveLink.value = data.driveLink
+      }
     }
     const handleCourseSelected = (courseId) => {
       contentForm.value.courseId = courseId
@@ -385,17 +399,22 @@ export default {
         const contentData = {
           ...contentForm.value,
           moduleId: selectedModuleId.value,
+          courseId: selectedCourseId.value,
         }
         if (contentForm.value.type === 'quiz') {
           await quizStore.createQuiz(contentData)
         } else if (contentForm.value.type === 'assignment') {
           await assignmentStore.createAssignment(contentData)
+        } else if (contentForm.value.type === 'document') {
+          const url = '/courses/module/doc_content/lecture'
+          await saveDocumentContent(contentData, url)
         } else {
           const url = '/courses/module/content/lecture' //for content type = video/lecture
           await contentStore.createContent(contentData, url)
         }
       } catch (error) {
         isLoading.value = false
+        throw error
       } finally {
         isLoading.value = false
       }
@@ -412,7 +431,12 @@ export default {
           contentForm.value.status = 'updated'
           showConfirmDialog.value = false
           isSavingData.value = true
-          await updateContent()
+          console.log('type = ' + contentForm.value.type)
+          if (contentForm.value.type === 'lecture') await updateContent()
+          else if (contentForm.value.type === 'document') {
+            console.log('Updating document')
+            await updateDocumentContent()
+          }
           toast.success('Content Updated successfully')
           isSavingData.value = false
           resetForm()
@@ -439,10 +463,50 @@ export default {
         await contentStore.updateContent(contentData, url)
       } catch (error) {
         isLoading.value = false
+        throw error
       } finally {
         isLoading.value = false
       }
     }
+
+    const saveDocumentContent = async (contentData, url) => {
+      console.log('Uploading Document...')
+      try {
+        const data = {
+          ...contentData,
+          driveDocLink: driveLink.value,
+        }
+        console.log(data)
+        const response = await api.post(url, data)
+        console.log('Upload successful:', response.data)
+        return response.data
+      } catch (error) {
+        console.error('Error uploading document:', error)
+        throw error
+      }
+    }
+
+    const updateDocumentContent = async () => {
+      console.log('updating doc content')
+      isLoading.value = true
+      try {
+        contentForm.value.moduleId = '0'
+        const contentData = {
+          ...contentForm.value,
+          driveDocLink: driveLink.value,
+          lectureId: selectedLectureId.value,
+        }
+        console.log({ ...contentData })
+        const url = '/courses/module/doc_content/lecture' //for content type = video/lecture
+        const response = await api.put(url, contentData)
+      } catch (error) {
+        isLoading.value = false
+        throw error
+      } finally {
+        isLoading.value = false
+      }
+    }
+
     // Utility Functions
     const isValidVideoUrl = (url) => {
       return url?.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/)
@@ -534,6 +598,8 @@ export default {
       isExistingData,
       updatePublishedContent,
       selectedLectureId,
+      driveLink,
+      updateDocumentContent,
     }
   },
 }

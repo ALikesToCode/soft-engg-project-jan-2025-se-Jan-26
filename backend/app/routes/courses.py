@@ -8,8 +8,7 @@ from typing import List, Optional
 from uuid import UUID
 from app.services.function_router import function_router
 
-router = APIRouter(tags=["Courses"])
-
+router = APIRouter(tags=["User Courses"])
 @router.get("/user/courses/history",
     summary="Get user's course history",
     description="Retrieves the course history for the currently authenticated user",
