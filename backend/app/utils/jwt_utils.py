@@ -3,8 +3,7 @@ from datetime import datetime, timedelta
 from app.config import settings
 import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger for this module
 logger = logging.getLogger(__name__)
 
 SECRET_KEY = settings.JWT_SECRET

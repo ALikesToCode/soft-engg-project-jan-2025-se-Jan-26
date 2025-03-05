@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     ALERT_THRESHOLD_OPEN_FILES: int = 1000
     ALERT_THRESHOLD_PROCESS_COUNT: int = 500
 
+    # Logflare Settings
+    USE_LOGFLARE: bool = False
+    LOGFLARE_SOURCE_ID: str = "b12c0a76-5b1a-4a58-93bc-e5340168165d"
+    LOGFLARE_API_KEY: str = "7sniujkFTAmT"
+    LOGFLARE_BATCH_SIZE: int = 10
+    LOGFLARE_LOG_LEVEL: str = "INFO"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -11,16 +11,7 @@ import os
 import asyncio
 from app.config import settings
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(settings.MONITORING_LOG_FILE),
-        logging.StreamHandler()
-    ]
-)
-
+# Get logger for this module
 logger = logging.getLogger(__name__)
 
 class ServiceStatus(BaseModel):
@@ -321,7 +312,19 @@ class MonitoringService:
             List of log entries
         """
         try:
-            log_file = Path(settings.MONITORING_LOG_FILE)
+            # Check if we're using Logflare
+            if settings.USE_LOGFLARE:
+                # When using Logflare, we'll return a message directing to the Logflare dashboard
+                return [{
+                    "timestamp": datetime.now().isoformat(),
+                    "level": "INFO",
+                    "message": f"Logs are being sent to Logflare. View them at https://logflare.app/sources/{settings.LOGFLARE_SOURCE_ID}"
+                }]
+            
+            # Otherwise, read from the local log file
+            log_dir = Path("logs")
+            log_file = log_dir / "app.log"
+            
             if not log_file.exists():
                 return []
             

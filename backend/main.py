@@ -26,6 +26,13 @@ from app.routes.course_routes import course_router
 from app.services.api_functions import *  # Import all API function declarations
 from app.routes import monitoring
 from app.services.monitoring_service import monitoring_service
+import logging
+from app.utils.logging_config import configure_logging
+from app.middleware import LoggingMiddleware
+
+# Configure logging
+logger = configure_logging()
+logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
 # Get the absolute path to the static directory
 STATIC_DIR = Path(__file__).parent / "static"
@@ -58,6 +65,9 @@ app.add_middleware(
 
 # Add Session Middleware
 app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
+
+# Add Logging Middleware
+app.add_middleware(LoggingMiddleware)
 
 # Mount static files directory
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

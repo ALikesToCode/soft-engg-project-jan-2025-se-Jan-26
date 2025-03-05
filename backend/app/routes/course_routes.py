@@ -20,7 +20,7 @@ class CourseCreate(BaseModel):
     syllabus: str | None = None
     description: str | None = None
 
-course_router = APIRouter()
+course_router = APIRouter(tags=["Courses"])
 
 @course_router.get("/courses", response_model=list[dict])
 async def fetch_courses(db: AsyncSession = Depends(get_db)):  

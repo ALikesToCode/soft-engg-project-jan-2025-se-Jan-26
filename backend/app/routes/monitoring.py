@@ -8,6 +8,7 @@ import logging
 
 router = APIRouter(tags=["monitoring"])
 
+# Get logger for this module
 logger = logging.getLogger(__name__)
 
 class AlertRequest(BaseModel):
