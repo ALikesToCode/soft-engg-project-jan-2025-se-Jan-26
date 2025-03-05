@@ -181,7 +181,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         )
     return payload # this returns the payload of the token containing email and role
 
-def get_current_faculty(token: str = Depends(oauth2_scheme)) -> dict:
+async def get_current_faculty(token: str = Depends(oauth2_scheme)) -> dict:
     """
     Get the current user and verify they have faculty role.
     
@@ -198,7 +198,7 @@ def get_current_faculty(token: str = Depends(oauth2_scheme)) -> dict:
     Raises:
         HTTPException: If the token is invalid or the user is not a faculty member
     """
-    user = get_current_user(token)
+    user = await get_current_user(token)
     if user.get("role") != "faculty":
         raise HTTPException(
             status_code=403,
