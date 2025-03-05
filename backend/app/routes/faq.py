@@ -21,7 +21,8 @@ async def read_faqs(
     category_id: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Retrieve all FAQs with optional filtering by category.
@@ -32,7 +33,8 @@ async def read_faqs(
 @router.get("/{faq_id}", response_model=FAQResponse)
 async def read_faq(
     faq_id: UUID,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Retrieve a specific FAQ by its ID.
@@ -46,7 +48,8 @@ async def read_faq(
 @router.post("/", response_model=FAQResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_faq(
     faq: FAQCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Create a new FAQ.
@@ -100,7 +103,8 @@ async def delete_existing_faq(
 @router.post("/search", response_model=List[FAQResponse])
 async def search_for_faqs(
     query: FAQSearchQuery,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Search for FAQs based on a query string.

@@ -102,6 +102,19 @@ class LogflareHandler(logging.Handler):
         
         return entry
     
+    def formatException(self, exc_info):
+        """
+        Format an exception info tuple into a string.
+        
+        Args:
+            exc_info: The exception info tuple
+            
+        Returns:
+            A formatted string representation of the exception
+        """
+        import traceback
+        return ''.join(traceback.format_exception(*exc_info))
+    
     def flush(self):
         """
         Flush the log buffer by sending logs to Logflare.

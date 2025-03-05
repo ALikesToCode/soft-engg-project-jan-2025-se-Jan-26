@@ -29,19 +29,19 @@ try:
     # Test connection
     redis_client.ping()
     logger.info("Redis connection established successfully")
-except redis.ConnectionError as e:
+except (redis.ConnectionError, redis.exceptions.ResponseError, redis.exceptions.RedisError) as e:
     logger.warning(f"Redis connection failed: {str(e)}. Using fallback mode.")
     # Create a mock Redis client for fallback
     class MockRedis:
         def __init__(self):
-            self.blacklist = set()
+            self.blacklist = {}
             logger.info("Using in-memory blacklist as Redis fallback")
             
         def exists(self, key):
             return key in self.blacklist
             
-        def set(self, key, value):
-            self.blacklist.add(key)
+        def set(self, key, value, **kwargs):
+            self.blacklist[key] = value
             return True
             
         def ping(self):

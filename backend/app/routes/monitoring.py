@@ -59,10 +59,19 @@ class AlertResolution(BaseModel):
 async def get_health():
     """Get system health status"""
     try:
-        return await monitoring_service.get_system_health()
+        health_data = await monitoring_service.get_system_health()
+        
+        # Handle Redis status specially
+        if "redis" in health_data["services"]:
+            redis_status = health_data["services"]["redis"]
+            # If Redis is in mock mode, consider it "up" for overall health
+            if redis_status == "mock":
+                health_data["services"]["redis"] = "up (mock)"
+        
+        return health_data
     except Exception as e:
-        logger.error(f"Error in get_health endpoint: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting system health: {str(e)}")
+        logger.error(f"Error getting system health: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/monitoring/metrics",
     summary="Get system metrics",
@@ -277,8 +286,29 @@ async def get_alerts(
 async def get_system_summary(
     current_user: dict = Depends(require_role("support"))
 ):
-    """Get comprehensive system summary"""
-    return await monitoring_service.get_system_summary()
+    """Get system summary"""
+    try:
+        summary = await monitoring_service.get_system_summary()
+        
+        # Handle Redis status specially
+        if "services" in summary and "redis" in summary["services"]:
+            redis_service = summary["services"]["redis"]
+            if isinstance(redis_service, dict) and "status" in redis_service:
+                # If Redis is in mock mode, consider it "up" for overall health
+                if redis_service["status"] == "mock":
+                    summary["services"]["redis"]["status"] = "up (mock)"
+                    # Don't count mock Redis as a problem for system status
+                    if summary["system_status"] == "degraded" and all(
+                        service["status"] in ["up", "up (mock)"] 
+                        for service_name, service in summary["services"].items() 
+                        if service_name != "redis" or service["status"] != "down"
+                    ):
+                        summary["system_status"] = "healthy"
+        
+        return summary
+    except Exception as e:
+        logger.error(f"Error getting system summary: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/monitoring/services",
     summary="Get service status",

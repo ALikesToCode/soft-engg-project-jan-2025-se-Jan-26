@@ -116,9 +116,55 @@ class MonitoringService:
         """Check health of all services"""
         services = {
             "database": settings.DATABASE_URL,
-            "redis": settings.REDIS_URL,
+            # Only include Redis if it's actually being used
             "api": settings.API_HEALTH_URL
         }
+        
+        # Add Redis service status with error handling
+        try:
+            from app.routes.auth import redis_client
+            # Check if we're using the real Redis or the mock
+            if hasattr(redis_client, 'ping') and callable(redis_client.ping):
+                is_mock = hasattr(redis_client, 'blacklist') and isinstance(redis_client.blacklist, dict)
+                if is_mock:
+                    # Using mock Redis
+                    self.service_status["redis"] = ServiceStatus(
+                        name="redis",
+                        status="mock",
+                        last_check=datetime.now(),
+                        response_time=0,
+                        error_message="Using in-memory mock Redis"
+                    )
+                else:
+                    # Try to ping the real Redis
+                    try:
+                        start_time = time.time()
+                        redis_client.ping()
+                        response_time = (time.time() - start_time) * 1000
+                        self.service_status["redis"] = ServiceStatus(
+                            name="redis",
+                            status="up",
+                            last_check=datetime.now(),
+                            response_time=response_time,
+                            error_message=None
+                        )
+                    except Exception as e:
+                        self.service_status["redis"] = ServiceStatus(
+                            name="redis",
+                            status="down",
+                            last_check=datetime.now(),
+                            response_time=None,
+                            error_message=str(e)
+                        )
+        except Exception as e:
+            # Redis module not available or other error
+            self.service_status["redis"] = ServiceStatus(
+                name="redis",
+                status="unknown",
+                last_check=datetime.now(),
+                response_time=None,
+                error_message=str(e)
+            )
         
         for service_name, url in services.items():
             try:

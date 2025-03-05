@@ -13,8 +13,16 @@ import logging
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/login",
+    scheme_name="bearerAuth"  # Match the scheme name in OpenAPI schema
+)
+pwd_context = CryptContext(
+    schemes=['bcrypt'],
+    deprecated='auto',
+    bcrypt__rounds=12,
+    bcrypt__ident='2b'
+)
 
 async def get_user(db: AsyncSession, email: str) -> Optional[User]:
     """
@@ -298,35 +306,58 @@ async def create_default_users(db: AsyncSession) -> None:
         support_email = "support@study.iitm.ac.in"
         support_user = await get_user(db, support_email)
         
+        print(f"Checking for support user: {support_email}")
+        
         if not support_user:
             # Create support user
+            hashed_password = pwd_context.hash("support123")
+            print(f"Creating support user with hashed password: {hashed_password[:10]}...")
+            
             support_user = User(
                 email=support_email,
                 name="Support Admin",
-                hashed_password=pwd_context.hash("support123"),
+                hashed_password=hashed_password,
                 is_google_user=False,
                 role="support"
             )
             db.add(support_user)
             print(f"Created default support user: {support_email}")
+        else:
+            print(f"Support user already exists: {support_email}")
+            # Update password for existing user
+            hashed_password = pwd_context.hash("support123")
+            print(f"Updating support user password: {hashed_password[:10]}...")
+            support_user.hashed_password = hashed_password
         
         # Check if faculty user exists
         faculty_email = "faculty@study.iitm.ac.in"
         faculty_user = await get_user(db, faculty_email)
         
+        print(f"Checking for faculty user: {faculty_email}")
+        
         if not faculty_user:
             # Create faculty user
+            hashed_password = pwd_context.hash("faculty123")
+            print(f"Creating faculty user with hashed password: {hashed_password[:10]}...")
+            
             faculty_user = User(
                 email=faculty_email,
                 name="Faculty Admin",
-                hashed_password=pwd_context.hash("faculty123"),
+                hashed_password=hashed_password,
                 is_google_user=False,
                 role="faculty"
             )
             db.add(faculty_user)
             print(f"Created default faculty user: {faculty_email}")
+        else:
+            print(f"Faculty user already exists: {faculty_email}")
+            # Update password for existing user
+            hashed_password = pwd_context.hash("faculty123")
+            print(f"Updating faculty user password: {hashed_password[:10]}...")
+            faculty_user.hashed_password = hashed_password
         
         await db.commit()
+        print("Default users committed to database successfully")
     except Exception as e:
         await db.rollback()
         print(f"Error creating default users: {str(e)}")
