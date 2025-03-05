@@ -31,6 +31,7 @@ import logging
 from app.utils.logging_config import configure_logging
 from app.middleware import LoggingMiddleware
 from contextlib import asynccontextmanager
+from app.routes.notification import router as notification
 
 # Configure logging
 logger = configure_logging()
@@ -404,6 +405,7 @@ app.include_router(courses_router, prefix="/api/v1", tags=["Courses"])
 app.include_router(course_router, prefix="/api/v1", tags=["Courses"])
 app.include_router(academic_integrity_router, prefix="/api/v1", tags=["Academic Integrity"])
 app.include_router(monitoring.router, prefix="/api/v1", tags=["Monitoring"])
+app.include_router(notification, prefix="/api/v1", tags=["Notification"])
 
 if __name__ == "__main__":
     import uvicorn
