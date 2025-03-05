@@ -336,4 +336,27 @@ async def create_system_alert(alert_type: str, severity: str, message: str):
 )
 async def get_system_alerts(alert_type: str = None, severity: str = None, resolved: bool = None):
     """Get system alerts"""
-    pass 
+    pass
+
+@function_router.function_declaration(
+    name="web_search",
+    description="Search the web for current information",
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "The search query"
+            },
+            "num_results": {
+                "type": "integer",
+                "description": "Maximum number of results to return",
+                "default": 5
+            }
+        },
+        "required": ["query"]
+    }
+)
+async def web_search(query: str, num_results: int = 5):
+    """Search the web for current information"""
+    return await function_router.web_search(query, num_results) 

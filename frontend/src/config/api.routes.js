@@ -4,7 +4,8 @@ export const API_ROUTES = {
   QUIZZES: '/api/v1/courses/quizzes',
   ASSIGNMENTS: '/api/v1/assignments',
   SUBMISSIONS: '/api/v1/assignments',
-  ACADEMIC_INTEGRITY: '/api/v1/academic-integrity'
+  ACADEMIC_INTEGRITY: '/api/v1/academic-integrity',
+  LLM: '/api/v1/llm'
 }
 
 export const API_VERSION = 'v1' 

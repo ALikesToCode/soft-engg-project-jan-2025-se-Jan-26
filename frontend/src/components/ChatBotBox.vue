@@ -95,6 +95,7 @@
 <script>
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import ChatService from '@/services/chat.service'
 
 export default {
   name: 'ChatBotBox',
@@ -172,21 +173,28 @@ export default {
       await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000))
     },
     async getAIResponse(message) {
-      // TODO: Further Improvements needed.
-
-      const response = await fetch("http://localhost:8000/api/v1/chat",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({"query":message})
-      });
-
-      if (!response.ok){
-        throw new Error(`Error: ${response.status}`)
+      try {
+        const data = await ChatService.sendMessage(message);
+        
+        // Handle function calls if present
+        if (data.function_calls && data.function_calls.length > 0) {
+          let resultText = data.content + "\n\n";
+          
+          // Add information about function calls
+          resultText += "I've gathered the following information:\n";
+          
+          for (const functionCall of data.function_calls) {
+            resultText += `- Used ${functionCall.name} with parameters: ${JSON.stringify(functionCall.arguments)}\n`;
+          }
+          
+          return resultText;
+        }
+        
+        return data.content;
+      } catch (error) {
+        console.error("Error getting AI response:", error);
+        return "I'm sorry, I encountered an error while processing your request. Please try again later.";
       }
-
-      const data = await response.json();
-      return data
-      
     },
     generateChatTitle(message) {
       // Generate a title based on the first message

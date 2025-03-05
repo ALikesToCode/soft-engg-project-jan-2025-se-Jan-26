@@ -4,6 +4,9 @@ from fastapi import HTTPException
 import inspect
 import json
 from functools import wraps
+import logging
+
+logger = logging.getLogger(__name__)
 
 class FunctionDeclaration(BaseModel):
     """Schema for function declarations that Gemini can understand"""
@@ -99,6 +102,47 @@ class FunctionRouter:
             self.register_function(name, description, wrapper, parameters)
             return wrapper
         return decorator
+
+    async def web_search(self, query: str, num_results: int = 5) -> List[Dict[str, str]]:
+        """
+        Perform a web search for the given query.
+        
+        Args:
+            query: The search query
+            num_results: Maximum number of results to return
+            
+        Returns:
+            List of search results with title, snippet, and url
+        """
+        try:
+            # This is a mock implementation - in production, you would integrate with a real search API
+            # such as Google Custom Search, Bing Search, or similar
+            logger.info(f"Performing web search for: {query}")
+            
+            # Mock results - in a real implementation, this would call an external API
+            mock_results = [
+                {
+                    "title": "Understanding Function Calling in LLMs",
+                    "snippet": "Function calling allows LLMs to interact with external tools while still using their reasoning capabilities.",
+                    "url": "https://example.com/function-calling-llm"
+                },
+                {
+                    "title": "Gemini API Documentation",
+                    "snippet": "Gemini can use both its knowledge and function calling to provide comprehensive responses.",
+                    "url": "https://ai.google.dev/docs/gemini_api"
+                },
+                {
+                    "title": "Best Practices for AI Assistants",
+                    "snippet": "Effective AI assistants combine model knowledge with external tools for the best user experience.",
+                    "url": "https://example.com/ai-assistant-best-practices"
+                }
+            ]
+            
+            # Return limited number of results
+            return mock_results[:num_results]
+        except Exception as e:
+            logger.error(f"Error in web_search: {str(e)}")
+            return [{"title": "Error", "snippet": f"Failed to perform web search: {str(e)}", "url": ""}]
 
 # Create global function router instance
 function_router = FunctionRouter() 
