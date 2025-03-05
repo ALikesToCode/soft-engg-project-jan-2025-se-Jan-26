@@ -4,8 +4,9 @@ from app.database import get_db
 from app.services.auth_service import get_current_user, require_auth
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.services.user_service import get_all_user_courses
 
-router = APIRouter()
+router = APIRouter(tags=["User Courses"])
 
 class UserProfileUpdate(BaseModel):
     """
@@ -187,3 +188,63 @@ async def update_user_profile(
     
     request.session["user"] = user
     return user
+
+
+
+@router.get("/user/courses",response_model=list[dict],
+    summary="Get user courses",
+    description="Retrieves all courses enrolled by the current user",
+    response_description="List of user courses",
+    responses={
+        200: {
+            "description": "User courses retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "id": "123e4567-e89b-12d3-a456-426614174000",
+                            "name": "Course Name",
+                            "code": "COURSE101",
+                            "title": "Course Title",
+                            "syllabus": "Course syllabus",
+                            "description": "Course description",
+                            "credits": 3,
+                            "duration": 12,
+                            "semester": "Spring",
+                            "year": 2022,
+                            "status": "active",
+                            "created_at": "2022-01-01T12:00:00",
+                            "updated_at": "2022-01-01T12:00:00"
+                        }
+                    ]
+                }
+            }
+        },
+        401: {
+            "description": "Unauthorized - User not authenticated",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Not authenticated"}
+                }
+            }
+        },
+        500: {
+            "description": "Internal Server Error - Failed to retrieve user courses",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Internal server error occurred"}
+                }
+            }
+        }
+    }
+)
+async def fetch_user_courses(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+    ):  
+    try:
+        courses = await get_all_user_courses(db, current_user["id"])  
+        return courses
+    except Exception as e:
+        print("Error=> ", e)
+        raise HTTPException(status_code=500, detail=str(e))

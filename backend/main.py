@@ -45,6 +45,10 @@ async def lifespan(app: FastAPI):
     # Initialize database on startup
     await init_db()
     
+    # Create default users
+    async with async_session() as session:
+        await create_default_users(session)
+    
     # Start monitoring service background tasks
     await monitoring_service.start_background_tasks()
     
@@ -400,8 +404,9 @@ app.include_router(chat, prefix="/api/v1", tags=["Chat"])
 app.include_router(assignment_router, prefix="/api/v1", tags=["Assignments"])
 app.include_router(faq_router, tags=["FAQs"])
 app.include_router(system_settings_router, prefix="/api/v1", tags=["System Settings"])
-app.include_router(courses_router, prefix="/api/v1", tags=["Courses"])
-app.include_router(course_router, prefix="/api/v1", tags=["Courses"])
+# Include both course routers with appropriate tags
+app.include_router(courses_router, prefix="/api/v1", tags=["User Courses"])
+app.include_router(course_router, prefix="/api/v1", tags=["Faculty Courses"])
 app.include_router(academic_integrity_router, prefix="/api/v1", tags=["Academic Integrity"])
 app.include_router(monitoring.router, prefix="/api/v1", tags=["Monitoring"])
 
@@ -414,4 +419,3 @@ if __name__ == "__main__":
         port=settings.PORT,
         reload=settings.ENV == "development"
     )
-

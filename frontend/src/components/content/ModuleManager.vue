@@ -10,7 +10,7 @@
       >
         <option value="">Select a course</option>
         <option v-for="course in courses" :key="course.id" :value="course.id">
-          {{ course.title }}
+          {{ course.name }}
         </option>
       </select>
     </div>
@@ -33,7 +33,13 @@
         >
           <div @click="fetchModuleLectures(module.id)" class="flex items-center">
             <span class="material-icons text-gray-400 mr-3 cursor-move">drag_indicator</span>
-            <span class="text-gray-900">{{ module.title }}</span>
+            <div class="flex flex-col">
+              <span class="text-gray-900">{{ module.title }}</span>
+              <span class="text-xs text-gray-600 flex items-center">
+                View Content
+                <span class="material-symbols-outlined text-base ml-1">keyboard_arrow_down</span>
+              </span>
+            </div>
           </div>
           <div class="flex space-x-2">
             <button @click.stop="editModule(module)" class="text-blue-600 hover:text-blue-700">
@@ -239,9 +245,13 @@ export default {
         isDataLoading.value = true
         const response = await api.get(`courses/lecture/content/${lectureId}`)
         isDataLoading.value = false
+        console.log(response.data)
         emit('lecture-data-content', { isExistingData: true, ...response.data })
       } catch (error) {
+        isDataLoading.value = false
         handleError(error, 'Failed to fetch the lecture content')
+      } finally {
+        isDataLoading.value = false
       }
     }
 
