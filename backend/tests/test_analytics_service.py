@@ -6,17 +6,6 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
-# Import your application modules
-# from app.main import app
-# from app.services.analytics_service import AnalyticsService
-# from app.models.course import Course
-# from app.models.user import User
-# from app.models.assignment import Assignment
-# from app.models.submission import Submission
-# from app.db.database import get_db
-
-# Assuming these are the correct imports for your application
-# Adjust as needed based on your actual project structure
 
 # Fixtures
 @pytest.fixture
