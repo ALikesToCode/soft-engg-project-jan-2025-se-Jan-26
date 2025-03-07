@@ -29,7 +29,7 @@ httptools==0.6.4
 httpx==0.28.1
 idna==3.10
 itsdangerous==2.2.0
-Jinja2==3.1.5
+Jinja2>=3.1.6
 jsonpatch==1.33
 jsonpointer==3.0.0
 langchain-core==0.3.40
@@ -75,7 +75,7 @@ uvloop==0.21.0
 watchfiles==1.0.4
 websockets==14.2
 zstandard==0.23.0
-pyjwt==2.10.0
+PyJWT>=2.10.1
 redis==5.0.0
 aiofiles==23.2.1
 boto3>=1.28.0
