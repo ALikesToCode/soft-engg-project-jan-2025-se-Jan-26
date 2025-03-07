@@ -1,182 +1,107 @@
-# Backend Setup and Running Guide
+# SE Team 26 Backend API
 
-This guide provides comprehensive instructions for setting up and running the backend server.
+This is the backend API for the SE Team 26 Project.
 
-## Prerequisites
+## Features
 
-- Python 3.8 or higher
+- User authentication (JWT-based)
+- Google OAuth integration
+- Course management
+- Assignment management
+- File uploads with S3 storage support
+- Plagiarism detection
+- Grading system
+- Monitoring and health checks
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.9+
 - PostgreSQL
-- Redis (optional, for caching and session management)
+- Redis (optional)
+- S3-compatible storage (for production)
 
-## Setup Steps
+### Installation
 
-### 1. Create Virtual Environment
-
-```bash
-# Create virtual environment
-python -m venv .venv
-
-# Activate virtual environment
-# On Linux/Mac
-source .venv/bin/activate
-# On Windows
-# .venv\Scripts\activate
-```
-
-### 2. Install Dependencies
+1. Clone the repository
+2. Navigate to the backend directory
+3. Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Setup PostgreSQL
-
-```bash
-# Install PostgreSQL (Debian/Ubuntu)
-sudo apt install postgresql
-
-# Access PostgreSQL command line
-sudo -i -u postgres
-psql
-
-# Setup database and user
-postgres=# ALTER USER postgres PASSWORD 'your_password';
-postgres=# CREATE DATABASE se_project_db;
-postgres=# \q
-```
-
-### 4. Configure Environment Variables
-
-Create a `.env` file in the backend directory by copying the `.env.example` file:
-
-```bash
-cp .env.example .env
-```
-
-Then update the following variables in your `.env` file:
+4. Create a `.env` file with the following variables:
 
 ```
-# Server Configuration
-PORT=8000
-HOST=0.0.0.0
-ENV=development
-
-# Database Configuration 
-# Format: postgres://<user>:<password>@<host>/<database>?sslmode=require
-DATABASE_URL=postgresql://postgres:your_password@localhost:5432/se_project_db
-
-# Authentication
-SESSION_SECRET=your_super_secret_key  # Generate a strong random string
-
-# Frontend URLs (for CORS)
-FRONTEND_URL=http://localhost:5173
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000
-
-# API Configuration
-API_PREFIX=/api/v1
-
-# Application
-APP_NAME="SE Team 26 API"
-APP_DESCRIPTION="Backend API for SE Team 26 Project"
-APP_VERSION="1.0.0"
-
-# Redis (if using Redis)
-REDIS_URL=redis://localhost:6379
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_DB=0
-
-# API Health Check
-API_HEALTH_URL=http://localhost:8000/health
-
-# Monitoring
-MONITORING_METRICS_HISTORY_SIZE=1000
-MONITORING_HEALTH_CHECK_INTERVAL=60
-
-# Logflare Settings
-USE_LOGFLARE=true
-LOGFLARE_SOURCE_ID=your_logflare_source_id
-LOGFLARE_API_KEY=your_logflare_api_key
-LOGFLARE_BATCH_SIZE=10
-LOGFLARE_LOG_LEVEL=INFO
-
-# Alert Thresholds (adjust based on your requirements)
-ALERT_THRESHOLD_CPU=80.0        # CPU usage percentage threshold
-ALERT_THRESHOLD_MEMORY=85.0     # Memory usage percentage threshold
-ALERT_THRESHOLD_DISK=90.0       # Disk usage percentage threshold
-ALERT_THRESHOLD_RESPONSE_TIME=2000.0  # Response time in milliseconds
-ALERT_THRESHOLD_ERROR_RATE=5.0  # Error rate percentage threshold
-
-# LLM Configuration (if using LLM features)
-LANGSMITH_TRACING=your_langsmith_tracing
-LANGSMITH_ENDPOINT=your_langsmith_endpoint
-LANGSMITH_API_KEY=your_langsmith_api_key
-LANGSMITH_PROJECT=your_langsmith_project
-GOOGLE_API_KEY=your_google_api_key
-
-# JWT Configuration
-JWT_SECRET=your_jwt_secret_key  # Generate a strong random string
+# Database and Authentication
+DATABASE_URL=postgresql://username:password@localhost:5432/dbname
+SESSION_SECRET=your_session_secret
+JWT_SECRET=your_jwt_secret
 JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=60
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+FRONTEND_URL=http://localhost:5173
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+
+# S3 Storage (optional for local development)
+S3_ACCESS_KEY=your_s3_access_key
+S3_SECRET_KEY=your_s3_secret_key
+S3_ENDPOINT_URL=your_s3_endpoint_url
+S3_BUCKET_NAME=your_s3_bucket_name
+S3_REGION=auto
 ```
 
-### 5. Database Migrations
-
-If migrations are needed, run:
+5. Run the application:
 
 ```bash
-python migrate.py
+uvicorn main:app --reload
 ```
 
-### 6. Start the Backend Server
+## File Storage
 
-#### Development mode:
+The application supports two modes of file storage:
 
-```bash
-# Start with auto-reload enabled
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
+1. **Local filesystem** (default for development)
+   - Files are stored in the `uploads` directory
+   - No additional configuration required
 
-#### Production mode:
+2. **S3-compatible storage** (required for production/Vercel)
+   - Files are stored in an S3-compatible storage service (like Cloudflare R2)
+   - Configure using the S3 environment variables
+   - Automatically used when running in a read-only environment (like Vercel)
 
-```bash
-# Start without auto-reload
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
+## Deployment
 
-Alternatively, you can use the provided shell script:
+### Local Deployment
 
-```bash
-# Make sure the script is executable
-chmod +x run.sh
+For local deployment, follow the installation steps above.
 
-# Run the server
-./run.sh
-```
+### Vercel Deployment
+
+For deploying to Vercel, see [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for detailed instructions.
+
+Key points for Vercel deployment:
+- Vercel has a read-only filesystem, so file uploads use S3-compatible storage
+- Redis connection is optional with an in-memory fallback
+- Environment variables need to be configured in the Vercel dashboard
 
 ## API Documentation
 
-Once the server is running, API documentation is available at:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+Once the application is running, you can access the API documentation at:
 
-## Running Tests
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+## Testing
+
+Run tests with pytest:
 
 ```bash
-# Run all tests
 pytest
-
-# Or use the shell script
-chmod +x run_tests.sh
-./run_tests.sh
 ```
 
-## Monitoring
+## License
 
-The application logs are sent to Logflare for centralized logging. You can view the logs in the Logflare dashboard at:
-
-```
-https://logflare.app/sources/YOUR_SOURCE_ID
-```
-
-When Logflare is disabled, logs are stored in the `logs` directory.
+This project is licensed under the MIT License - see the LICENSE file for details.

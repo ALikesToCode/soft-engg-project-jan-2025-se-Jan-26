@@ -67,10 +67,10 @@ class Settings(BaseSettings):
 
     # Logflare Settings
     USE_LOGFLARE: bool = False
-    LOGFLARE_SOURCE_ID: str = "b12c0a76-5b1a-4a58-93bc-e5340168165d"
-    LOGFLARE_API_KEY: str = "7sniujkFTAmT"
-    LOGFLARE_BATCH_SIZE: int = 10
-    LOGFLARE_LOG_LEVEL: str = "INFO"
+    LOGFLARE_SOURCE_ID: str
+    LOGFLARE_API_KEY: str           
+    LOGFLARE_BATCH_SIZE: int
+    LOGFLARE_LOG_LEVEL: str 
 
     class Config:
         env_file = ".env"

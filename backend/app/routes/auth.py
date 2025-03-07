@@ -14,40 +14,61 @@ import logging
 from starlette.responses import RedirectResponse
 import jwt
 from pydantic import BaseModel
+import os
 
 router = APIRouter(tags=["Authentication"])
 logger = logging.getLogger(__name__)
+
+# Check if we're in a serverless environment
+SERVERLESS_ENV = os.environ.get("VERCEL") == "1"
 
 # Use settings for Redis configuration if available, otherwise use defaults
 redis_host = getattr(settings, 'REDIS_HOST', '127.0.0.1')
 redis_port = getattr(settings, 'REDIS_PORT', 6379)
 redis_db = getattr(settings, 'REDIS_DB', 0)
+redis_url = os.environ.get("REDIS_URL", getattr(settings, 'REDIS_URL', None))
+
+# Create a mock Redis client for fallback
+class MockRedis:
+    def __init__(self):
+        self.blacklist = {}
+        logger.info("Using in-memory blacklist as Redis fallback")
+        
+    def exists(self, key):
+        return key in self.blacklist
+        
+    def set(self, key, value, **kwargs):
+        self.blacklist[key] = value
+        return True
+        
+    def ping(self):
+        return True
 
 # Initialize Redis client with error handling
-try:
-    redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
-    # Test connection
-    redis_client.ping()
-    logger.info("Redis connection established successfully")
-except (redis.ConnectionError, redis.exceptions.ResponseError, redis.exceptions.RedisError) as e:
-    logger.warning(f"Redis connection failed: {str(e)}. Using fallback mode.")
-    # Create a mock Redis client for fallback
-    class MockRedis:
-        def __init__(self):
-            self.blacklist = {}
-            logger.info("Using in-memory blacklist as Redis fallback")
-            
-        def exists(self, key):
-            return key in self.blacklist
-            
-        def set(self, key, value, **kwargs):
-            self.blacklist[key] = value
-            return True
-            
-        def ping(self):
-            return True
-    
-    redis_client = MockRedis()
+if SERVERLESS_ENV:
+    # In serverless environments, default to using the mock Redis
+    # unless a valid REDIS_URL environment variable is provided
+    if redis_url:
+        try:
+            redis_client = redis.from_url(redis_url, decode_responses=True)
+            redis_client.ping()
+            logger.info("Redis connection established successfully using REDIS_URL")
+        except (redis.ConnectionError, redis.exceptions.ResponseError, redis.exceptions.RedisError) as e:
+            logger.warning(f"Redis connection failed: {str(e)}. Using fallback mode.")
+            redis_client = MockRedis()
+    else:
+        logger.warning("No REDIS_URL provided in serverless environment. Using in-memory fallback.")
+        redis_client = MockRedis()
+else:
+    # In non-serverless environments, try to connect to Redis using host/port
+    try:
+        redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
+        # Test connection
+        redis_client.ping()
+        logger.info("Redis connection established successfully")
+    except (redis.ConnectionError, redis.exceptions.ResponseError, redis.exceptions.RedisError) as e:
+        logger.warning(f"Redis connection failed: {str(e)}. Using fallback mode.")
+        redis_client = MockRedis()
 
 def is_token_blacklisted(token: str):
     logger = logging.getLogger(__name__)
@@ -58,7 +79,8 @@ def is_token_blacklisted(token: str):
         return is_blacklisted
     except Exception as e:
         logger.error(f"Error checking token blacklist: {str(e)}")
-        # If Redis is down, assume token is not blacklisted
+        # If there's an error checking the blacklist, assume token is not blacklisted
+        # This is a fallback to prevent users from being locked out
         return False
 
 def is_token_valid(token: str):
