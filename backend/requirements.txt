@@ -79,3 +79,6 @@ PyJWT>=2.10.1
 redis==5.0.0
 aiofiles==23.2.1
 boto3>=1.28.0
+pytest
+pandas 
+aiosqlite
