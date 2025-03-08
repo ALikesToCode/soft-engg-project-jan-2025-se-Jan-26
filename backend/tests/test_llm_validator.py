@@ -15,7 +15,7 @@ def test_empty_query():
     
     with pytest.raises(ValidationError):
         LLMInputValidator(query="   ", max_tokens=1024)
-
+    
 def test_query_length():
     """Test query length validation"""
     # Test maximum length
