@@ -1,15 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Path, Query, Body
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any, Union
-from datetime import datetime
+from datetime import datetime, UTC
 from app.database import get_db, AsyncSession
-from app.services.auth_service import require_auth, require_role
+from app.services.auth_service import require_auth, require_role, get_current_faculty, get_current_user
 import logging
 import json
 import re
 import uuid
 from enum import Enum
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy import and_, or_
+from app.models.assignment import Submission
+from app.models.user import User
 
 router = APIRouter(
     prefix="/academic-integrity",
@@ -101,6 +106,39 @@ class ValidationResponse(BaseModel):
     containsSensitiveContent: bool = Field(..., description="Whether the request contains sensitive content")
     sensitiveContentDetails: Optional[Dict[str, Any]] = Field(None, description="Details about the sensitive content")
 
+# Schema for academic integrity flag
+class AcademicIntegrityFlag(BaseModel):
+    """
+    Model for academic integrity flag.
+    """
+    id: uuid.UUID = Field(..., description="Unique ID for the flag")
+    submission_id: uuid.UUID = Field(..., description="ID of the flagged submission")
+    assignment_id: uuid.UUID = Field(..., description="ID of the assignment")
+    student_id: uuid.UUID = Field(..., description="ID of the student whose submission is flagged")
+    flagged_by: uuid.UUID = Field(..., description="ID of the faculty who flagged the submission")
+    reason: str = Field(..., description="Reason for flagging the submission")
+    status: str = Field(..., description="Status of the flag (pending, resolved, dismissed)")
+    resolution_notes: Optional[str] = Field(None, description="Notes on how the flag was resolved")
+    created_at: datetime = Field(..., description="Timestamp when the flag was created")
+    updated_at: datetime = Field(..., description="Timestamp when the flag was last updated")
+
+# Schema for creating a new flag
+class AcademicIntegrityFlagCreate(BaseModel):
+    """
+    Model for creating a new academic integrity flag.
+    """
+    reason: str = Field(..., description="Reason for flagging the submission")
+    status: str = Field("pending", description="Status of the flag (pending, resolved, dismissed)")
+
+# Schema for updating a flag
+class AcademicIntegrityFlagUpdate(BaseModel):
+    """
+    Model for updating an academic integrity flag.
+    """
+    reason: Optional[str] = Field(None, description="Reason for flagging the submission")
+    status: Optional[str] = Field(None, description="Status of the flag (pending, resolved, dismissed)")
+    resolution_notes: Optional[str] = Field(None, description="Notes on how the flag was resolved")
+
 # Get all flagged interactions
 @router.get("/flags", 
     response_model=List[FlagResponse],
@@ -140,8 +178,8 @@ async def get_flagged_interactions(
                 "status": "pending",
                 "course_id": "course_123",
                 "user_id": "user_789",
-                "created_at": datetime.now(),
-                "updated_at": datetime.now(),
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC),
                 "reviewed_by": None,
                 "comments": []
             }
@@ -190,14 +228,14 @@ async def update_flag_status(
             "status": update_data.status,
             "course_id": "course_123",
             "user_id": "user_789",
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
             "reviewed_by": user.get('sub'),
             "comments": [
                 {
                     "user_id": user.get('sub'),
                     "comment": update_data.comment,
-                    "timestamp": datetime.now()
+                    "timestamp": datetime.now(UTC)
                 }
             ]
         }
@@ -245,14 +283,14 @@ async def escalate_flag(
             "status": "escalated",
             "course_id": "course_123",
             "user_id": "user_789",
-            "created_at": datetime.now(),
-            "updated_at": datetime.now(),
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
             "reviewed_by": user.get('sub'),
             "comments": [
                 {
                     "user_id": user.get('sub'),
                     "comment": f"Escalated: {escalation_details.reason}",
-                    "timestamp": datetime.now()
+                    "timestamp": datetime.now(UTC)
                 }
             ]
         }
@@ -318,8 +356,8 @@ async def get_flag_statistics(
                     "status": "pending",
                     "course_id": course_id,
                     "user_id": "user_789",
-                    "created_at": datetime.now(),
-                    "updated_at": datetime.now(),
+                    "created_at": datetime.now(UTC),
+                    "updated_at": datetime.now(UTC),
                     "reviewed_by": None,
                     "comments": []
                 }
@@ -366,7 +404,7 @@ async def get_flag_audit_trail(
                 "flag_id": flag_id,
                 "action": "create",
                 "user_id": "user_123",
-                "timestamp": datetime.now(),
+                "timestamp": datetime.now(UTC),
                 "details": {"severity": "medium", "source": "assignment"}
             },
             {
@@ -374,7 +412,7 @@ async def get_flag_audit_trail(
                 "flag_id": flag_id,
                 "action": "update",
                 "user_id": "faculty_456",
-                "timestamp": datetime.now(),
+                "timestamp": datetime.now(UTC),
                 "details": {"status": "reviewed", "comment": "Reviewing this flag"}
             }
         ]
@@ -444,4 +482,196 @@ async def validate_llm_request(request: LLMRequestValidationModel, user: dict = 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error validating LLM request"
-        ) 
+        )
+
+@router.post("/assignments/{assignment_id}/submissions/{submission_id}/flag", 
+             response_model=dict, summary="Flag a submission for academic integrity concerns")
+async def flag_submission(
+    assignment_id: uuid.UUID = Path(..., description="ID of the assignment"),
+    submission_id: uuid.UUID = Path(..., description="ID of the submission to flag"),
+    flag_data: AcademicIntegrityFlagCreate = Body(..., description="Flag data"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_faculty)
+):
+    """
+    Flag a submission for academic integrity concerns.
+    
+    This endpoint allows faculty to flag a submission for academic integrity concerns such as plagiarism.
+    
+    - **assignment_id**: ID of the assignment
+    - **submission_id**: ID of the submission to flag
+    - **flag_data**: Flag data including reason and status
+    
+    Returns:
+    - **message**: Success message
+    - **flag_id**: ID of the created flag
+    """
+    try:
+        # Check if submission exists
+        submission = await db.get(Submission, submission_id)
+        if not submission or submission.assignment_id != assignment_id:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        
+        # Create flag
+        flag = {
+            "id": uuid.uuid4(),
+            "submission_id": submission_id,
+            "assignment_id": assignment_id,
+            "student_id": submission.student_id,
+            "flagged_by": current_user["id"],
+            "reason": flag_data.reason,
+            "status": flag_data.status,
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
+        }
+        
+        # TODO: Store flag in database
+        
+        return {
+            "message": "Submission flagged successfully",
+            "flag_id": str(flag["id"])
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/assignments/{assignment_id}/submissions/{submission_id}/flag", 
+            response_model=dict, summary="Get flag for a submission")
+async def get_submission_flag(
+    assignment_id: uuid.UUID = Path(..., description="ID of the assignment"),
+    submission_id: uuid.UUID = Path(..., description="ID of the submission"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_faculty)
+):
+    """
+    Get flag for a submission.
+    
+    This endpoint allows faculty to get the academic integrity flag for a submission.
+    
+    - **assignment_id**: ID of the assignment
+    - **submission_id**: ID of the submission
+    
+    Returns:
+    - **flag**: Flag data if exists, null otherwise
+    """
+    try:
+        # Check if submission exists
+        submission = await db.get(Submission, submission_id)
+        if not submission or submission.assignment_id != assignment_id:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        
+        # TODO: Get flag from database
+        # For now, return mock data
+        flag = {
+            "id": uuid.uuid4(),
+            "submission_id": submission_id,
+            "assignment_id": assignment_id,
+            "student_id": submission.student_id,
+            "flagged_by": current_user["id"],
+            "reason": "Suspected plagiarism",
+            "status": "pending",
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
+        }
+        
+        return {
+            "flag": flag
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/assignments/{assignment_id}/submissions/{submission_id}/flag", 
+            response_model=dict, summary="Update flag for a submission")
+async def update_submission_flag(
+    assignment_id: uuid.UUID = Path(..., description="ID of the assignment"),
+    submission_id: uuid.UUID = Path(..., description="ID of the submission"),
+    flag_data: AcademicIntegrityFlagUpdate = Body(..., description="Updated flag data"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_faculty)
+):
+    """
+    Update flag for a submission.
+    
+    This endpoint allows faculty to update the academic integrity flag for a submission.
+    
+    - **assignment_id**: ID of the assignment
+    - **submission_id**: ID of the submission
+    - **flag_data**: Updated flag data
+    
+    Returns:
+    - **message**: Success message
+    - **flag**: Updated flag data
+    """
+    try:
+        # Check if submission exists
+        submission = await db.get(Submission, submission_id)
+        if not submission or submission.assignment_id != assignment_id:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        
+        # TODO: Update flag in database
+        # For now, return mock data
+        flag = {
+            "id": uuid.uuid4(),
+            "submission_id": submission_id,
+            "assignment_id": assignment_id,
+            "student_id": submission.student_id,
+            "flagged_by": current_user["id"],
+            "reason": flag_data.reason or "Suspected plagiarism",
+            "status": flag_data.status or "pending",
+            "resolution_notes": flag_data.resolution_notes,
+            "created_at": datetime.now(UTC),
+            "updated_at": datetime.now(UTC),
+        }
+        
+        return {
+            "message": "Flag updated successfully",
+            "flag": flag
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/academic-integrity/flags", response_model=List[dict], summary="Get all academic integrity flags")
+async def get_all_flags(
+    status: Optional[str] = Query(None, description="Filter flags by status"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_faculty)
+):
+    """
+    Get all academic integrity flags.
+    
+    This endpoint allows faculty to get all academic integrity flags, optionally filtered by status.
+    
+    - **status**: Optional filter for flag status (pending, resolved, dismissed)
+    
+    Returns:
+    - **flags**: List of flag data
+    """
+    try:
+        # TODO: Get flags from database
+        # For now, return mock data
+        flags = [
+            {
+                "id": uuid.uuid4(),
+                "submission_id": uuid.uuid4(),
+                "assignment_id": uuid.uuid4(),
+                "student_id": uuid.uuid4(),
+                "flagged_by": current_user["id"],
+                "reason": "Suspected plagiarism",
+                "status": "pending",
+                "created_at": datetime.now(UTC),
+                "updated_at": datetime.now(UTC),
+            }
+        ]
+        
+        # Filter by status if provided
+        if status:
+            flags = [f for f in flags if f["status"] == status]
+        
+        return flags
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 

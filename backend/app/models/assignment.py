@@ -90,6 +90,12 @@ class Assignment(Base):
     creator = relationship("User", foreign_keys=[created_by])
     course = relationship("Course", back_populates="assignments")
 
+    def __str__(self):
+        return f"Assignment(id={self.id}, title={self.title})"
+    
+    def __repr__(self):
+        return self.__str__()
+
 
 class Submission(Base):
     """
@@ -168,4 +174,10 @@ class Submission(Base):
     # Relationships
     assignment = relationship("Assignment", back_populates="submissions")
     student = relationship("User", foreign_keys=[student_id])
-    grader = relationship("User", foreign_keys=[graded_by]) 
+    grader = relationship("User", foreign_keys=[graded_by])
+
+    def __str__(self):
+        return f"Submission(id={self.id}, assignment_id={self.assignment_id}, student_id={self.student_id})"
+    
+    def __repr__(self):
+        return self.__str__() 

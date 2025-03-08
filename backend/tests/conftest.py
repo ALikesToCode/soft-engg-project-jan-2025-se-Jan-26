@@ -57,9 +57,8 @@ def client():
 
 @pytest.fixture
 async def async_client():
-    # Use the newer AsyncClient initialization format
-    async with AsyncClient(base_url="http://test") as ac:
-        ac.app = app  # Attach the app to the client
+    # Use AsyncClient for async tests
+    async with AsyncClient(base_url="http://testserver") as ac:
         yield ac
 
 # Setup and teardown for each test

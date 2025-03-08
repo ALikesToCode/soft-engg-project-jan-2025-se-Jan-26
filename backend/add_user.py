@@ -4,7 +4,7 @@ from app.database import get_db, Base, engine
 from app.models.user import User
 from sqlalchemy.future import select
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
@@ -44,7 +44,7 @@ async def add_user(email, name, role, password):
                 role=role,
                 hashed_password=pwd_context.hash(password),
                 is_google_user=False,
-                created_at=datetime.now()
+                created_at=datetime.now(UTC)
             )
             db.add(user)
             await db.commit()
@@ -54,7 +54,7 @@ async def add_user(email, name, role, password):
             user.name = name
             user.role = role
             user.hashed_password = pwd_context.hash(password)
-            user.updated_at = datetime.now()
+            user.updated_at = datetime.now(UTC)
             await db.commit()
             print(f"Updated user: {user.email} with role: {user.role} and id: {user.id}")
         break  # Exit after first iteration
