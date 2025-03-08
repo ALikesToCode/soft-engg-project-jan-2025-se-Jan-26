@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 from starlette.responses import RedirectResponse
 import jwt
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 import os
 
 router = APIRouter(tags=["Authentication"])
@@ -599,12 +599,13 @@ class PasswordUpdate(BaseModel):
     """
     password: str
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "password": "securePassword123"
             }
         }
+    )
 
 @router.post("/auth/set-password", 
     summary="Set or update user password",

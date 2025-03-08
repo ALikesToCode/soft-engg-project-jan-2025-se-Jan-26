@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.requests import Request
 from app.database import get_db
 from app.services.auth_service import get_current_user, require_auth, get_user
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.user_service import get_all_user_courses
 
@@ -23,30 +23,31 @@ class UserProfileUpdate(BaseModel):
     name: str | None = Field(
         None, 
         description="User's display name", 
-        example="John Doe",
         min_length=1,
-        max_length=100
+        max_length=100,
+        json_schema_extra={"example": "John Doe"}
     )
     email: str | None = Field(
         None, 
         description="User's email address", 
-        example="john.doe@example.com",
-        pattern=r"^[\w\.-]+@[\w\.-]+\.\w+$"
+        pattern=r"^[\w\.-]+@[\w\.-]+\.\w+$",
+        json_schema_extra={"example": "john.doe@example.com"}
     )
     picture: str | None = Field(
         None, 
-        description="URL to user's profile picture", 
-        example="https://example.com/profile.jpg"
+        description="URL to user's profile picture",
+        json_schema_extra={"example": "https://example.com/profile.jpg"}
     )
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "name": "John Doe",
                 "email": "john.doe@example.com",
                 "picture": "https://example.com/profile.jpg"
             }
         }
+    )
 
 @router.get("/user/profile", 
     summary="Get user profile",

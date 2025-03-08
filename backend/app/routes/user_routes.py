@@ -6,7 +6,7 @@ from app.services.user_service import create_user, update_user, delete_user, Use
 from sqlalchemy.future import select
 from app.database import get_db
 from app.models.user import User
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 import bcrypt
 from typing import List, Optional
 
@@ -19,8 +19,7 @@ class UserSchema(BaseModel):
     role: str = "student" # Default role
     picture: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # User routes
 

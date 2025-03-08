@@ -1,3 +1,4 @@
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 from typing import List
 from datetime import timedelta
@@ -79,9 +80,10 @@ class Settings(BaseSettings):
     LOGFLARE_BATCH_SIZE: int
     LOGFLARE_LOG_LEVEL: str 
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = ConfigDict(
+        env_file=".env",
+        case_sensitive=True
+    )
 
     @property
     def allowed_origins_list(self) -> List[str]:
