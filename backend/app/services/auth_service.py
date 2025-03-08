@@ -54,7 +54,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> Opti
         password: The plaintext password to verify
         
     Returns:
-        The User object if authentication is successful, otherwise False
+        The User object if authentication is successful, otherwise None
         
     Raises:
         HTTPException: If an error occurs during authentication
@@ -65,15 +65,15 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> Opti
         user = await get_user(db, email)
         if not user:
             logger.warning(f"User not found: {email}")
-            return False
+            return None
             
         # If user has no password set (Google user without password)
         if not user.hashed_password:
-            return False
+            return None
             
         # Check if the password is correct using passlib
         if not pwd_context.verify(password, user.hashed_password):
-            return False
+            return None
             
         return user
     except Exception as e:

@@ -165,7 +165,9 @@ async def test_create_assignment(db_session: AsyncSession):
     
     result = await AssignmentService.create_assignment(db_session, assignment_data, faculty_id)
     assert result is not None
-    assert "assignment_id" in result
+    assert result.id is not None
+    assert result.title == "Test Assignment"
+    assert result.description == "This is a test assignment"
     
     # Get the assignment
     assignment = await AssignmentService.get_assignment_by_id(db_session, result["assignment_id"])

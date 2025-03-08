@@ -3,6 +3,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import NullPool
 from .config import settings
 from urllib.parse import urlparse, parse_qs
+from sqlalchemy.types import TypeDecorator, CHAR
+from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+import uuid
 
 # Parse the database URL to handle SSL properly
 url = urlparse(settings.DATABASE_URL)
@@ -64,7 +67,6 @@ async def init_db():
     from app.models.assignment import Assignment, Submission
     from app.models.role import Role
     from datetime import datetime
-    import uuid
     from sqlalchemy import inspect
     
     # Check if tables already exist
@@ -109,3 +111,38 @@ async def init_db():
                     print(f"Error creating default users: {e}")
         else:
             print("Database tables already exist, skipping initialization.")
+
+# Custom UUID type for SQLite compatibility
+class UUID(TypeDecorator):
+    """Platform-independent UUID type.
+    
+    Uses PostgreSQL's UUID type when available, otherwise uses CHAR(36).
+    """
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PostgresUUID())
+        else:
+            return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return value
+        else:
+            if isinstance(value, uuid.UUID):
+                return str(value)
+            return value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return value
+        else:
+            if not isinstance(value, uuid.UUID):
+                return uuid.UUID(value)
+            return value

@@ -16,6 +16,8 @@ import logging
 import boto3
 from botocore.exceptions import ClientError
 import io
+from typing import Union, Dict, Any, Optional
+from dateutil import parser
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +127,7 @@ class AssignmentService:
     """
     
     @staticmethod
-    async def create_assignment(db: AsyncSession, assignment_data: dict, user_id: uuid.UUID):
+    async def create_assignment(db: AsyncSession, assignment_data: Dict[str, Any], user_id: Union[str, uuid.UUID]):
         """
         Create a new assignment.
         
@@ -137,6 +139,34 @@ class AssignmentService:
         Returns:
             The created assignment
         """
+        # Convert string to UUID if needed
+        if isinstance(user_id, str):
+            user_id = uuid.UUID(user_id)
+            
+        # Convert course_id to UUID if it's a string
+        if 'course_id' in assignment_data and isinstance(assignment_data['course_id'], str):
+            assignment_data['course_id'] = uuid.UUID(assignment_data['course_id'])
+            
+        # Convert module_id to UUID if it's a string and not None
+        if 'module_id' in assignment_data and assignment_data['module_id'] and isinstance(assignment_data['module_id'], str):
+            assignment_data['module_id'] = uuid.UUID(assignment_data['module_id'])
+        
+        # Convert due_date from ISO string to datetime object if needed
+        if 'due_date' in assignment_data and isinstance(assignment_data['due_date'], str):
+            try:
+                assignment_data['due_date'] = datetime.fromisoformat(assignment_data['due_date'])
+            except ValueError:
+                # If fromisoformat fails, try a more lenient approach
+                assignment_data['due_date'] = parser.parse(assignment_data['due_date'])
+        
+        # Convert peer_review_due_date from ISO string to datetime object if needed
+        if 'peer_review_due_date' in assignment_data and assignment_data['peer_review_due_date'] and isinstance(assignment_data['peer_review_due_date'], str):
+            try:
+                assignment_data['peer_review_due_date'] = datetime.fromisoformat(assignment_data['peer_review_due_date'])
+            except ValueError:
+                # If fromisoformat fails, try a more lenient approach
+                assignment_data['peer_review_due_date'] = parser.parse(assignment_data['peer_review_due_date'])
+        
         assignment = Assignment(**assignment_data, created_by=user_id)
         db.add(assignment)
         await db.commit()
@@ -144,7 +174,7 @@ class AssignmentService:
         return assignment
     
     @staticmethod
-    async def get_assignment(db: AsyncSession, assignment_id: uuid.UUID):
+    async def get_assignment(db: AsyncSession, assignment_id: Union[str, uuid.UUID]):
         """
         Get an assignment by ID.
         
@@ -153,8 +183,12 @@ class AssignmentService:
             assignment_id: Assignment ID
             
         Returns:
-            The assignment or None if not found
+            The assignment if found, None otherwise
         """
+        # Convert string to UUID if needed
+        if isinstance(assignment_id, str):
+            assignment_id = uuid.UUID(assignment_id)
+        
         result = await db.execute(select(Assignment).filter(Assignment.id == assignment_id))
         return result.scalars().first()
     
@@ -379,16 +413,24 @@ class AssignmentService:
                 existing_submission.submitted_at = datetime.now(UTC)
                 
                 # Check if submission is late
-                if assignment.due_date and datetime.now(UTC) > assignment.due_date:
-                    existing_submission.late_submission = True
-                    
-                    # Apply late penalty if configured
-                    if assignment.allow_late_submissions and assignment.late_penalty > 0:
-                        days_late = (datetime.now(UTC) - assignment.due_date).days
-                        if days_late > 0:
-                            existing_submission.late_penalty_applied = min(
-                                100, assignment.late_penalty * days_late
-                            )
+                if assignment.due_date:
+                    # Ensure both datetimes are timezone-aware
+                    now = datetime.now(UTC)
+                    due_date = assignment.due_date
+                    if due_date.tzinfo is None:
+                        # If due_date is naive, make it timezone-aware
+                        due_date = due_date.replace(tzinfo=UTC)
+                        
+                    if now > due_date:
+                        existing_submission.late_submission = True
+                        
+                        # Apply late penalty if configured
+                        if assignment.allow_late_submissions and assignment.late_penalty > 0:
+                            days_late = (now - due_date).days
+                            if days_late > 0:
+                                existing_submission.late_penalty_applied = min(
+                                    100, assignment.late_penalty * days_late
+                                )
             
             # If a new file is uploaded, save it and update file info
             if file:
@@ -444,16 +486,24 @@ class AssignmentService:
             submission.submitted_at = datetime.now(UTC)
             
             # Check if submission is late
-            if assignment.due_date and datetime.now(UTC) > assignment.due_date:
-                submission.late_submission = True
-                
-                # Apply late penalty if configured
-                if assignment.allow_late_submissions and assignment.late_penalty > 0:
-                    days_late = (datetime.now(UTC) - assignment.due_date).days
-                    if days_late > 0:
-                        submission.late_penalty_applied = min(
-                            100, assignment.late_penalty * days_late
-                        )
+            if assignment.due_date:
+                # Ensure both datetimes are timezone-aware
+                now = datetime.now(UTC)
+                due_date = assignment.due_date
+                if due_date.tzinfo is None:
+                    # If due_date is naive, make it timezone-aware
+                    due_date = due_date.replace(tzinfo=UTC)
+                    
+                if now > due_date:
+                    submission.late_submission = True
+                    
+                    # Apply late penalty if configured
+                    if assignment.allow_late_submissions and assignment.late_penalty > 0:
+                        days_late = (now - due_date).days
+                        if days_late > 0:
+                            submission.late_penalty_applied = min(
+                                100, assignment.late_penalty * days_late
+                            )
         
         # If a file is uploaded, save it and update file info
         if file:

@@ -5,7 +5,7 @@ from sqlalchemy import select
 from app.models.user import User
 from app.models.course import Course, Module, LectureContent, Lecture, CourseEnrollment, LectureContentDoc
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, Union
 import bcrypt
 import uuid
 
@@ -24,7 +24,7 @@ class UserUpdate(BaseModel):
     picture: Optional[str] = None
 
 
-async def create_user(db: AsyncSession, user_data: UserCreate) -> User:
+async def create_user(db: AsyncSession, user_data: UserCreate) -> uuid.UUID:
     user_dict = user_data.model_dump(exclude_unset=True)  # Remove unset fields
     
     # Extract password from user_dict to handle it separately
@@ -41,9 +41,13 @@ async def create_user(db: AsyncSession, user_data: UserCreate) -> User:
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    return user
+    return user.id
 
-async def update_user(db: AsyncSession, user_id: int, user_data: UserUpdate) -> User:
+async def update_user(db: AsyncSession, user_id: Union[str, uuid.UUID], user_data: UserUpdate) -> User:
+    # Convert string to UUID if needed
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+        
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -58,7 +62,11 @@ async def update_user(db: AsyncSession, user_id: int, user_data: UserUpdate) -> 
     await db.refresh(user)
     return user
 
-async def delete_user(db: AsyncSession, user_id: int):
+async def delete_user(db: AsyncSession, user_id: Union[str, uuid.UUID]):
+    # Convert string to UUID if needed
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+        
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -66,7 +74,7 @@ async def delete_user(db: AsyncSession, user_id: int):
     await db.commit()
     return {"message": "User deleted"}
 
-async def get_user_by_id(db: AsyncSession, user_id: int) -> User:
+async def get_user_by_id(db: AsyncSession, user_id: Union[str, uuid.UUID]) -> User:
     """
     Get a user by their ID.
     
@@ -77,6 +85,10 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> User:
     Returns:
         User object if found, None otherwise
     """
+    # Convert string to UUID if needed
+    if isinstance(user_id, str):
+        user_id = uuid.UUID(user_id)
+        
     user = await db.get(User, user_id)
     return user
 

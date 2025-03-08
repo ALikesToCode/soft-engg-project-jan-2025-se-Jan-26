@@ -1,8 +1,7 @@
 import uuid
 from sqlalchemy import Column, String, DateTime, Boolean, Table, ForeignKey, Integer
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from app.database import Base, engine
+from app.database import Base, engine, UUID
 from app.models.course import Course, user_courses
 from app.models.role import Role, user_roles
 from datetime import datetime, UTC
@@ -33,7 +32,7 @@ class User(Base):
     """
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, 
+    id = Column(UUID, primary_key=True, default=uuid.uuid4, 
                 comment="Unique identifier for the user")
     email = Column(String, unique=True, index=True, 
                   comment="User's email address, used for authentication and communication")

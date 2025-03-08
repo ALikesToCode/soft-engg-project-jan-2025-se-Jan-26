@@ -1,7 +1,6 @@
 from sqlalchemy import Column, String, DateTime, Boolean, Integer, ForeignKey, Float, Text, JSON
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-from app.database import Base
+from app.database import Base, UUID
 import uuid
 from datetime import datetime, UTC
 
@@ -39,17 +38,17 @@ class Assignment(Base):
     """
     __tablename__ = "assignments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, 
+    id = Column(UUID, primary_key=True, default=uuid.uuid4, 
                 comment="Unique identifier for the assignment")
     title = Column(String, nullable=False, 
                   comment="Assignment title")
     description = Column(Text, nullable=False, 
                         comment="Assignment description")
-    course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id"), nullable=False, 
+    course_id = Column(UUID, ForeignKey("courses.id"), nullable=False, 
                       comment="Foreign key to the course this assignment belongs to")
-    module_id = Column(UUID(as_uuid=True), nullable=True, 
+    module_id = Column(UUID, nullable=True, 
                       comment="Foreign key to the module this assignment belongs to (optional)")
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, 
+    created_by = Column(UUID, ForeignKey("users.id"), nullable=False, 
                        comment="Foreign key to the user who created the assignment")
     created_at = Column(DateTime, default=datetime.now(UTC), 
                        comment="Timestamp when the assignment was created")
@@ -123,13 +122,13 @@ class Submission(Base):
     """
     __tablename__ = "submissions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, 
+    id = Column(UUID, primary_key=True, default=uuid.uuid4, 
                 comment="Unique identifier for the submission")
-    assignment_id = Column(UUID(as_uuid=True), ForeignKey("assignments.id"), nullable=False, 
+    assignment_id = Column(UUID, ForeignKey("assignments.id"), nullable=False, 
                           comment="Foreign key to the assignment this submission is for")
-    student_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, 
+    student_id = Column(UUID, ForeignKey("users.id"), nullable=False, 
                        comment="Foreign key to the student who submitted")
-    group_id = Column(UUID(as_uuid=True), nullable=True, 
+    group_id = Column(UUID, nullable=True, 
                      comment="Foreign key to the group if this is a group submission (optional)")
     submitted_at = Column(DateTime, nullable=True, 
                          comment="Timestamp when the submission was made")
@@ -153,7 +152,7 @@ class Submission(Base):
                   comment="Numeric grade assigned to the submission")
     feedback = Column(Text, nullable=True, 
                      comment="Feedback text from the instructor")
-    graded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, 
+    graded_by = Column(UUID, ForeignKey("users.id"), nullable=True, 
                       comment="Foreign key to the user who graded the submission")
     graded_at = Column(DateTime, nullable=True, 
                       comment="Timestamp when the submission was graded")

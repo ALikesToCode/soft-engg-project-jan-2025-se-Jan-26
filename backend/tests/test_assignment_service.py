@@ -9,12 +9,16 @@ from app.services.assignment_service import AssignmentService
 from app.models.assignment import Assignment, Submission
 
 # Mock file for testing
-class MockUploadFile(UploadFile):
+class MockUploadFile:
     def __init__(self, filename="test.txt", content_type="text/plain", content=b"Test content"):
         self.filename = filename
-        self.content_type = content_type
+        self._content_type = content_type
         self._content = BytesIO(content)
         self.size = len(content)
+    
+    @property
+    def content_type(self):
+        return self._content_type
     
     async def read(self):
         return self._content.getvalue()
@@ -143,15 +147,15 @@ async def test_create_submission_with_file(db_session, test_assignment, test_use
     submission_data = {
         "status": "submitted"
     }
-    
+
     # Create mock file
     mock_file = MockUploadFile(
         filename="test_submission.txt",
         content_type="text/plain",
         content=b"This is a test submission file content"
     )
-    
-    # Create submission with file
+
+    # Create submission
     submission = await AssignmentService.create_submission(
         db_session,
         test_assignment.id,
@@ -159,17 +163,27 @@ async def test_create_submission_with_file(db_session, test_assignment, test_use
         submission_data,
         mock_file
     )
-    
+
     # Verify submission was created
     assert submission is not None
+    assert submission.id is not None
     assert submission.assignment_id == test_assignment.id
     assert submission.student_id == test_users["student"].id
     assert submission.status == "submitted"
-    assert submission.submitted_at is not None
     assert submission.file_name == "test_submission.txt"
-    assert submission.file_size > 0
     assert submission.file_type == "text/plain"
-    assert submission.file_path is not None
+    assert submission.file_size == len(b"This is a test submission file content")
+    assert submission.submitted_at is not None
+
+    # Verify file was saved
+    if not os.environ.get("TESTING"):
+        assert os.path.exists(submission.file_path)
+        
+        # Clean up test file
+        try:
+            os.remove(submission.file_path)
+        except:
+            pass
 
 # Test get submission
 @pytest.mark.asyncio

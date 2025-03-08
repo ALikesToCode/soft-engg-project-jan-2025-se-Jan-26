@@ -1,9 +1,8 @@
 from sqlalchemy import Column, String, Integer, Text, DateTime, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 import uuid
 
-from app.database import Base
+from app.database import Base, UUID
 
 
 class FAQ(Base):
@@ -11,7 +10,7 @@ class FAQ(Base):
     
     __tablename__ = "faqs"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     question = Column(String(500), nullable=False)
     answer = Column(Text, nullable=False)
     category_id = Column(String(50), nullable=False)  # general, technical, courses, account, faculty
