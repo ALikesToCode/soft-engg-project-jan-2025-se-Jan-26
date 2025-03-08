@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     LANGSMITH_PROJECT: str
     GOOGLE_API_KEY: str
 
+    # S3 Storage Settings
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_ENDPOINT_URL: str = ""
+    S3_BUCKET_NAME: str = ""
+    S3_REGION: str = ""
+
     # Monitoring Settings
     MONITORING_METRICS_HISTORY_SIZE: int = 1000
     MONITORING_HEALTH_CHECK_INTERVAL: int = 60  # seconds
