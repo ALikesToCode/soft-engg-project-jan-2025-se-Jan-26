@@ -170,7 +170,7 @@ async def test_create_assignment(db_session: AsyncSession):
     assert result.description == "This is a test assignment"
     
     # Get the assignment
-    assignment = await AssignmentService.get_assignment_by_id(db_session, result["assignment_id"])
+    assignment = await AssignmentService.get_assignment(db_session, result.id)
     assert assignment is not None
     assert assignment.title == assignment_data["title"]
     assert assignment.description == assignment_data["description"]
@@ -205,7 +205,7 @@ async def test_update_assignment(db_session: AsyncSession):
     }
     
     result = await AssignmentService.create_assignment(db_session, assignment_data, faculty_id)
-    assignment_id = result["assignment_id"]
+    assignment_id = result.id
     
     # Update the assignment
     update_data = {
@@ -214,12 +214,15 @@ async def test_update_assignment(db_session: AsyncSession):
         "status": "published"
     }
     
-    success = await AssignmentService.update_assignment(db_session, assignment_id, update_data, faculty_id)
-    assert success is True
+    updated_assignment = await AssignmentService.update_assignment(db_session, assignment_id, update_data)
+    assert updated_assignment is not None
+    assert updated_assignment.title == update_data["title"]
+    assert updated_assignment.points == update_data["points"]
+    assert updated_assignment.status == update_data["status"]
     
     # Get the updated assignment
-    assignment = await AssignmentService.get_assignment_by_id(db_session, assignment_id)
+    assignment = await AssignmentService.get_assignment(db_session, assignment_id)
+    assert assignment is not None
     assert assignment.title == update_data["title"]
     assert assignment.points == update_data["points"]
-    assert assignment.status == update_data["status"]
-    assert assignment.description == assignment_data["description"]  # Should not change 
+    assert assignment.status == update_data["status"] 

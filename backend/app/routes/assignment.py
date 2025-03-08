@@ -10,7 +10,7 @@ import uuid
 import os
 import json
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, UTC
 from app.models.user import User
 
 router = APIRouter(tags=["Assignments"])
@@ -97,7 +97,7 @@ async def create_assignment(
     - **assignment_id**: ID of the created assignment
     """
     try:
-        assignment_data = assignment.dict()
+        assignment_data = assignment.model_dump()
         result = await AssignmentService.create_assignment(db, assignment_data, current_user["id"])
         
         return {
@@ -238,7 +238,7 @@ async def update_assignment(
     - **assignment_id**: ID of the updated assignment
     """
     try:
-        assignment_data = {k: v for k, v in assignment.dict().items() if v is not None}
+        assignment_data = {k: v for k, v in assignment.model_dump().items() if v is not None}
         result = await AssignmentService.update_assignment(db, assignment_id, assignment_data)
         
         return {
@@ -322,7 +322,7 @@ async def submit_assignment(
         
         # Check if assignment is past due date and late submissions are not allowed
         if (
-            assignment.due_date < datetime.utcnow() and 
+            assignment.due_date < datetime.now(UTC) and 
             not assignment.allow_late_submissions and
             status == "submitted"
         ):

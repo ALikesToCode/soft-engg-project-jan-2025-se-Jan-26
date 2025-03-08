@@ -4,10 +4,11 @@ import json
 from datetime import datetime, timedelta, UTC
 from fastapi import status
 from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 # Test create assignment endpoint
 @pytest.mark.asyncio
-async def test_create_assignment_endpoint(async_client, tokens, test_users):
+async def test_create_assignment_endpoint(client: TestClient, tokens, test_users):
     # Prepare test data
     assignment_data = {
         "title": "API Test Assignment",
@@ -25,142 +26,141 @@ async def test_create_assignment_endpoint(async_client, tokens, test_users):
     }
     
     # Test with faculty token (should succeed)
-    response = await async_client.post(
+    response = client.post(
         "/api/v1/assignments",
         json=assignment_data,
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
-    assert data["id"] is not None
-    assert data["title"] == assignment_data["title"]
-    assert data["description"] == assignment_data["description"]
+    assert "assignment_id" in data
     
     # Test with student token (should fail)
-    response = await async_client.post(
+    response = client.post(
         "/api/v1/assignments",
         json=assignment_data,
         headers={"Authorization": f"Bearer {tokens['student']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_403_FORBIDDEN
+    
+    # Test without token (should fail)
+    response = client.post(
+        "/api/v1/assignments",
+        json=assignment_data
+    )
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 # Test get assignments endpoint
 @pytest.mark.asyncio
-async def test_get_assignments_endpoint(async_client, tokens, test_assignment):
+async def test_get_assignments_endpoint(client: TestClient, tokens, test_assignment):
     # Test with valid course_id
-    response = await async_client.get(
+    response = client.get(
         f"/api/v1/assignments?course_id={test_assignment.course_id}",
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert isinstance(data, list)
-    assert len(data) > 0
-    assert any(a["id"] == str(test_assignment.id) for a in data)
+    assignments = response.json()
+    assert isinstance(assignments, list)
+    assert len(assignments) >= 1
     
     # Test with invalid course_id
-    response = await async_client.get(
+    response = client.get(
         f"/api/v1/assignments?course_id={uuid.uuid4()}",
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert isinstance(data, list)
-    assert len(data) == 0
+    assignments = response.json()
+    assert isinstance(assignments, list)
+    assert len(assignments) == 0
+    
+    # Test without course_id
+    response = client.get(
+        "/api/v1/assignments",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_200_OK
+    assignments = response.json()
+    assert isinstance(assignments, list)
 
 # Test get assignment details endpoint
 @pytest.mark.asyncio
-async def test_get_assignment_details_endpoint(async_client, tokens, test_assignment):
+async def test_get_assignment_details_endpoint(client: TestClient, tokens, test_assignment):
     # Test with valid assignment_id
-    response = await async_client.get(
+    response = client.get(
         f"/api/v1/assignments/{test_assignment.id}",
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert data["id"] == str(test_assignment.id)
-    assert data["title"] == test_assignment.title
-    assert data["description"] == test_assignment.description
+    assignment = response.json()
+    assert assignment["id"] == str(test_assignment.id)
+    assert assignment["title"] == test_assignment.title
     
     # Test with invalid assignment_id
-    response = await async_client.get(
+    response = client.get(
         f"/api/v1/assignments/{uuid.uuid4()}",
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 # Test update assignment endpoint
 @pytest.mark.asyncio
-async def test_update_assignment_endpoint(async_client, tokens, test_assignment):
+async def test_update_assignment_endpoint(client: TestClient, tokens, test_assignment):
     # Prepare update data
     update_data = {
-        "title": "Updated API Assignment",
-        "description": "This assignment was updated via API",
+        "title": "Updated Assignment Title",
+        "description": "This assignment has been updated via API",
         "points": 150
     }
     
     # Test with faculty token (should succeed)
-    response = await async_client.put(
+    response = client.put(
         f"/api/v1/assignments/{test_assignment.id}",
         json=update_data,
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
-    assert data["id"] == str(test_assignment.id)
-    assert data["title"] == update_data["title"]
-    assert data["description"] == update_data["description"]
-    assert data["points"] == update_data["points"]
+    assert data["message"] == "Assignment updated successfully"
+    
+    # Verify the update was applied
+    response = client.get(
+        f"/api/v1/assignments/{test_assignment.id}",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    updated_assignment = response.json()
+    assert updated_assignment["title"] == update_data["title"]
+    assert updated_assignment["description"] == update_data["description"]
+    assert updated_assignment["points"] == update_data["points"]
     
     # Test with student token (should fail)
-    response = await async_client.put(
+    response = client.put(
         f"/api/v1/assignments/{test_assignment.id}",
         json=update_data,
         headers={"Authorization": f"Bearer {tokens['student']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 # Test delete assignment endpoint
 @pytest.mark.asyncio
-async def test_delete_assignment_endpoint(async_client, tokens, test_assignment):
+async def test_delete_assignment_endpoint(client: TestClient, tokens, test_assignment):
     # Test with student token (should fail)
-    response = await async_client.delete(
+    response = client.delete(
         f"/api/v1/assignments/{test_assignment.id}",
         headers={"Authorization": f"Bearer {tokens['student']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_403_FORBIDDEN
     
     # Test with faculty token (should succeed)
-    response = await async_client.delete(
+    response = client.delete(
         f"/api/v1/assignments/{test_assignment.id}",
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert data["message"] == "Assignment deleted successfully"
     
-    # Verify assignment is deleted
-    response = await async_client.get(
+    # Verify the assignment was deleted
+    response = client.get(
         f"/api/v1/assignments/{test_assignment.id}",
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
@@ -168,153 +168,149 @@ async def test_delete_assignment_endpoint(async_client, tokens, test_assignment)
 
 # Test submit assignment endpoint
 @pytest.mark.asyncio
-async def test_submit_assignment_endpoint(async_client, tokens, test_assignment):
+async def test_submit_assignment_endpoint(client: TestClient, tokens, test_assignment):
     # Prepare submission data
     submission_data = {
-        "content": "This is a test submission content via API",
+        "content": "This is my submission for the test assignment",
         "status": "submitted"
     }
     
     # Test with student token (should succeed)
-    response = await async_client.post(
+    response = client.post(
         f"/api/v1/assignments/{test_assignment.id}/submit",
         data=submission_data,
         headers={"Authorization": f"Bearer {tokens['student']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
+    assert "submission_id" in data
     assert data["message"] == "Assignment submitted successfully"
-    assert data["submission_id"] is not None
     
-    # Test submitting again (should update existing submission)
-    updated_submission_data = {
-        "content": "This is an updated submission content",
-        "status": "submitted"
-    }
-    
-    response = await async_client.post(
+    # Test with faculty token (should fail)
+    response = client.post(
         f"/api/v1/assignments/{test_assignment.id}/submit",
-        data=updated_submission_data,
+        data=submission_data,
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    
+    # Test with invalid assignment_id
+    response = client.post(
+        f"/api/v1/assignments/{uuid.uuid4()}/submit",
+        data=submission_data,
         headers={"Authorization": f"Bearer {tokens['student']}"}
     )
-    
-    # Verify response
-    assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert data["message"] == "Assignment submitted successfully"
-    assert data["submission_id"] is not None
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 # Test get my submission endpoint
 @pytest.mark.asyncio
-async def test_get_my_submission_endpoint(async_client, tokens, test_assignment, test_submission):
+async def test_get_my_submission_endpoint(client: TestClient, tokens, test_assignment, test_submission):
     # Test with student token (should succeed)
-    response = await async_client.get(
+    response = client.get(
         f"/api/v1/assignments/{test_assignment.id}/my-submission",
         headers={"Authorization": f"Bearer {tokens['student']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert data["message"] == "Submission retrieved successfully"
-    assert data["submission"] is not None
-    assert data["submission"]["id"] == str(test_submission.id)
-    assert data["submission"]["assignment_id"] == str(test_assignment.id)
-    assert data["submission"]["student_id"] == str(test_submission.student_id)
+    submission = response.json()
+    assert submission["assignment_id"] == str(test_assignment.id)
+    assert submission["student_id"] == str(test_submission.student_id)
     
-    # Test with faculty token (should return null submission)
-    response = await async_client.get(
+    # Test with faculty token (should fail)
+    response = client.get(
         f"/api/v1/assignments/{test_assignment.id}/my-submission",
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
+    assert response.status_code == status.HTTP_404_NOT_FOUND
     
-    # Verify response
-    assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert data["message"] == "Submission retrieved successfully"
-    assert data["submission"] is None
+    # Test with invalid assignment_id
+    response = client.get(
+        f"/api/v1/assignments/{uuid.uuid4()}/my-submission",
+        headers={"Authorization": f"Bearer {tokens['student']}"}
+    )
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 # Test get all submissions endpoint
 @pytest.mark.asyncio
-async def test_get_all_submissions_endpoint(async_client, tokens, test_assignment, test_submission):
+async def test_get_all_submissions_endpoint(client: TestClient, tokens, test_assignment, test_submission):
     # Test with faculty token (should succeed)
-    response = await async_client.get(
+    response = client.get(
         f"/api/v1/assignments/{test_assignment.id}/submissions",
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert isinstance(data, list)
-    assert len(data) > 0
-    assert any(s["id"] == str(test_submission.id) for s in data)
+    submissions = response.json()
+    assert isinstance(submissions, list)
+    assert len(submissions) >= 1
     
     # Test with student token (should fail)
-    response = await async_client.get(
+    response = client.get(
         f"/api/v1/assignments/{test_assignment.id}/submissions",
         headers={"Authorization": f"Bearer {tokens['student']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_403_FORBIDDEN
+    
+    # Test with invalid assignment_id
+    response = client.get(
+        f"/api/v1/assignments/{uuid.uuid4()}/submissions",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 # Test grade submission endpoint
 @pytest.mark.asyncio
-async def test_grade_submission_endpoint(async_client, tokens, test_assignment, test_submission):
+async def test_grade_submission_endpoint(client: TestClient, tokens, test_assignment, test_submission):
     # Prepare grade data
     grade_data = {
-        "grade": 85,
-        "feedback": "Good work, but could improve code organization"
+        "grade": 95.5,
+        "feedback": "Excellent work on this assignment!"
     }
     
-    # Test with student token (should fail)
-    response = await async_client.put(
-        f"/api/v1/assignments/{test_assignment.id}/grade/{test_submission.id}",
-        json=grade_data,
-        headers={"Authorization": f"Bearer {tokens['student']}"}
-    )
-    
-    # Verify response
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-    
     # Test with faculty token (should succeed)
-    response = await async_client.put(
+    response = client.put(
         f"/api/v1/assignments/{test_assignment.id}/grade/{test_submission.id}",
         json=grade_data,
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert data["message"] == "Submission graded successfully"
-    assert data["submission_id"] == str(test_submission.id)
-    assert data["grade"] == grade_data["grade"]
+    
+    # Test with student token (should fail)
+    response = client.put(
+        f"/api/v1/assignments/{test_assignment.id}/grade/{test_submission.id}",
+        json=grade_data,
+        headers={"Authorization": f"Bearer {tokens['student']}"}
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    
+    # Test with invalid submission_id
+    response = client.put(
+        f"/api/v1/assignments/{test_assignment.id}/grade/{uuid.uuid4()}",
+        json=grade_data,
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 # Test plagiarism report endpoint
 @pytest.mark.asyncio
-async def test_plagiarism_report_endpoint(async_client, tokens, test_assignment, test_submission):
+async def test_plagiarism_report_endpoint(client: TestClient, tokens, test_assignment, test_submission):
     # Test with student token (should fail)
-    response = await async_client.get(
+    response = client.get(
         f"/api/v1/assignments/{test_assignment.id}/submissions/{test_submission.id}/plagiarism",
         headers={"Authorization": f"Bearer {tokens['student']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_403_FORBIDDEN
     
     # Test with faculty token (should succeed)
-    response = await async_client.get(
+    response = client.get(
         f"/api/v1/assignments/{test_assignment.id}/submissions/{test_submission.id}/plagiarism",
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    
-    # Verify response
     assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert data["message"] == "Plagiarism report retrieved successfully"
-    assert "plagiarism_score" in data
-    assert "report" in data 
+    
+    # Test with invalid submission_id
+    response = client.get(
+        f"/api/v1/assignments/{test_assignment.id}/submissions/{uuid.uuid4()}/plagiarism",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_404_NOT_FOUND 

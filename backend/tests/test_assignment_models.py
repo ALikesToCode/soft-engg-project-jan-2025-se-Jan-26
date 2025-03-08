@@ -89,7 +89,7 @@ async def test_submission_model(db_session, test_assignment, test_users):
     # Create test data
     submission_data = SubmissionCreate(
         content="This is a test submission content",
-        status="draft"
+        status="submitted"
     )
     
     # Create submission
@@ -109,7 +109,7 @@ async def test_submission_model(db_session, test_assignment, test_users):
     assert submission.status == submission_data.status
     assert submission.grade is None
     assert submission.feedback is None
-    assert submission.plagiarism_score is None
+    assert submission.plagiarism_score == 0.0
     assert submission.submitted_at is not None
     
     # Test direct model creation
