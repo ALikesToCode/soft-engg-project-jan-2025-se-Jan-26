@@ -7,7 +7,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
+from sqlalchemy import event, text
 from httpx import AsyncClient
+from urllib.parse import urlparse, parse_qs
 
 from app.database import Base, get_db
 # Import all models to ensure they are registered with Base
@@ -21,16 +23,29 @@ from app.config import settings
 from app.utils.jwt_utils import create_access_token
 from main import app
 
-# Test database URL - use a file-based database instead of in-memory
-TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+# Use the same database URL as production but add a test schema prefix
+# Parse the database URL to handle SSL properly
+url = urlparse(settings.DATABASE_URL)
+query_params = parse_qs(url.query)
+
+# Remove sslmode from the URL and handle it in connect_args
+ssl_mode = query_params.pop('sslmode', ['prefer'])[0]
+cleaned_url = f"{url.scheme}://{url.netloc}{url.path}"
+if query_params:
+    cleaned_url += '?' + '&'.join(f"{k}={v[0]}" for k, v in query_params.items())
+
+# Create test engine and session with proper SSL configuration
+TEST_DATABASE_URL = cleaned_url.replace("postgres://", "postgresql+asyncpg://")
 
 # Create test engine and session
 engine = create_async_engine(
     TEST_DATABASE_URL,
-    echo=False,
+    echo=True,  # Set to True for debugging
     future=True,
-    # Don't use NullPool for SQLite to keep connections alive
-    connect_args={"check_same_thread": False}
+    poolclass=NullPool,
+    connect_args={
+        "ssl": ssl_mode == "require"
+    }
 )
 TestingSessionLocal = sessionmaker(
     engine, 
@@ -64,20 +79,26 @@ async def async_client():
 # Setup and teardown for each test
 @pytest.fixture(autouse=True)
 async def setup_db():
-    # Remove test database file if it exists
-    if os.path.exists("./test.db"):
-        os.remove("./test.db")
-        
-    # Create test database tables
+    # Create a unique test schema name for this test run to isolate test data
+    test_schema = f"test_{uuid.uuid4().hex[:8]}"
+    
+    # Create test schema and tables within that schema
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)  # Create all tables
+        # Create the test schema
+        await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {test_schema}"))
+        
+        # Set the search path to use our test schema
+        await conn.execute(text(f"SET search_path TO {test_schema}"))
+        
+        # Create all tables in the test schema
+        await conn.run_sync(Base.metadata.create_all)
         
         # Verify that tables were created
-        tables = await conn.run_sync(lambda sync_conn: sync_conn.dialect.get_table_names(sync_conn))
-        print(f"Created tables: {tables}")
+        tables = await conn.run_sync(lambda sync_conn: sync_conn.dialect.get_table_names(sync_conn, schema=test_schema))
+        print(f"Created tables in schema {test_schema}: {tables}")
         
-        if 'users' not in tables:
-            print("WARNING: 'users' table was not created!")
+        if not tables:
+            print(f"WARNING: No tables were created in schema {test_schema}!")
     
     # Create test upload directories
     if not os.path.exists(TEST_UPLOAD_DIR):
@@ -85,14 +106,21 @@ async def setup_db():
     if not os.path.exists(TEST_ASSIGNMENT_DIR):
         os.makedirs(TEST_ASSIGNMENT_DIR)
     
+    # Set the schema for all database operations in this test session
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_search_path(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute(f"SET search_path TO {test_schema}")
+        cursor.close()
+    
     yield
+    
+    # Clean up: drop the test schema
+    async with engine.begin() as conn:
+        await conn.execute(text(f"DROP SCHEMA IF EXISTS {test_schema} CASCADE"))
     
     # Close all connections
     await engine.dispose()
-    
-    # Remove test database file
-    if os.path.exists("./test.db"):
-        os.remove("./test.db")
     
     # Remove test upload directories
     if os.path.exists(TEST_UPLOAD_DIR):

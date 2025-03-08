@@ -5,8 +5,89 @@ from app.services.auth_service import get_current_user, require_auth, get_user
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.user_service import get_all_user_courses
+from app.models.user import User
+from sqlalchemy.future import select
+from typing import List
 
 router = APIRouter(tags=["User Courses"])
+
+# User schema for response
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str
+    picture: str | None = None
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+    @classmethod
+    def from_orm(cls, obj):
+        # Convert UUID to string
+        if hasattr(obj, 'id') and obj.id:
+            obj.id = str(obj.id)
+        return super().from_orm(obj)
+
+# Add a new endpoint to get all users
+@router.get("/users", 
+    response_model=List[UserResponse],
+    summary="Get all users",
+    description="Retrieves all users in the system. Only accessible to faculty/admin users.",
+    response_description="List of all users",
+    responses={
+        200: {
+            "description": "Users retrieved successfully"
+        },
+        401: {
+            "description": "Unauthorized - User not authenticated"
+        },
+        403: {
+            "description": "Forbidden - User does not have required permissions"
+        }
+    }
+)
+async def get_all_users(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all users in the system.
+    
+    This endpoint returns a list of all users in the system. It is only accessible
+    to users with faculty or admin roles.
+    
+    Args:
+        db: Database session
+        current_user: The authenticated user information
+        
+    Returns:
+        List of user objects
+        
+    Raises:
+        HTTPException: 401 error if the user is not authenticated
+        HTTPException: 403 error if the user does not have required permissions
+    """
+    # Check if user has permission (faculty or admin)
+    if current_user["role"] not in ["faculty", "admin", "support"]:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    
+    # Get all users from the database
+    result = await db.execute(select(User))
+    users = result.scalars().all()
+    
+    # Convert User objects to dictionaries with string IDs
+    user_list = []
+    for user in users:
+        user_dict = {
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "picture": user.picture
+        }
+        user_list.append(user_dict)
+    
+    return user_list
 
 class UserProfileUpdate(BaseModel):
     """

@@ -1,0 +1,2 @@
+Database URL: postgresql+asyncpg://neondb_owner:npg_F4rdxz9IpSXo@ep-weathered-breeze-a8jcdehd-pooler.eastus2.azure.neon.tech/neondb?sslmode=require
+Error connecting to database: connect() got an unexpected keyword argument 'sslmode'
