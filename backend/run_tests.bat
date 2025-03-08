@@ -16,7 +16,7 @@ if not exist ".\test_uploads" mkdir ".\test_uploads"
 
 REM Run the tests with pytest
 echo Running tests...
-python -m pytest tests/test_auth.py -v -o asyncio_default_fixture_loop_scope=function
+python -m pytest tests/ -v -o asyncio_default_fixture_loop_scope=function
 
 REM Clean up test uploads directory
 echo Cleaning up test uploads...
