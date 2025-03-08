@@ -63,12 +63,10 @@ def test_command_injection_prevention():
             validator.validate_query(query)
 
 def test_xss_prevention():
-    """Test that XSS attempts are sanitized"""
+    """Test that XSS attempts are rejected"""
     xss_query = '<script>alert("XSS")</script>'
-    validator = LLMInputValidator(query=xss_query)
-    sanitized = validator.sanitize_input()
-    assert '<script>' not in sanitized
-    assert sanitized == '&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;'
+    with pytest.raises(ValueError):
+        validator = LLMInputValidator(query=xss_query)
 
 def test_schema_compliance():
     """Test schema compliance validation"""

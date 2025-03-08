@@ -58,6 +58,34 @@ async def delete_user(db: AsyncSession, user_id: int):
     await db.commit()
     return {"message": "User deleted"}
 
+async def get_user_by_id(db: AsyncSession, user_id: int) -> User:
+    """
+    Get a user by their ID.
+    
+    Args:
+        db: Database session
+        user_id: ID of the user to retrieve
+        
+    Returns:
+        User object if found, None otherwise
+    """
+    user = await db.get(User, user_id)
+    return user
+
+async def get_users(db: AsyncSession):
+    """
+    Get all users.
+    
+    Args:
+        db: Database session
+        
+    Returns:
+        List of all users
+    """
+    result = await db.execute(select(User))
+    users = result.scalars().all()
+    return users
+
 async def get_all_user_courses(db: AsyncSession, user_id: uuid.UUID):
     """
     Get all Courses for a specificed user.
