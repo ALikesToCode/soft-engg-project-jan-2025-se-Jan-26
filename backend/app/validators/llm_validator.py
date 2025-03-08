@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 import re
 from typing import Optional
 from html import escape
@@ -25,7 +25,7 @@ class LLMInputValidator(BaseModel):
     )
 
     # Validators
-    @validator('query')
+    @field_validator('query')
     def validate_query(cls, v):
         # Remove any null bytes
         v = v.replace('\x00', '')
@@ -55,7 +55,7 @@ class LLMInputValidator(BaseModel):
         
         return v.strip()
 
-    @validator('max_tokens')
+    @field_validator('max_tokens')
     def validate_max_tokens(cls, v):
         if v is not None and (v < 1 or v > 2048):
             raise ValueError("max_tokens must be between 1 and 2048")
@@ -88,18 +88,19 @@ class LLMInputValidator(BaseModel):
         """
         try:
             # Validate using pydantic's built-in validation
-            self.validate(self.dict())
+            self.model_validate(self.model_dump())
             return True
         except Exception:
             return False
 
-    class Config:
-        """Pydantic model configuration"""
-        validate_assignment = True
-        extra = "forbid"  # Forbid extra attributes
-        json_schema_extra = {
+    # Pydantic v2 configuration
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",  # Forbid extra attributes
+        json_schema_extra={
             "example": {
                 "query": "What courses are available in the IITM program?",
                 "max_tokens": 1024
             }
-        } 
+        }
+    ) 

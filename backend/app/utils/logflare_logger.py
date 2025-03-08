@@ -1,7 +1,7 @@
 import logging
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict, Any, Optional
 from app.config import settings
 
@@ -80,7 +80,7 @@ class LogflareHandler(logging.Handler):
         entry = {
             'message': message,
             'level': record.levelname,
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': datetime.now(UTC).isoformat() + 'Z',
             'logger': record.name,
             'pathname': record.pathname,
             'lineno': record.lineno,

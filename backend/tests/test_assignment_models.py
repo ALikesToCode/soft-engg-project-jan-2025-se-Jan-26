@@ -1,6 +1,6 @@
 import pytest
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.assignment import Assignment, Submission
@@ -15,7 +15,7 @@ async def test_assignment_model(db_session, test_users):
         title="Test Assignment Model",
         description="This is a test assignment for model testing",
         course_id=str(uuid.uuid4()),
-        due_date=datetime.utcnow() + timedelta(days=7),
+        due_date=datetime.now(UTC) + timedelta(days=7),
         points=100,
         status="draft",
         submission_type="text",
@@ -51,7 +51,7 @@ async def test_assignment_model(db_session, test_users):
         description="Created directly through the model",
         course_id=uuid.uuid4(),
         created_by=faculty_id,
-        due_date=datetime.utcnow() + timedelta(days=10),
+        due_date=datetime.now(UTC) + timedelta(days=10),
         points=150,
         status="published",
         submission_type="file",
@@ -121,7 +121,7 @@ async def test_submission_model(db_session, test_assignment, test_users):
         grade=95,
         feedback="Excellent work!",
         plagiarism_score=0.0,
-        submitted_at=datetime.utcnow()
+        submitted_at=datetime.now(UTC)
     )
     
     # Add to session and commit
@@ -153,7 +153,7 @@ async def test_submission_model(db_session, test_assignment, test_users):
 @pytest.mark.asyncio
 async def test_late_submission_calculation(db_session, test_users):
     # Create an assignment due in the past
-    past_due_date = datetime.utcnow() - timedelta(days=2)
+    past_due_date = datetime.now(UTC) - timedelta(days=2)
     assignment_data = AssignmentCreate(
         title="Past Due Assignment",
         description="This assignment is already past due",
@@ -205,7 +205,7 @@ async def test_late_submission_calculation(db_session, test_users):
     assert effective_grade == 80.0
     
     # Test submission that's not late
-    future_due_date = datetime.utcnow() + timedelta(days=7)
+    future_due_date = datetime.now(UTC) + timedelta(days=7)
     assignment_data.due_date = future_due_date
     assignment_data.title = "Future Due Assignment"
     
@@ -229,7 +229,7 @@ async def test_assignment_status_transitions(db_session, test_users):
         title="Status Transition Assignment",
         description="Testing status transitions",
         course_id=str(uuid.uuid4()),
-        due_date=datetime.utcnow() + timedelta(days=7),
+        due_date=datetime.now(UTC) + timedelta(days=7),
         points=100,
         status="draft",
         submission_type="text",

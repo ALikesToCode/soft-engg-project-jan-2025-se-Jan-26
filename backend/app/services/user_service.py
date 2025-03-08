@@ -26,10 +26,18 @@ class UserUpdate(BaseModel):
 
 async def create_user(db: AsyncSession, user_data: UserCreate) -> User:
     user_dict = user_data.model_dump(exclude_unset=True)  # Remove unset fields
+    
+    # Extract password from user_dict to handle it separately
+    password = user_dict.pop('password')
+    
+    # Create user object without password field
     user = User(**user_dict)
+    
+    # Hash the password and set it on the user object
     user.hashed_password = bcrypt.hashpw(
-        user_data.password.encode('utf-8'),
+        password.encode('utf-8'),
         bcrypt.gensalt()).decode('utf-8')
+    
     db.add(user)
     await db.commit()
     await db.refresh(user)

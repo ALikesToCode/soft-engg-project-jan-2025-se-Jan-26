@@ -1,7 +1,7 @@
 import os
 import uuid
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -199,7 +199,7 @@ class AssignmentService:
         for key, value in assignment_data.items():
             setattr(assignment, key, value)
         
-        assignment.updated_at = datetime.utcnow()
+        assignment.updated_at = datetime.now(UTC)
         await db.commit()
         await db.refresh(assignment)
         return assignment
@@ -376,15 +376,15 @@ class AssignmentService:
             
             # If status is changed to "submitted", set submitted_at
             if submission_data.get("status") == "submitted" and existing_submission.submitted_at is None:
-                existing_submission.submitted_at = datetime.utcnow()
+                existing_submission.submitted_at = datetime.now(UTC)
                 
                 # Check if submission is late
-                if assignment.due_date and datetime.utcnow() > assignment.due_date:
+                if assignment.due_date and datetime.now(UTC) > assignment.due_date:
                     existing_submission.late_submission = True
                     
                     # Apply late penalty if configured
                     if assignment.allow_late_submissions and assignment.late_penalty > 0:
-                        days_late = (datetime.utcnow() - assignment.due_date).days
+                        days_late = (datetime.now(UTC) - assignment.due_date).days
                         if days_late > 0:
                             existing_submission.late_penalty_applied = min(
                                 100, assignment.late_penalty * days_late
@@ -422,7 +422,7 @@ class AssignmentService:
                 existing_submission.file_size = file.size
                 existing_submission.file_type = file.content_type or mimetypes.guess_type(file.filename)[0]
             
-            existing_submission.updated_at = datetime.utcnow()
+            existing_submission.updated_at = datetime.now(UTC)
             
             # Run plagiarism check if enabled and submission is being submitted
             if assignment.plagiarism_detection and submission_data.get("status") == "submitted":
@@ -441,15 +441,15 @@ class AssignmentService:
         
         # If status is "submitted", set submitted_at
         if submission_data.get("status") == "submitted":
-            submission.submitted_at = datetime.utcnow()
+            submission.submitted_at = datetime.now(UTC)
             
             # Check if submission is late
-            if assignment.due_date and datetime.utcnow() > assignment.due_date:
+            if assignment.due_date and datetime.now(UTC) > assignment.due_date:
                 submission.late_submission = True
                 
                 # Apply late penalty if configured
                 if assignment.allow_late_submissions and assignment.late_penalty > 0:
-                    days_late = (datetime.utcnow() - assignment.due_date).days
+                    days_late = (datetime.now(UTC) - assignment.due_date).days
                     if days_late > 0:
                         submission.late_penalty_applied = min(
                             100, assignment.late_penalty * days_late
@@ -563,7 +563,7 @@ class AssignmentService:
         
         submission.status = "graded"
         submission.graded_by = grader_id
-        submission.graded_at = datetime.utcnow()
+        submission.graded_at = datetime.now(UTC)
         
         await db.commit()
         await db.refresh(submission)

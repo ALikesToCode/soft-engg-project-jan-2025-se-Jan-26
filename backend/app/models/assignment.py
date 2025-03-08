@@ -3,7 +3,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.database import Base
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 class Assignment(Base):
     """
@@ -51,9 +51,9 @@ class Assignment(Base):
                       comment="Foreign key to the module this assignment belongs to (optional)")
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, 
                        comment="Foreign key to the user who created the assignment")
-    created_at = Column(DateTime, default=datetime.utcnow, 
+    created_at = Column(DateTime, default=datetime.now(UTC), 
                        comment="Timestamp when the assignment was created")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, 
+    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC), 
                        comment="Timestamp when the assignment was last updated")
     due_date = Column(DateTime, nullable=False, 
                      comment="Deadline for assignment submission")
@@ -133,7 +133,7 @@ class Submission(Base):
                      comment="Foreign key to the group if this is a group submission (optional)")
     submitted_at = Column(DateTime, nullable=True, 
                          comment="Timestamp when the submission was made")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, 
+    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC), 
                        comment="Timestamp when the submission was last updated")
     status = Column(String, default="draft", 
                    comment="Submission status (draft, submitted, graded)")

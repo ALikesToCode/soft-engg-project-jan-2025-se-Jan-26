@@ -1,7 +1,7 @@
 import pytest
 import uuid
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from fastapi import status
 from httpx import AsyncClient
 
@@ -13,7 +13,7 @@ async def test_create_assignment_endpoint(async_client, tokens, test_users):
         "title": "API Test Assignment",
         "description": "This is a test assignment created via API",
         "course_id": str(uuid.uuid4()),
-        "due_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+        "due_date": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         "points": 100,
         "status": "draft",
         "submission_type": "file",

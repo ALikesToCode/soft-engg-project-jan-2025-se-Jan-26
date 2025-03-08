@@ -1,7 +1,7 @@
 import pytest
 import uuid
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from fastapi import UploadFile, HTTPException
 from io import BytesIO
 
@@ -27,7 +27,7 @@ async def test_create_assignment(db_session, test_users):
         "title": "Test Assignment Creation",
         "description": "This is a test assignment for creation",
         "course_id": uuid.uuid4(),
-        "due_date": datetime.utcnow() + timedelta(days=7),
+        "due_date": datetime.now(UTC) + timedelta(days=7),
         "points": 100,
         "status": "draft",
         "submission_type": "file"
@@ -264,7 +264,7 @@ async def test_plagiarism_check(db_session, test_assignment, test_users):
         id=uuid.uuid4(),
         assignment_id=test_assignment.id,
         student_id=test_users["faculty"].id,  # Using faculty as another student for this test
-        submitted_at=datetime.utcnow(),
+        submitted_at=datetime.now(UTC),
         status="submitted",
         content=submission2_data["content"]
     )

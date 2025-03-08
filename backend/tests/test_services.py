@@ -1,10 +1,10 @@
 import pytest
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.auth_service import authenticate_user, create_access_token, decode_access_token
-from app.services.user_service import create_user, get_user_by_id, get_users, update_user, delete_user
+from app.services.user_service import create_user, get_user_by_id, get_users, update_user, delete_user, UserCreate, UserUpdate
 from app.services.assignment_service import AssignmentService
 from app.models.user import User
 from app.models.assignment import Assignment, Submission
@@ -14,12 +14,12 @@ from app.models.assignment import Assignment, Submission
 async def test_authenticate_user_valid(db_session: AsyncSession):
     """Test user authentication with valid credentials"""
     # Create a test user first
-    user_data = {
-        "email": "test_auth@example.com",
-        "name": "Test Auth User",
-        "password": "password123",
-        "role": "student"
-    }
+    user_data = UserCreate(
+        email="test_auth@example.com",
+        name="Test Auth User",
+        password="password123",
+        role="student"
+    )
     user_id = await create_user(db_session, user_data)
     
     # Test authentication
@@ -32,12 +32,12 @@ async def test_authenticate_user_valid(db_session: AsyncSession):
 async def test_authenticate_user_invalid(db_session: AsyncSession):
     """Test user authentication with invalid credentials"""
     # Create a test user first
-    user_data = {
-        "email": "test_auth_invalid@example.com",
-        "name": "Test Auth Invalid User",
-        "password": "password123",
-        "role": "student"
-    }
+    user_data = UserCreate(
+        email="test_auth_invalid@example.com",
+        name="Test Auth Invalid User",
+        password="password123",
+        role="student"
+    )
     user_id = await create_user(db_session, user_data)
     
     # Test authentication with wrong password
@@ -48,8 +48,9 @@ async def test_authenticate_user_invalid(db_session: AsyncSession):
 async def test_token_generation_and_validation():
     """Test JWT token generation and validation"""
     # Create test user data
+    user_id = str(uuid.uuid4())
     user_data = {
-        "id": str(uuid.uuid4()),
+        "sub": user_id,  # Add the 'sub' field for the subject (user ID)
         "email": "token_test@example.com",
         "name": "Token Test User",
         "role": "faculty"
@@ -62,7 +63,7 @@ async def test_token_generation_and_validation():
     # Validate token
     decoded = decode_access_token(token)
     assert decoded is not None
-    assert decoded["sub"] == user_data["id"]
+    assert decoded["sub"] == user_id
     assert decoded["email"] == user_data["email"]
     assert decoded["role"] == user_data["role"]
 
@@ -71,63 +72,63 @@ async def test_token_generation_and_validation():
 async def test_create_and_get_user(db_session: AsyncSession):
     """Test user creation and retrieval"""
     # Create a test user
-    user_data = {
-        "email": "test_create@example.com",
-        "name": "Test Create User",
-        "password": "password123",
-        "role": "student"
-    }
+    user_data = UserCreate(
+        email="test_create@example.com",
+        name="Test Create User",
+        password="password123",
+        role="student"
+    )
     user_id = await create_user(db_session, user_data)
     assert user_id is not None
     
     # Get the user by ID
     user = await get_user_by_id(db_session, user_id)
     assert user is not None
-    assert user.email == user_data["email"]
-    assert user.name == user_data["name"]
-    assert user.role == user_data["role"]
+    assert user.email == user_data.email
+    assert user.name == user_data.name
+    assert user.role == user_data.role
 
 @pytest.mark.asyncio
 async def test_update_user(db_session: AsyncSession):
     """Test user update"""
     # Create a test user
-    user_data = {
-        "email": "test_update@example.com",
-        "name": "Test Update User",
-        "password": "password123",
-        "role": "student"
-    }
+    user_data = UserCreate(
+        email="test_update@example.com",
+        name="Test Update User",
+        password="password123",
+        role="student"
+    )
     user_id = await create_user(db_session, user_data)
     
     # Update the user
-    update_data = {
-        "name": "Updated Name",
-        "role": "faculty"
-    }
-    success = await update_user(db_session, user_id, update_data)
-    assert success is True
+    update_data = UserUpdate(
+        name="Updated Name",
+        role="faculty"
+    )
+    updated_user = await update_user(db_session, user_id, update_data)
+    assert updated_user is not None
     
     # Get the updated user
     user = await get_user_by_id(db_session, user_id)
-    assert user.name == update_data["name"]
-    assert user.role == update_data["role"]
-    assert user.email == user_data["email"]  # Email should not change
+    assert user.name == update_data.name
+    assert user.role == update_data.role
+    assert user.email == user_data.email  # Email should not change
 
 @pytest.mark.asyncio
 async def test_delete_user(db_session: AsyncSession):
     """Test user deletion"""
     # Create a test user
-    user_data = {
-        "email": "test_delete@example.com",
-        "name": "Test Delete User",
-        "password": "password123",
-        "role": "student"
-    }
+    user_data = UserCreate(
+        email="test_delete@example.com",
+        name="Test Delete User",
+        password="password123",
+        role="student"
+    )
     user_id = await create_user(db_session, user_data)
     
     # Delete the user
-    success = await delete_user(db_session, user_id)
-    assert success is True
+    result = await delete_user(db_session, user_id)
+    assert result is not None
     
     # Try to get the deleted user
     user = await get_user_by_id(db_session, user_id)
@@ -138,12 +139,12 @@ async def test_delete_user(db_session: AsyncSession):
 async def test_create_assignment(db_session: AsyncSession):
     """Test assignment creation"""
     # Create a test user (faculty)
-    faculty_data = {
-        "email": "faculty_test@example.com",
-        "name": "Faculty Test User",
-        "password": "password123",
-        "role": "faculty"
-    }
+    faculty_data = UserCreate(
+        email="faculty_test@example.com",
+        name="Faculty Test User",
+        password="password123",
+        role="faculty"
+    )
     faculty_id = await create_user(db_session, faculty_data)
     
     # Create a test assignment
@@ -151,7 +152,7 @@ async def test_create_assignment(db_session: AsyncSession):
         "title": "Test Assignment",
         "description": "This is a test assignment",
         "course_id": str(uuid.uuid4()),
-        "due_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+        "due_date": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         "points": 100,
         "status": "draft",
         "submission_type": "text",
@@ -177,12 +178,12 @@ async def test_create_assignment(db_session: AsyncSession):
 async def test_update_assignment(db_session: AsyncSession):
     """Test assignment update"""
     # Create a test user (faculty)
-    faculty_data = {
-        "email": "faculty_update@example.com",
-        "name": "Faculty Update User",
-        "password": "password123",
-        "role": "faculty"
-    }
+    faculty_data = UserCreate(
+        email="faculty_update@example.com",
+        name="Faculty Update User",
+        password="password123",
+        role="faculty"
+    )
     faculty_id = await create_user(db_session, faculty_data)
     
     # Create a test assignment
@@ -190,7 +191,7 @@ async def test_update_assignment(db_session: AsyncSession):
         "title": "Test Assignment for Update",
         "description": "This is a test assignment for update",
         "course_id": str(uuid.uuid4()),
-        "due_date": (datetime.utcnow() + timedelta(days=7)).isoformat(),
+        "due_date": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
         "points": 100,
         "status": "draft",
         "submission_type": "text",

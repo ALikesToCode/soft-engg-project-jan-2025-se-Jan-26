@@ -2,7 +2,7 @@ import pytest
 import uuid
 import os
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
@@ -10,21 +10,27 @@ from sqlalchemy.pool import NullPool
 from httpx import AsyncClient
 
 from app.database import Base, get_db
+# Import all models to ensure they are registered with Base
 from app.models.user import User
 from app.models.assignment import Assignment, Submission
+from app.models.course import Course, CourseEnrollment
+from app.models.role import Role
+from app.models.faq import FAQ
+from app.models.system_settings import SystemSettings, Integration
 from app.config import settings
 from app.utils.jwt_utils import create_access_token
 from main import app
 
-# Test database URL
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+# Test database URL - use a file-based database instead of in-memory
+TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
 # Create test engine and session
 engine = create_async_engine(
     TEST_DATABASE_URL,
-    poolclass=NullPool,
     echo=False,
-    future=True
+    future=True,
+    # Don't use NullPool for SQLite to keep connections alive
+    connect_args={"check_same_thread": False}
 )
 TestingSessionLocal = sessionmaker(
     engine, 
@@ -51,15 +57,28 @@ def client():
 
 @pytest.fixture
 async def async_client():
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    # Use the newer AsyncClient initialization format
+    async with AsyncClient(base_url="http://test") as ac:
+        ac.app = app  # Attach the app to the client
         yield ac
 
 # Setup and teardown for each test
 @pytest.fixture(autouse=True)
 async def setup_db():
+    # Remove test database file if it exists
+    if os.path.exists("./test.db"):
+        os.remove("./test.db")
+        
     # Create test database tables
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(Base.metadata.create_all)  # Create all tables
+        
+        # Verify that tables were created
+        tables = await conn.run_sync(lambda sync_conn: sync_conn.dialect.get_table_names(sync_conn))
+        print(f"Created tables: {tables}")
+        
+        if 'users' not in tables:
+            print("WARNING: 'users' table was not created!")
     
     # Create test upload directories
     if not os.path.exists(TEST_UPLOAD_DIR):
@@ -69,12 +88,16 @@ async def setup_db():
     
     yield
     
-    # Drop test database tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
+    # Close all connections
+    await engine.dispose()
+    
+    # Remove test database file
+    if os.path.exists("./test.db"):
+        os.remove("./test.db")
     
     # Remove test upload directories
     if os.path.exists(TEST_UPLOAD_DIR):
+        print("Cleaning up test uploads...")
         shutil.rmtree(TEST_UPLOAD_DIR)
 
 # Fixture for database session
@@ -144,7 +167,7 @@ async def test_assignment(db_session, test_users):
         description="This is a test assignment",
         course_id=uuid.uuid4(),
         created_by=test_users["faculty"].id,
-        due_date=datetime.utcnow() + timedelta(days=7),
+        due_date=datetime.now(UTC) + timedelta(days=7),
         points=100,
         status="published",
         submission_type="file",
@@ -168,7 +191,7 @@ async def test_submission(db_session, test_assignment, test_users):
         id=uuid.uuid4(),
         assignment_id=test_assignment.id,
         student_id=test_users["student"].id,
-        submitted_at=datetime.utcnow(),
+        submitted_at=datetime.now(UTC),
         status="submitted",
         content="This is a test submission content",
         file_name="test_file.txt",
