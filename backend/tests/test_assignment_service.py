@@ -9,6 +9,14 @@ from app.services.assignment_service import AssignmentService
 from app.models.assignment import Assignment, Submission
 from app.models.user import User
 
+# Helper function to get session from async generator
+async def get_session(session_obj):
+    """Extract the actual session from an async generator or return the session if it's already a session object"""
+    if hasattr(session_obj, "__aiter__"):  # Check if it's an async generator
+        async for session in session_obj:
+            return session
+    return session_obj
+
 # Mock file for testing
 class MockUploadFile:
     def __init__(self, filename="test.txt", content_type="text/plain", content=b"Test content"):
@@ -28,6 +36,9 @@ class MockUploadFile:
 @pytest.mark.asyncio
 async def test_create_assignment(db_session, test_users):
     """Test creating an assignment"""
+    # Get actual session
+    session = await get_session(db_session)
+    
     # Ensure test_users is awaited if it's a coroutine
     users = await test_users if isinstance(test_users, object) and hasattr(test_users, "__await__") else test_users
     
@@ -44,7 +55,7 @@ async def test_create_assignment(db_session, test_users):
     
     # Create assignment
     assignment = await AssignmentService.create_assignment(
-        db_session, 
+        session, 
         assignment_data, 
         users["faculty"].id
     )
@@ -61,39 +72,48 @@ async def test_create_assignment(db_session, test_users):
 @pytest.mark.asyncio
 async def test_get_assignment(db_session, test_assignment):
     """Test getting an assignment by ID"""
-    # Ensure test_assignment is awaited if it's a coroutine
-    assignment_obj = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
+    # Get actual session
+    session = await get_session(db_session)
+    
+    # Get the test assignment
+    assignment = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
     
     # Get assignment
-    assignment = await AssignmentService.get_assignment(db_session, assignment_obj.id)
+    assignment = await AssignmentService.get_assignment(session, assignment.id)
     
     # Verify assignment was retrieved
     assert assignment is not None
-    assert assignment.id == assignment_obj.id
-    assert assignment.title == assignment_obj.title
-    assert assignment.description == assignment_obj.description
+    assert assignment.id == assignment.id
+    assert assignment.title == assignment.title
+    assert assignment.description == assignment.description
 
 # Test get assignments by course
 @pytest.mark.asyncio
 async def test_get_assignments_by_course(db_session, test_assignment):
     """Test getting assignments by course ID"""
-    # Ensure test_assignment is awaited if it's a coroutine
-    assignment_obj = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
+    # Get actual session
+    session = await get_session(db_session)
+    
+    # Get the test assignment
+    assignment = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
     
     # Get assignments by course
-    assignments = await AssignmentService.get_assignments_by_course(db_session, assignment_obj.course_id)
+    assignments = await AssignmentService.get_assignments_by_course(session, assignment.course_id)
     
     # Verify assignments were retrieved
     assert assignments is not None
     assert len(assignments) > 0
-    assert any(a.id == assignment_obj.id for a in assignments)
+    assert any(a.id == assignment.id for a in assignments)
 
 # Test update assignment
 @pytest.mark.asyncio
 async def test_update_assignment(db_session, test_assignment):
     """Test updating an assignment"""
-    # Ensure test_assignment is awaited if it's a coroutine
-    assignment_obj = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
+    # Get actual session
+    session = await get_session(db_session)
+    
+    # Get the test assignment
+    assignment = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
     
     # Prepare update data
     update_data = {
@@ -105,14 +125,14 @@ async def test_update_assignment(db_session, test_assignment):
     
     # Update assignment
     updated_assignment = await AssignmentService.update_assignment(
-        db_session,
-        assignment_obj.id,
+        session,
+        assignment.id,
         update_data
     )
     
     # Verify assignment was updated
     assert updated_assignment is not None
-    assert updated_assignment.id == assignment_obj.id
+    assert updated_assignment.id == assignment.id
     assert updated_assignment.title == update_data["title"]
     assert updated_assignment.description == update_data["description"]
     assert updated_assignment.points == update_data["points"]
@@ -122,26 +142,32 @@ async def test_update_assignment(db_session, test_assignment):
 @pytest.mark.asyncio
 async def test_delete_assignment(db_session, test_assignment):
     """Test deleting an assignment"""
-    # Ensure test_assignment is awaited if it's a coroutine
-    assignment_obj = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
+    # Get actual session
+    session = await get_session(db_session)
+    
+    # Get the test assignment
+    assignment = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
     
     # Delete assignment
-    result = await AssignmentService.delete_assignment(db_session, assignment_obj.id)
+    result = await AssignmentService.delete_assignment(session, assignment.id)
     
     # Verify assignment was deleted
     assert result is True
     
     # Verify assignment no longer exists
-    deleted_assignment = await AssignmentService.get_assignment(db_session, assignment_obj.id)
+    deleted_assignment = await AssignmentService.get_assignment(session, assignment.id)
     assert deleted_assignment is None
 
 # Test create submission
 @pytest.mark.asyncio
 async def test_create_submission(db_session, test_assignment, test_users):
     """Test creating a submission"""
-    # Ensure test_users and test_assignment are awaited if they're coroutines
+    # Get actual session
+    session = await get_session(db_session)
+    
+    # Get the test assignment and users
+    assignment = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
     users = await test_users if isinstance(test_users, object) and hasattr(test_users, "__await__") else test_users
-    assignment_obj = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
     
     # Prepare submission data
     submission_data = {
@@ -151,15 +177,15 @@ async def test_create_submission(db_session, test_assignment, test_users):
     
     # Create submission
     submission = await AssignmentService.create_submission(
-        db_session,
-        assignment_obj.id,
+        session,
+        assignment.id,
         users["student"].id,
         submission_data
     )
     
     # Verify submission was created
     assert submission is not None
-    assert submission.assignment_id == assignment_obj.id
+    assert submission.assignment_id == assignment.id
     assert submission.student_id == users["student"].id
     assert submission.content == submission_data["content"]
     assert submission.status == submission_data["status"]

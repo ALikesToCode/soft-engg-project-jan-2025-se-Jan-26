@@ -8,9 +8,12 @@ async def test_db_connection(db_session):
     """Test that we can connect to the database and perform basic operations."""
     # Get the actual session from the async generator
     session = None
-    async for s in db_session:
-        session = s
-        break
+    if hasattr(db_session, "__aiter__"):  # Check if it's an async generator
+        async for s in db_session:
+            session = s
+            break
+    else:  # If it's already a session
+        session = db_session
     
     if not session:
         pytest.fail("Could not get session from db_session fixture")

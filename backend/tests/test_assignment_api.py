@@ -10,7 +10,8 @@ from fastapi.testclient import TestClient
 @pytest.mark.asyncio
 async def test_create_assignment(client: TestClient, tokens):
     # Login as faculty
-    headers = {"Authorization": f"Bearer {tokens['faculty']}"}
+    token_data = await tokens if isinstance(tokens, object) and hasattr(tokens, "__await__") else tokens
+    headers = {"Authorization": f"Bearer {token_data['faculty']}"}
     
     # Create test assignment data
     assignment_data = {
@@ -29,7 +30,11 @@ async def test_create_assignment(client: TestClient, tokens):
     }
     
     # Send request to create assignment
-    response = client.post(
+    response = await client.post(
+        "/api/v1/assignments",
+        headers=headers,
+        json=assignment_data
+    ) if isinstance(client, AsyncClient) else client.post(
         "/api/v1/assignments",
         headers=headers,
         json=assignment_data
@@ -48,7 +53,8 @@ async def test_create_assignment(client: TestClient, tokens):
 @pytest.mark.asyncio
 async def test_get_assignments(client: TestClient, tokens):
     # Login as faculty
-    headers = {"Authorization": f"Bearer {tokens['faculty']}"}
+    token_data = await tokens if isinstance(tokens, object) and hasattr(tokens, "__await__") else tokens
+    headers = {"Authorization": f"Bearer {token_data['faculty']}"}
     
     # Create a test assignment first
     assignment_id = await test_create_assignment(client, tokens)
@@ -82,7 +88,8 @@ async def test_get_assignments(client: TestClient, tokens):
 @pytest.mark.asyncio
 async def test_get_assignment(client: TestClient, tokens):
     # Login as faculty
-    headers = {"Authorization": f"Bearer {tokens['faculty']}"}
+    token_data = await tokens if isinstance(tokens, object) and hasattr(tokens, "__await__") else tokens
+    headers = {"Authorization": f"Bearer {token_data['faculty']}"}
     
     # Create a test assignment first
     assignment_id = await test_create_assignment(client, tokens)
@@ -103,7 +110,8 @@ async def test_get_assignment(client: TestClient, tokens):
 @pytest.mark.asyncio
 async def test_update_assignment(client: TestClient, tokens):
     # Login as faculty
-    headers = {"Authorization": f"Bearer {tokens['faculty']}"}
+    token_data = await tokens if isinstance(tokens, object) and hasattr(tokens, "__await__") else tokens
+    headers = {"Authorization": f"Bearer {token_data['faculty']}"}
     
     # Create a test assignment first
     assignment_id = await test_create_assignment(client, tokens)
@@ -141,13 +149,14 @@ async def test_update_assignment(client: TestClient, tokens):
 @pytest.mark.asyncio
 async def test_submit_assignment(client: TestClient, tokens):
     # Login as faculty to create assignment
-    headers = {"Authorization": f"Bearer {tokens['faculty']}"}
+    token_data = await tokens if isinstance(tokens, object) and hasattr(tokens, "__await__") else tokens
+    headers = {"Authorization": f"Bearer {token_data['faculty']}"}
     
     # Create test assignment
     assignment_id = await test_create_assignment(client, tokens)
     
     # Login as student to submit
-    student_headers = {"Authorization": f"Bearer {tokens['student']}"}
+    student_headers = {"Authorization": f"Bearer {token_data['student']}"}
     
     # Prepare submission data
     submission_data = {
@@ -175,13 +184,14 @@ async def test_submit_assignment(client: TestClient, tokens):
 @pytest.mark.asyncio
 async def test_get_my_submission(client: TestClient, tokens):
     # Login as faculty to create assignment
-    headers = {"Authorization": f"Bearer {tokens['faculty']}"}
+    token_data = await tokens if isinstance(tokens, object) and hasattr(tokens, "__await__") else tokens
+    headers = {"Authorization": f"Bearer {token_data['faculty']}"}
     
     # Create test assignment
     assignment_id = await test_create_assignment(client, tokens)
     
     # Login as student to submit
-    student_headers = {"Authorization": f"Bearer {tokens['student']}"}
+    student_headers = {"Authorization": f"Bearer {token_data['student']}"}
     
     # Submit the assignment
     await test_submit_assignment(client, tokens)
@@ -203,13 +213,14 @@ async def test_get_my_submission(client: TestClient, tokens):
 @pytest.mark.asyncio
 async def test_grade_submission(client: TestClient, tokens):
     # Login as faculty
-    headers = {"Authorization": f"Bearer {tokens['faculty']}"}
+    token_data = await tokens if isinstance(tokens, object) and hasattr(tokens, "__await__") else tokens
+    headers = {"Authorization": f"Bearer {token_data['faculty']}"}
     
     # Create test assignment
     assignment_id = await test_create_assignment(client, tokens)
     
     # Login as student to submit
-    student_headers = {"Authorization": f"Bearer {tokens['student']}"}
+    student_headers = {"Authorization": f"Bearer {token_data['student']}"}
     
     # Submit the assignment
     submission_id = await test_submit_assignment(client, tokens)
@@ -245,7 +256,8 @@ async def test_grade_submission(client: TestClient, tokens):
 @pytest.mark.asyncio
 async def test_delete_assignment(client: TestClient, tokens):
     # Login as faculty
-    headers = {"Authorization": f"Bearer {tokens['faculty']}"}
+    token_data = await tokens if isinstance(tokens, object) and hasattr(tokens, "__await__") else tokens
+    headers = {"Authorization": f"Bearer {token_data['faculty']}"}
     
     # Create a test assignment first
     assignment_id = await test_create_assignment(client, tokens)

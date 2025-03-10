@@ -52,7 +52,7 @@ class MockLLMResponse:
 
 # Chat endpoint tests
 @pytest.mark.asyncio
-@patch('app.routes.chat.get_chat_history')
+@patch('app.routes.llm.get_chat_history')
 async def test_get_chat_history(mock_history, client, student_token):
     """Test getting chat history"""
     # Mock the chat history response
@@ -78,7 +78,7 @@ async def test_get_chat_history(mock_history, client, student_token):
     assert data[2]["role"] == "assistant"
 
 @pytest.mark.asyncio
-@patch('app.routes.chat.llm')
+@patch('app.routes.llm.llm')
 async def test_chat_basic_response(mock_llm, client, student_token):
     """Test basic chat functionality without function calls"""
     # Mock LLM response
@@ -99,8 +99,8 @@ async def test_chat_basic_response(mock_llm, client, student_token):
     assert "function_call" not in data
 
 @pytest.mark.asyncio
-@patch('app.routes.chat.llm')
-@patch('app.routes.chat.function_router.execute_function')
+@patch('app.routes.llm.llm')
+@patch('app.routes.llm.function_router.execute_function')
 async def test_chat_with_function_call(mock_execute_function, mock_llm, client, student_token):
     """Test chat with function calling capability"""
     # Mock function execution
@@ -137,8 +137,8 @@ async def test_chat_with_function_call(mock_execute_function, mock_llm, client, 
     assert data["function_call"]["name"] == "web_search"
 
 @pytest.mark.asyncio
-@patch('app.routes.chat.llm')
-@patch('app.routes.chat.function_router.execute_function')
+@patch('app.routes.llm.llm')
+@patch('app.routes.llm.function_router.execute_function')
 async def test_chat_with_function_error(mock_execute_function, mock_llm, client, student_token):
     """Test chat with function execution error"""
     # Mock function execution to raise an error
@@ -212,7 +212,7 @@ async def test_chat_with_sql_injection(client, student_token):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 @pytest.mark.asyncio
-@patch('app.routes.chat.function_router.get_function_declarations')
+@patch('app.routes.llm.function_router.get_function_declarations')
 async def test_get_available_functions(mock_get_functions, client, student_token):
     """Test getting available functions"""
     # Mock the function declarations
@@ -265,7 +265,7 @@ async def test_get_available_functions(mock_get_functions, client, student_token
     assert data[1]["name"] == "web_search"
 
 @pytest.mark.asyncio
-@patch('app.routes.chat.function_router.execute_function')
+@patch('app.routes.llm.function_router.execute_function')
 async def test_execute_function(mock_execute, client, student_token):
     """Test executing a function directly"""
     # Mock function execution
@@ -301,7 +301,7 @@ async def test_execute_function(mock_execute, client, student_token):
     assert data["result"]["courses"][0]["name"] == "Introduction to Computer Science"
 
 @pytest.mark.asyncio
-@patch('app.routes.chat.web_search')
+@patch('app.routes.llm.web_search')
 async def test_web_search_function(mock_web_search, client, student_token):
     """Test the web search function"""
     # Mock web search results
