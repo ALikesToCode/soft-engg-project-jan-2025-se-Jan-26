@@ -8,6 +8,9 @@ from httpx import AsyncClient
 from app.models.user import User
 from app.utils.jwt_utils import create_access_token
 from main import app
+from app.schemas.user import UserCreate, UserLogin
+from app.services.auth import verify_password, get_password_hash
+import uuid
 
 # Test constants
 BASE_URL = "/api/v1/auth"
@@ -310,3 +313,260 @@ async def test_verify_email_invalid_token(mock_verify, client):
     
     # Check response
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+# Mark all tests in this file as auth tests
+pytestmark = [pytest.mark.auth, pytest.mark.api]
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_password_hashing():
+    """Test that password hashing works correctly."""
+    password = "testpassword"
+    hashed = get_password_hash(password)
+    assert verify_password(password, hashed)
+    assert not verify_password("wrongpassword", hashed)
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_login_valid_credentials(client, test_users):
+    """Test login with valid credentials."""
+    # Patch the verify_password function to return True
+    with patch("app.routes.auth.verify_password", return_value=True):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "faculty@test.com", "password": "password"}
+        )
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert "access_token" in data
+        assert data["token_type"] == "bearer"
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_login_invalid_credentials(client):
+    """Test login with invalid credentials."""
+    # Patch the verify_password function to return False
+    with patch("app.routes.auth.verify_password", return_value=False):
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"email": "faculty@test.com", "password": "wrongpassword"}
+        )
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        data = response.json()
+        assert "detail" in data
+        assert data["detail"] == "Incorrect email or password"
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_get_current_user(client, tokens):
+    """Test getting the current user with a valid token."""
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["email"] == "faculty@test.com"
+    assert data["role"] == "faculty"
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_get_current_user_invalid_token(client):
+    """Test getting the current user with an invalid token."""
+    response = client.get(
+        "/api/v1/auth/me",
+        headers={"Authorization": "Bearer invalidtoken"}
+    )
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_register_user(client, db_session):
+    """Test registering a new user."""
+    # Patch the get_user_by_email function to return None (user doesn't exist)
+    with patch("app.routes.auth.get_user_by_email", return_value=None):
+        # Patch the create_user function to return a user
+        with patch("app.routes.auth.create_user") as mock_create_user:
+            mock_user = MagicMock()
+            mock_user.id = uuid.uuid4()
+            mock_user.email = "newuser@test.com"
+            mock_user.name = "New User"
+            mock_user.role = "student"
+            mock_create_user.return_value = mock_user
+            
+            response = client.post(
+                "/api/v1/auth/register",
+                json={
+                    "email": "newuser@test.com",
+                    "password": "password",
+                    "name": "New User",
+                    "role": "student"
+                }
+            )
+            assert response.status_code == status.HTTP_201_CREATED
+            data = response.json()
+            assert data["email"] == "newuser@test.com"
+            assert data["name"] == "New User"
+            assert data["role"] == "student"
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_register_existing_user(client):
+    """Test registering a user with an email that already exists."""
+    # Patch the get_user_by_email function to return a user (user exists)
+    with patch("app.routes.auth.get_user_by_email") as mock_get_user:
+        mock_user = MagicMock()
+        mock_user.email = "existinguser@test.com"
+        mock_get_user.return_value = mock_user
+        
+        response = client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": "existinguser@test.com",
+                "password": "password",
+                "name": "Existing User",
+                "role": "student"
+            }
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        data = response.json()
+        assert "detail" in data
+        assert "already registered" in data["detail"]
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_refresh_token(client, tokens):
+    """Test refreshing a token."""
+    response = client.post(
+        "/api/v1/auth/refresh",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_refresh_token_invalid(client):
+    """Test refreshing an invalid token."""
+    response = client.post(
+        "/api/v1/auth/refresh",
+        headers={"Authorization": "Bearer invalidtoken"}
+    )
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+@pytest.mark.integration
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_google_login(client):
+    """Test Google login."""
+    # This is a more complex test that requires mocking the Google OAuth flow
+    # Marking as slow since it involves multiple external service mocks
+    with patch("app.routes.auth.verify_google_token") as mock_verify:
+        mock_verify.return_value = {
+            "email": "google@test.com",
+            "name": "Google User",
+            "picture": "https://example.com/picture.jpg"
+        }
+        
+        with patch("app.routes.auth.get_user_by_email") as mock_get_user:
+            # First, test when the user doesn't exist
+            mock_get_user.return_value = None
+            
+            with patch("app.routes.auth.create_user") as mock_create_user:
+                mock_user = MagicMock()
+                mock_user.id = uuid.uuid4()
+                mock_user.email = "google@test.com"
+                mock_user.name = "Google User"
+                mock_user.role = "student"
+                mock_user.is_google_user = True
+                mock_create_user.return_value = mock_user
+                
+                response = client.post(
+                    "/api/v1/auth/google",
+                    json={"token": "google_token"}
+                )
+                assert response.status_code == status.HTTP_200_OK
+                data = response.json()
+                assert "access_token" in data
+                assert data["token_type"] == "bearer"
+                assert data["is_new_user"] == True
+            
+            # Then, test when the user exists
+            mock_user = MagicMock()
+            mock_user.id = uuid.uuid4()
+            mock_user.email = "google@test.com"
+            mock_user.name = "Google User"
+            mock_user.role = "student"
+            mock_user.is_google_user = True
+            mock_get_user.return_value = mock_user
+            
+            response = client.post(
+                "/api/v1/auth/google",
+                json={"token": "google_token"}
+            )
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert "access_token" in data
+            assert data["token_type"] == "bearer"
+            assert data["is_new_user"] == False
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_logout(client, tokens):
+    """Test logging out."""
+    # In a real implementation, this might involve blacklisting the token
+    # For this test, we'll just check that the endpoint returns a success response
+    response = client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["message"] == "Successfully logged out"
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_change_password(client, tokens, db_session):
+    """Test changing a password."""
+    # Patch the get_user_by_id function to return a user
+    with patch("app.routes.auth.get_user_by_id") as mock_get_user:
+        mock_user = MagicMock()
+        mock_user.id = uuid.uuid4()
+        mock_user.email = "faculty@test.com"
+        mock_user.hashed_password = get_password_hash("oldpassword")
+        mock_get_user.return_value = mock_user
+        
+        # Patch the verify_password function
+        with patch("app.routes.auth.verify_password") as mock_verify:
+            # First, test with incorrect old password
+            mock_verify.return_value = False
+            
+            response = client.post(
+                "/api/v1/auth/change-password",
+                json={
+                    "old_password": "wrongpassword",
+                    "new_password": "newpassword"
+                },
+                headers={"Authorization": f"Bearer {tokens['faculty']}"}
+            )
+            assert response.status_code == status.HTTP_400_BAD_REQUEST
+            
+            # Then, test with correct old password
+            mock_verify.return_value = True
+            
+            with patch("app.routes.auth.update_user_password") as mock_update:
+                mock_update.return_value = True
+                
+                response = client.post(
+                    "/api/v1/auth/change-password",
+                    json={
+                        "old_password": "oldpassword",
+                        "new_password": "newpassword"
+                    },
+                    headers={"Authorization": f"Bearer {tokens['faculty']}"}
+                )
+                assert response.status_code == status.HTTP_200_OK
+                data = response.json()
+                assert data["message"] == "Password updated successfully"

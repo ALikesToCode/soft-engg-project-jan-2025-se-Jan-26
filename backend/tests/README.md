@@ -19,6 +19,54 @@ This directory contains tests for the Assignment Management System backend. The 
 - `test_academic_integrity.py`: Tests for academic integrity endpoints
 - `test_chat.py`: Tests for chat and function calling endpoints
 
+## Optimized Test Setup
+
+The test suite has been optimized for performance and compatibility with Python 3.13. Key optimizations include:
+
+### Session-Scoped Fixtures
+
+- Database schema and engine are created once per test session
+- Test upload directories are created once per test session
+- Dependency overrides are applied once per test session
+
+### In-Memory SQLite Support
+
+Tests can run with an in-memory SQLite database for faster execution:
+
+```bash
+# Enable SQLite for testing
+export TEST_USE_SQLITE=true
+```
+
+### Parallel Test Execution
+
+Tests can run in parallel using pytest-xdist:
+
+```bash
+# Install pytest-xdist
+pip install pytest-xdist
+
+# Run tests in parallel
+python -m pytest tests/ -n auto
+```
+
+### Test Categorization
+
+Tests are categorized using pytest markers:
+
+- `@pytest.mark.unit`: Unit tests
+- `@pytest.mark.integration`: Integration tests
+- `@pytest.mark.api`: API tests
+- `@pytest.mark.model`: Model tests
+- `@pytest.mark.service`: Service tests
+- `@pytest.mark.auth`: Authentication tests
+- `@pytest.mark.llm`: LLM-related tests
+- `@pytest.mark.chat`: Chat-related tests
+- `@pytest.mark.academic_integrity`: Academic integrity tests
+- `@pytest.mark.assignment`: Assignment-related tests
+- `@pytest.mark.analytics`: Analytics-related tests
+- `@pytest.mark.slow`: Slow tests
+
 ## Running Tests
 
 You can run the tests using the provided script:
@@ -26,6 +74,28 @@ You can run the tests using the provided script:
 ```bash
 # From the backend directory
 ./run_tests.sh
+```
+
+The script supports various options:
+
+```bash
+# Run with coverage report
+./run_tests.sh --coverage
+
+# Run only unit tests
+./run_tests.sh --unit
+
+# Run failed tests first
+./run_tests.sh --failed-first
+
+# Skip slow tests
+./run_tests.sh --not-slow
+
+# Run specific test file
+./run_tests.sh tests/test_auth.py
+
+# Run with profiling
+./run_tests.sh --profile
 ```
 
 Or manually with pytest:
@@ -37,25 +107,47 @@ export DATABASE_URL="sqlite+aiosqlite:///:memory:"
 export JWT_SECRET_KEY="test_secret_key_for_testing_purposes_only"
 export JWT_ALGORITHM="HS256"
 export JWT_EXPIRATION=3600
-export UPLOAD_DIR="./test_uploads"
+export UPLOAD_DIR="./tests/test_uploads"
 export REDIS_URL="redis://localhost:6379/0"
 
 # Run tests
 python -m pytest tests/ -v
 ```
 
-To run specific test files:
+## Installing Test Dependencies
+
+Install the required testing dependencies:
 
 ```bash
-# Run a specific test file
-python -m pytest tests/test_auth.py -v
+# Automatically install dependencies and set up the test environment
+./setup_tests.sh
 
-# Run tests with specific markers
-python -m pytest tests/ -m "asyncio" -v
-
-# Run tests with coverage report
-python -m pytest tests/ --cov=app --cov-report=term-missing
+# Or manually install dependencies
+pip install -r requirements-test.txt
 ```
+
+This will install:
+- pytest and pytest-asyncio
+- pytest-xdist for parallel testing
+- pytest-cov for coverage reports
+- pytest-lazy-fixture for optimized fixture usage
+- Compatible versions of bcrypt, pydantic, and pydantic-settings for Python 3.13
+
+### Python 3.13 Compatibility Notes
+
+When using Python 3.13, some packages have compatibility issues:
+
+- **pytest-profiling**: Not compatible with Python 3.13 as it uses the removed `pipes` module. The `run_tests.sh` script automatically falls back to using Python's built-in `cProfile` for profiling when running with Python 3.13.
+
+## Python 3.13 Compatibility
+
+The test suite includes patches for compatibility with Python 3.13:
+
+1. **Passlib Patch**: Fixes issues with bcrypt 4.x and passlib
+2. **Pydantic Patch**: Fixes issues with Pydantic's ForwardRef evaluation
+3. **Python Typing Patch**: Fixes issues with Python's typing module
+
+For more information, see the `PYTHON_3_13_COMPATIBILITY.md` file in the backend directory.
 
 ## Test Coverage
 
@@ -152,11 +244,15 @@ python -m pytest tests/ --cov=app --cov-report=term-missing
 
 The `conftest.py` file provides several fixtures that can be used across tests:
 
-- `client`: FastAPI TestClient for synchronous requests
-- `async_client`: AsyncClient for asynchronous requests
-- `db_session`: Database session for direct database operations
-- `test_users`: Pre-created faculty and student users
-- `tokens`: JWT tokens for faculty and student users
+- `test_schema`: Test schema name (session-scoped)
+- `database_url`: Database URL for testing (session-scoped)
+- `engine`: Database engine (session-scoped)
+- `session_factory`: Session factory (session-scoped)
+- `db_session`: Database session (function-scoped)
+- `client`: FastAPI TestClient (function-scoped)
+- `async_client`: AsyncClient for asynchronous requests (function-scoped)
+- `test_users`: Pre-created faculty, student, and support users
+- `tokens`: JWT tokens for faculty, student, and support users
 - `test_assignment`: Sample assignment for testing
 - `test_submission`: Sample submission for testing
 
@@ -182,6 +278,17 @@ When adding new tests:
 6. Use `@pytest.mark.asyncio` for asynchronous tests
 7. Use `@pytest.mark.parametrize` for testing multiple inputs
 8. Use mocking to isolate the code being tested
+9. Add appropriate markers to categorize your tests
+
+## Performance Tips
+
+1. **Use session-scoped fixtures** for expensive operations
+2. **Use function-scoped fixtures** for test-specific data
+3. **Use in-memory SQLite** for faster database tests
+4. **Run tests in parallel** with pytest-xdist
+5. **Skip slow tests** during development with `--not-slow`
+6. **Profile tests** with built-in cProfile (Python 3.13) or pytest-profiling (Python < 3.13)
+7. **Use test categories** to run only what you need
 
 ## Continuous Integration
 

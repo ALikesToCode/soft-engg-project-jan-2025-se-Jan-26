@@ -2,26 +2,38 @@ import pytest
 import uuid
 import os
 import shutil
+import sys
 from datetime import datetime, timedelta, UTC
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, StaticPool
 from sqlalchemy import event, text
 from httpx import AsyncClient
 from urllib.parse import urlparse, parse_qs
 
-# Apply Python typing module patch for Python 3.13 compatibility
-from app.utils.typing_patch import apply_patch as apply_typing_patch
-apply_typing_patch()
+# Global flag to track if patches have been applied
+_PATCHES_APPLIED = False
 
-# Apply Pydantic v1 patch for Python 3.13 compatibility
-from app.utils.pydantic_patch import apply_patch
-apply_patch()
+def apply_all_patches():
+    """Apply all patches for Python 3.13 compatibility only once."""
+    global _PATCHES_APPLIED
+    if _PATCHES_APPLIED or sys.version_info < (3, 13):
+        return
+    
+    # Apply patches in the correct order
+    from app.utils.typing_patch import apply_patch as apply_typing_patch
+    from app.utils.pydantic_patch import apply_patch as apply_pydantic_patch
+    from app.utils.passlib_patch import apply_patch as apply_passlib_patch
+    
+    apply_typing_patch()
+    apply_pydantic_patch()
+    apply_passlib_patch()
+    
+    _PATCHES_APPLIED = True
 
-# Apply passlib bcrypt patch for newer bcrypt versions
-from app.utils.passlib_patch import apply_patch as apply_passlib_patch
-apply_passlib_patch()
+# Apply patches at module load time
+apply_all_patches()
 
 from app.database import Base, get_db
 # Import all models to ensure they are registered with Base
@@ -35,119 +47,157 @@ from app.config import settings
 from app.utils.jwt_utils import create_access_token
 from main import app
 
-# Use the same database URL as production but add a test schema prefix
-# Parse the database URL to handle SSL properly
-url = urlparse(settings.DATABASE_URL)
-query_params = parse_qs(url.query)
-
-# Remove sslmode from the URL and handle it in connect_args
-ssl_mode = query_params.pop('sslmode', ['prefer'])[0]
-cleaned_url = f"{url.scheme}://{url.netloc}{url.path}"
-if query_params:
-    cleaned_url += '?' + '&'.join(f"{k}={v[0]}" for k, v in query_params.items())
-
-# Create test engine and session with proper SSL configuration
-TEST_DATABASE_URL = cleaned_url.replace("postgres://", "postgresql+asyncpg://")
-
-# Create test engine and session
-engine = create_async_engine(
-    TEST_DATABASE_URL,
-    echo=True,  # Set to True for debugging
-    future=True,
-    poolclass=NullPool,
-    connect_args={
-        "ssl": ssl_mode == "require"
-    }
-)
-TestingSessionLocal = sessionmaker(
-    engine, 
-    class_=AsyncSession, 
-    expire_on_commit=False
-)
-
 # Test upload directory
 TEST_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "test_uploads")
 TEST_ASSIGNMENT_DIR = os.path.join(TEST_UPLOAD_DIR, "assignments")
 
-# Override the get_db dependency
-async def override_get_db():
-    async with TestingSessionLocal() as session:
-        yield session
+# Create test upload directories if they don't exist
+if not os.path.exists(TEST_UPLOAD_DIR):
+    os.makedirs(TEST_UPLOAD_DIR)
+if not os.path.exists(TEST_ASSIGNMENT_DIR):
+    os.makedirs(TEST_ASSIGNMENT_DIR)
 
-app.dependency_overrides[get_db] = override_get_db
+# Session-scoped schema name
+@pytest.fixture(scope="session")
+def test_schema():
+    """Create a single test schema name for the entire test session."""
+    return f"test_{uuid.uuid4().hex[:8]}"
 
-# Test client
-@pytest.fixture
-def client():
-    with TestClient(app) as c:
-        yield c
-
-@pytest.fixture
-async def async_client():
-    # Use AsyncClient for async tests
-    async with AsyncClient(base_url="http://testserver") as ac:
-        yield ac
-
-# Setup and teardown for each test
-@pytest.fixture(autouse=True)
-async def setup_db():
-    # Create a unique test schema name for this test run to isolate test data
-    test_schema = f"test_{uuid.uuid4().hex[:8]}"
+# Session-scoped database URL
+@pytest.fixture(scope="session")
+def database_url():
+    """Configure the database URL for testing."""
+    # Check if we should use in-memory SQLite for faster tests
+    if os.environ.get("TEST_USE_SQLITE", "false").lower() == "true":
+        return "sqlite+aiosqlite:///:memory:"
     
-    # Create test schema and tables within that schema
+    # Otherwise, use PostgreSQL with a test schema
+    url = urlparse(settings.DATABASE_URL)
+    query_params = parse_qs(url.query)
+    
+    # Remove sslmode from the URL and handle it in connect_args
+    ssl_mode = query_params.pop('sslmode', ['prefer'])[0]
+    cleaned_url = f"{url.scheme}://{url.netloc}{url.path}"
+    if query_params:
+        cleaned_url += '?' + '&'.join(f"{k}={v[0]}" for k, v in query_params.items())
+    
+    return cleaned_url.replace("postgres://", "postgresql+asyncpg://")
+
+# Session-scoped engine
+@pytest.fixture(scope="session")
+async def engine(database_url, test_schema):
+    """Create a database engine once per test session."""
+    is_sqlite = database_url.startswith("sqlite")
+    
+    # Configure engine based on database type
+    if is_sqlite:
+        engine = create_async_engine(
+            database_url,
+            echo=False,  # Set to False for faster tests
+            future=True,
+            poolclass=StaticPool,  # Better for in-memory testing
+        )
+    else:
+        # For PostgreSQL, create a dedicated test schema
+        engine = create_async_engine(
+            database_url,
+            echo=False,
+            future=True,
+            poolclass=NullPool,  # Avoid connection pooling in tests
+            connect_args={
+                # Don't include ssl parameter if using Python 3.13
+                **({"ssl": True} if sys.version_info < (3, 13) else {})
+            }
+        )
+    
+    # Create schema and tables
     async with engine.begin() as conn:
-        # Create the test schema
-        await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {test_schema}"))
+        if not is_sqlite:
+            # Create and use test schema for PostgreSQL
+            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {test_schema}"))
+            await conn.execute(text(f"SET search_path TO {test_schema}"))
         
-        # Set the search path to use our test schema
-        await conn.execute(text(f"SET search_path TO {test_schema}"))
-        
-        # Create all tables in the test schema
+        # Create all tables
         await conn.run_sync(Base.metadata.create_all)
         
-        # Verify that tables were created
-        tables = await conn.run_sync(lambda sync_conn: sync_conn.dialect.get_table_names(sync_conn, schema=test_schema))
-        print(f"Created tables in schema {test_schema}: {tables}")
-        
-        if not tables:
-            print(f"WARNING: No tables were created in schema {test_schema}!")
+        # Verify tables were created
+        if not is_sqlite:
+            tables = await conn.run_sync(lambda sync_conn: sync_conn.dialect.get_table_names(sync_conn, schema=test_schema))
+            print(f"Created tables in schema {test_schema}: {tables}")
+            
+            if not tables:
+                print(f"WARNING: No tables were created in schema {test_schema}!")
     
-    # Create test upload directories
-    if not os.path.exists(TEST_UPLOAD_DIR):
-        os.makedirs(TEST_UPLOAD_DIR)
-    if not os.path.exists(TEST_ASSIGNMENT_DIR):
-        os.makedirs(TEST_ASSIGNMENT_DIR)
+    # Set search path for PostgreSQL connections
+    if not is_sqlite:
+        @event.listens_for(engine.sync_engine, "connect")
+        def set_search_path(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute(f"SET search_path TO {test_schema}")
+            cursor.close()
     
-    # Set the schema for all database operations in this test session
-    @event.listens_for(engine.sync_engine, "connect")
-    def set_search_path(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute(f"SET search_path TO {test_schema}")
-        cursor.close()
+    yield engine
     
-    yield
-    
-    # Clean up: drop the test schema
+    # Cleanup at the end of the session
     async with engine.begin() as conn:
-        await conn.execute(text(f"DROP SCHEMA IF EXISTS {test_schema} CASCADE"))
+        if not is_sqlite:
+            await conn.execute(text(f"DROP SCHEMA IF EXISTS {test_schema} CASCADE"))
     
     # Close all connections
     await engine.dispose()
     
-    # Remove test upload directories
+    # Clean up test upload directories at the end of the session
     if os.path.exists(TEST_UPLOAD_DIR):
         print("Cleaning up test uploads...")
         shutil.rmtree(TEST_UPLOAD_DIR)
 
-# Fixture for database session
+# Session-scoped session factory
+@pytest.fixture(scope="session")
+def session_factory(engine):
+    """Create a session factory once per test session."""
+    return sessionmaker(
+        engine, 
+        class_=AsyncSession, 
+        expire_on_commit=False
+    )
+
+# Function-scoped database session
 @pytest.fixture
-async def db_session():
-    async with TestingSessionLocal() as session:
+async def db_session(session_factory):
+    """Create a new database session for a test."""
+    async with session_factory() as session:
         yield session
+        # Rollback any changes made during the test
+        await session.rollback()
+
+# Override the get_db dependency
+@pytest.fixture(scope="session")
+def override_get_db(session_factory):
+    """Override the get_db dependency for the entire test session."""
+    async def _override_get_db():
+        async with session_factory() as session:
+            yield session
+    
+    app.dependency_overrides[get_db] = _override_get_db
+    return _override_get_db
+
+# Test client with session-scoped dependency override
+@pytest.fixture
+def client(override_get_db):
+    """Create a test client with the overridden get_db dependency."""
+    with TestClient(app) as c:
+        yield c
+
+@pytest.fixture
+async def async_client(override_get_db):
+    """Create an async test client with the overridden get_db dependency."""
+    async with AsyncClient(app=app, base_url="http://testserver") as ac:
+        yield ac
 
 # Fixture for test users
 @pytest.fixture
 async def test_users(db_session):
+    """Create test users for testing."""
     # Create a faculty user
     faculty_user = User(
         id=uuid.uuid4(),
@@ -168,38 +218,62 @@ async def test_users(db_session):
         role="student"
     )
     
+    # Create a support user
+    support_user = User(
+        id=uuid.uuid4(),
+        email="support@test.com",
+        name="Test Support",
+        hashed_password="hashed_password",
+        is_google_user=False,
+        role="support"
+    )
+    
     db_session.add(faculty_user)
     db_session.add(student_user)
+    db_session.add(support_user)
     await db_session.commit()
     
     return {
         "faculty": faculty_user,
-        "student": student_user
+        "student": student_user,
+        "support": support_user
     }
 
 # Fixture for JWT tokens
 @pytest.fixture
 async def tokens(test_users):
+    """Create JWT tokens for test users."""
+    # Ensure test_users is awaited if it's a coroutine
+    users = await test_users if isinstance(test_users, object) and hasattr(test_users, "__await__") else test_users
+    
     faculty_token = create_access_token({
         "email": "faculty@test.com",
         "role": "faculty",
-        "sub": str(test_users["faculty"].id)
+        "sub": str(users["faculty"].id)
     })
     
     student_token = create_access_token({
         "email": "student@test.com",
         "role": "student",
-        "sub": str(test_users["student"].id)
+        "sub": str(users["student"].id)
+    })
+    
+    support_token = create_access_token({
+        "email": "support@test.com",
+        "role": "support",
+        "sub": str(users["support"].id)
     })
     
     return {
         "faculty": faculty_token,
-        "student": student_token
+        "student": student_token,
+        "support": support_token
     }
 
 # Fixture for test assignment
 @pytest.fixture
 async def test_assignment(db_session, test_users):
+    """Create a test assignment."""
     assignment = Assignment(
         id=uuid.uuid4(),
         title="Test Assignment",
@@ -226,6 +300,7 @@ async def test_assignment(db_session, test_users):
 # Fixture for test submission
 @pytest.fixture
 async def test_submission(db_session, test_assignment, test_users):
+    """Create a test submission."""
     submission = Submission(
         id=uuid.uuid4(),
         assignment_id=test_assignment.id,
