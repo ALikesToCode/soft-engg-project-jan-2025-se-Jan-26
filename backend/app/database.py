@@ -11,10 +11,16 @@ import asyncio
 from typing import AsyncGenerator
 from fastapi import Depends
 from datetime import datetime, UTC
+import re
 
 # Parse the database URL to handle SSL properly
 url = urlparse(settings.DATABASE_URL)
 query_params = parse_qs(url.query)
+
+# Extract schema from path if present
+path_parts = url.path.split('/')
+db_name = path_parts[-1]
+schema_name = 'public'  # Default schema
 
 # Remove sslmode from the URL and handle it in connect_args
 ssl_mode = query_params.pop('sslmode', ['prefer'])[0]
@@ -29,7 +35,10 @@ engine = create_async_engine(
     echo=True,
     poolclass=NullPool,
     connect_args={
-        "ssl": ssl_mode == "require"
+        "ssl": ssl_mode == "require",
+        "server_settings": {
+            "search_path": schema_name
+        }
     }
 )
 
@@ -74,9 +83,13 @@ async def init_db():
     from app.models.faq import FAQ
     from app.models.system_settings import SystemSettings, Integration
     from datetime import datetime
-    from sqlalchemy import inspect
+    from sqlalchemy import inspect, text
     
     try:
+        # First, ensure the schema exists
+        async with engine.begin() as conn:
+            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
+            
         # Check if tables already exist
         async with engine.begin() as conn:
             # Use run_sync to properly handle inspection on async connection
@@ -85,6 +98,15 @@ async def init_db():
             # Only create tables if they don't exist
             if 'users' not in tables:
                 print("Creating database tables for the first time...")
+                
+                # Create enum types first
+                try:
+                    await conn.execute(text("CREATE TYPE coursestatus AS ENUM ('DRAFT', 'ACTIVE', 'ARCHIVED')"))
+                except Exception as e:
+                    if "already exists" not in str(e):
+                        print(f"Warning: Could not create enum type: {e}")
+                
+                # Then create all tables
                 await conn.run_sync(Base.metadata.create_all)
                 
                 # Create default users only if tables were just created
@@ -93,7 +115,7 @@ async def init_db():
                         # Check if support user exists
                         support_email = "support@study.iitm.ac.in"
                         result = await session.execute(
-                            "SELECT * FROM users WHERE email = :email",
+                            text("SELECT * FROM users WHERE email = :email"),
                             {"email": support_email}
                         )
                         support_user = result.fetchone()
@@ -104,33 +126,52 @@ async def init_db():
                             from app.utils.password import get_password_hash
                             hashed_password = get_password_hash("support123")
                             print(f"Updating support user password: {hashed_password[:10]}...")
+                            
+                            # Use a parameterized query with proper timestamp handling
+                            now_str = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
                             await session.execute(
-                                "UPDATE users SET hashed_password = :password, updated_at = :updated_at WHERE email = :email",
-                                {"password": hashed_password, "updated_at": datetime.now(UTC), "email": support_email}
+                                text("UPDATE users SET hashed_password = :password, updated_at = :updated_at WHERE email = :email"),
+                                {"password": hashed_password, "updated_at": now_str, "email": support_email}
                             )
                             await session.commit()
                         elif not tables:
                             # Create default faculty user
-                            faculty_user = User(
-                                id=uuid.UUID('123e4567-e89b-12d3-a456-426614174000'),
-                                email="faculty@study.iitm.ac.in",
-                                name="Default Faculty",
-                                role="faculty",
-                                created_at=datetime.now(UTC),
-                                updated_at=datetime.now(UTC)
+                            now = datetime.now(UTC)
+                            now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+                            
+                            # Use direct SQL to avoid ORM timezone issues
+                            faculty_id = str(uuid.uuid4())
+                            await session.execute(
+                                text("""
+                                    INSERT INTO users (id, email, name, role, created_at, updated_at) 
+                                    VALUES (:id, :email, :name, :role, :created_at, :updated_at)
+                                """),
+                                {
+                                    "id": faculty_id,
+                                    "email": "faculty@study.iitm.ac.in",
+                                    "name": "Default Faculty",
+                                    "role": "faculty",
+                                    "created_at": now_str,
+                                    "updated_at": now_str
+                                }
                             )
-                            session.add(faculty_user)
                             
                             # Create default support user
-                            support_user = User(
-                                id=uuid.UUID('123e4567-e89b-12d3-a456-426614174001'),
-                                email="support@study.iitm.ac.in",
-                                name="Support Team",
-                                role="support",
-                                created_at=datetime.now(UTC),
-                                updated_at=datetime.now(UTC)
+                            support_id = str(uuid.uuid4())
+                            await session.execute(
+                                text("""
+                                    INSERT INTO users (id, email, name, role, created_at, updated_at) 
+                                    VALUES (:id, :email, :name, :role, :created_at, :updated_at)
+                                """),
+                                {
+                                    "id": support_id,
+                                    "email": "support@study.iitm.ac.in",
+                                    "name": "Support Team",
+                                    "role": "support",
+                                    "created_at": now_str,
+                                    "updated_at": now_str
+                                }
                             )
-                            session.add(support_user)
                             
                             await session.commit()
                             print("Default users created successfully.")

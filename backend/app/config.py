@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     REDIS_URL: str = "redis://localhost:6379"
+    REDIS_USERNAME: str = "default"
+    REDIS_PASSWORD: str = ""
 
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"

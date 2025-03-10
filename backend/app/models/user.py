@@ -44,9 +44,9 @@ class User(Base):
                            comment="Flag indicating if the user authenticated via Google OAuth")
     picture = Column(String, nullable=True, 
                     comment="URL to the user's profile picture, typically from Google profile")
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), 
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), 
                        comment="Timestamp when the user record was created")
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), 
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), 
                        comment="Timestamp when the user record was last updated")
     # three roles are defined: student, faculty, support
     role = Column(String, default="student", 

@@ -15,6 +15,7 @@ from starlette.responses import RedirectResponse
 import jwt
 from pydantic import BaseModel, ConfigDict
 import os
+from urllib.parse import urlparse
 
 router = APIRouter(tags=["Authentication"])
 logger = logging.getLogger(__name__)
@@ -27,6 +28,8 @@ redis_host = getattr(settings, 'REDIS_HOST', '127.0.0.1')
 redis_port = getattr(settings, 'REDIS_PORT', 6379)
 redis_db = getattr(settings, 'REDIS_DB', 0)
 redis_url = os.environ.get("REDIS_URL", getattr(settings, 'REDIS_URL', None))
+redis_username = getattr(settings, 'REDIS_USERNAME', 'default')
+redis_password = getattr(settings, 'REDIS_PASSWORD', None)
 
 # Create a mock Redis client for fallback
 class MockRedis:
@@ -50,6 +53,15 @@ if SERVERLESS_ENV:
     # unless a valid REDIS_URL environment variable is provided
     if redis_url:
         try:
+            # If we have a URL but no explicit password in it, try to add it
+            if redis_password and "://:@" not in redis_url and "@" not in redis_url:
+                # Parse the URL to insert password
+                parsed = urlparse(redis_url)
+                if redis_username != 'default':
+                    redis_url = f"{parsed.scheme}://{redis_username}:{redis_password}@{parsed.netloc}{parsed.path}"
+                else:
+                    redis_url = f"{parsed.scheme}://:{redis_password}@{parsed.netloc}{parsed.path}"
+            
             redis_client = redis.from_url(redis_url, decode_responses=True)
             redis_client.ping()
             logger.info("Redis connection established successfully using REDIS_URL")
@@ -62,7 +74,21 @@ if SERVERLESS_ENV:
 else:
     # In non-serverless environments, try to connect to Redis using host/port
     try:
-        redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
+        # Include password if available
+        connection_kwargs = {
+            "host": redis_host,
+            "port": redis_port,
+            "db": redis_db,
+            "decode_responses": True
+        }
+        
+        if redis_username != 'default':
+            connection_kwargs["username"] = redis_username
+            
+        if redis_password:
+            connection_kwargs["password"] = redis_password
+            
+        redis_client = redis.Redis(**connection_kwargs)
         # Test connection
         redis_client.ping()
         logger.info("Redis connection established successfully")

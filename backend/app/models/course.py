@@ -8,9 +8,9 @@ import uuid
 
 # Enums for course and enrollment status
 class CourseStatus(str, enum.Enum):
-    DRAFT = "draft"
-    ACTIVE = "active" 
-    ARCHIVED = "archived"
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE" 
+    ARCHIVED = "ARCHIVED"
 
 class EnrollmentStatus(str, enum.Enum):
     ENROLLED = "enrolled"

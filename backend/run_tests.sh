@@ -8,7 +8,7 @@ export JWT_SECRET_KEY="test_secret_key_for_testing_purposes_only"
 export JWT_ALGORITHM="HS256"
 export JWT_EXPIRATION=3600
 export UPLOAD_DIR="./test_uploads"
-export REDIS_URL="redis://localhost:6379/0"
+export REDIS_URL="redis://redis-19669.c264.ap-south-1-1.ec2.redns.redis-cloud.com:19669"
 
 # Create test uploads directory if it doesn't exist
 mkdir -p ./test_uploads

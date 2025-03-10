@@ -313,12 +313,17 @@ async def create_default_users(db: AsyncSession) -> None:
             hashed_password = pwd_context.hash("support123")
             print(f"Creating support user with hashed password: {hashed_password[:10]}...")
             
+            from datetime import datetime, UTC
+            now = datetime.now(UTC)
+            
             support_user = User(
                 email=support_email,
                 name="Support Admin",
                 hashed_password=hashed_password,
                 is_google_user=False,
-                role="support"
+                role="support",
+                created_at=now,
+                updated_at=now
             )
             db.add(support_user)
             print(f"Created default support user: {support_email}")
@@ -327,40 +332,50 @@ async def create_default_users(db: AsyncSession) -> None:
             # Update password for existing user
             hashed_password = pwd_context.hash("support123")
             print(f"Updating support user password: {hashed_password[:10]}...")
-            support_user.hashed_password = hashed_password
-        
+            
+            # Use direct SQL to avoid timezone issues
+            from sqlalchemy import text
+            from datetime import datetime, UTC
+            
+            await db.execute(
+                text("UPDATE users SET hashed_password = :password, updated_at = :updated_at WHERE id = :user_id"),
+                {
+                    "password": hashed_password, 
+                    "updated_at": datetime.now(UTC), 
+                    "user_id": support_user.id
+                }
+            )
+            
         # Check if faculty user exists
         faculty_email = "faculty@study.iitm.ac.in"
         faculty_user = await get_user(db, faculty_email)
         
-        print(f"Checking for faculty user: {faculty_email}")
-        
         if not faculty_user:
             # Create faculty user
             hashed_password = pwd_context.hash("faculty123")
-            print(f"Creating faculty user with hashed password: {hashed_password[:10]}...")
+            
+            from datetime import datetime, UTC
+            now = datetime.now(UTC)
             
             faculty_user = User(
                 email=faculty_email,
-                name="Faculty Admin",
+                name="Default Faculty",
                 hashed_password=hashed_password,
                 is_google_user=False,
-                role="faculty"
+                role="faculty",
+                created_at=now,
+                updated_at=now
             )
             db.add(faculty_user)
             print(f"Created default faculty user: {faculty_email}")
-        else:
-            print(f"Faculty user already exists: {faculty_email}")
-            # Update password for existing user
-            hashed_password = pwd_context.hash("faculty123")
-            print(f"Updating faculty user password: {hashed_password[:10]}...")
-            faculty_user.hashed_password = hashed_password
         
+        # Commit changes
         await db.commit()
-        print("Default users committed to database successfully")
+        
     except Exception as e:
         await db.rollback()
-        print(f"Error creating default users: {str(e)}")
+        print(f"Error creating default users: {e}")
+        logger.error(f"Failed to create default users: {e}")
 
 def require_role(required_role: str) -> Callable:
     """

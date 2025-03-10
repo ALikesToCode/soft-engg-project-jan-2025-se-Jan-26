@@ -43,20 +43,26 @@ STATIC_DIR = Path(__file__).parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for application startup and shutdown"""
-    # Initialize database on startup
-    await init_db()
-    
-    # Create default users
-    async with async_session() as session:
-        await create_default_users(session)
-    
-    # Start monitoring service background tasks
-    await monitoring_service.start_background_tasks()
-    
+    try:
+        # Initialize database on startup
+        await init_db()
+        
+        # Create default users
+        async with async_session() as session:
+            await create_default_users(session)
+        
+        # Start monitoring service background tasks
+        await monitoring_service.start_background_tasks()
+    except Exception as e:
+        logger.error(f"Error during application startup: {e}")
+        
     yield
     
-    # Stop monitoring service background tasks on shutdown
-    await monitoring_service.stop_background_tasks()
+    try:
+        # Stop monitoring service background tasks on shutdown
+        await monitoring_service.stop_background_tasks()
+    except Exception as e:
+        logger.error(f"Error during application shutdown: {e}")
 
 # Replace the FastAPI app instance with one that uses the lifespan handler
 app = FastAPI(
