@@ -11,6 +11,10 @@ from sqlalchemy import event, text
 from httpx import AsyncClient
 from urllib.parse import urlparse, parse_qs
 
+# Apply Python typing module patch for Python 3.13 compatibility
+from app.utils.typing_patch import apply_patch as apply_typing_patch
+apply_typing_patch()
+
 # Apply Pydantic v1 patch for Python 3.13 compatibility
 from app.utils.pydantic_patch import apply_patch
 apply_patch()

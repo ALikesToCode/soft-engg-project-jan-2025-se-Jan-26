@@ -29,6 +29,21 @@ def apply_patch():
             # Attach the fake __about__ module to bcrypt
             bcrypt.__about__ = FakeAbout()
             
+            # Monkey patch the _load_backend_mixin function if it exists
+            if hasattr(passlib_bcrypt, '_load_backend_mixin'):
+                original_load_backend_mixin = passlib_bcrypt._load_backend_mixin
+                
+                def patched_load_backend_mixin(name):
+                    """
+                    Patched version of _load_backend_mixin that handles newer bcrypt versions.
+                    """
+                    if name == "bcrypt":
+                        return bcrypt
+                    else:
+                        return original_load_backend_mixin(name)
+                
+                passlib_bcrypt._load_backend_mixin = patched_load_backend_mixin
+            
             # Filter out the specific warning
             warnings.filterwarnings(
                 "ignore", 

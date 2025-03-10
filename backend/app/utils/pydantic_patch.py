@@ -7,6 +7,7 @@ the type_params parameter correctly, addressing the deprecation warning in Pytho
 import sys
 import types
 import warnings
+import inspect
 from typing import Any, Dict, Optional, Set, cast
 
 def apply_patch():
@@ -22,36 +23,65 @@ def apply_patch():
         # Import the module that needs patching
         from pydantic.v1 import typing as pydantic_v1_typing
         
-        # Get the original _evaluate method
-        original_evaluate = pydantic_v1_typing.ForwardRef._evaluate
+        # Completely replace the ForwardRef class with our own implementation
+        original_ForwardRef = pydantic_v1_typing.ForwardRef
         
-        # Define the patched method
-        def patched_evaluate(self, globalns: Optional[Dict[str, Any]], localns: Optional[Dict[str, Any]], 
-                             recursive_guard: Optional[Set[Any]] = None, type_params=None):
+        class PatchedForwardRef(original_ForwardRef):
             """
-            Patched version of ForwardRef._evaluate that includes the type_params parameter.
+            A patched version of ForwardRef that handles Python 3.13's changes to _evaluate.
             """
-            # Ensure recursive_guard is a set
-            if recursive_guard is None:
-                recursive_guard = set()
-            
-            # In Python 3.13, ForwardRef._evaluate expects type_params
-            if type_params is None:
-                type_params = {}
+            def _evaluate(self, globalns, localns, recursive_guard=None, type_params=None):
+                """
+                Patched version of _evaluate that handles both recursive_guard and type_params.
+                """
+                # Ensure recursive_guard is a set
+                if recursive_guard is None:
+                    recursive_guard = set()
                 
-            try:
-                # Try calling with both parameters
-                return original_evaluate(self, globalns, localns, recursive_guard=recursive_guard, type_params=type_params)
-            except TypeError:
-                # If that fails, try with just recursive_guard
+                # Ensure type_params is a dict
+                if type_params is None:
+                    type_params = {}
+                
+                # Get the forward value (the string representation of the type)
+                forward_value = self.__forward_value__
+                
+                # Check if we've seen this type before (to prevent infinite recursion)
+                if forward_value in recursive_guard:
+                    return Any
+                
+                # Add this type to the recursive guard set
+                recursive_guard.add(forward_value)
+                
                 try:
-                    return original_evaluate(self, globalns, localns, recursive_guard=recursive_guard)
-                except TypeError:
-                    # If that also fails, try with positional arguments
-                    return original_evaluate(self, globalns, localns, recursive_guard)
+                    # Try to evaluate the type string in the given namespaces
+                    if globalns is None and localns is None:
+                        globalns = localns = {}
+                    elif globalns is None:
+                        globalns = localns
+                    elif localns is None:
+                        localns = globalns
+                    
+                    # Evaluate the type string
+                    value = eval(forward_value, globalns, localns)
+                    return value
+                except (NameError, TypeError):
+                    # If evaluation fails, return Any
+                    return Any
+                finally:
+                    # Remove this type from the recursive guard set
+                    recursive_guard.discard(forward_value)
         
-        # Apply the patch
-        pydantic_v1_typing.ForwardRef._evaluate = patched_evaluate
+        # Replace the ForwardRef class
+        pydantic_v1_typing.ForwardRef = PatchedForwardRef
+        
+        # Also patch the evaluate_forwardref function
+        def patched_evaluate_forwardref(type_, globalns, localns):
+            """
+            Patched version of evaluate_forwardref that handles the recursive_guard parameter.
+            """
+            return cast(Any, type_)._evaluate(globalns, localns, set())
+        
+        pydantic_v1_typing.evaluate_forwardref = patched_evaluate_forwardref
         
         # Filter out the specific deprecation warning
         warnings.filterwarnings(
