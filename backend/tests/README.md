@@ -8,8 +8,16 @@ This directory contains tests for the Assignment Management System backend. The 
 - `test_assignment_models.py`: Tests for the Assignment and Submission models
 - `test_assignment_service.py`: Tests for the assignment service functions
 - `test_assignment_routes.py`: Tests for the assignment API endpoints
+- `test_assignment_api.py`: Integration tests for the assignment API
+- `test_assignment_basic.py`: Basic tests for assignment models and schemas
 - `test_auth.py`: Tests for authentication functionality
-- `test_llm.py`: Tests for LLM integration
+- `test_llm.py`: Tests for LLM integration and function calling
+- `test_llm_validator.py`: Tests for LLM input validation
+- `test_analytics_service.py`: Tests for analytics service
+- `test_api_endpoints.py`: Tests for general API endpoints
+- `test_services.py`: Tests for various service functions
+- `test_academic_integrity.py`: Tests for academic integrity endpoints
+- `test_chat.py`: Tests for chat and function calling endpoints
 
 ## Running Tests
 
@@ -36,16 +44,40 @@ export REDIS_URL="redis://localhost:6379/0"
 python -m pytest tests/ -v
 ```
 
+To run specific test files:
+
+```bash
+# Run a specific test file
+python -m pytest tests/test_auth.py -v
+
+# Run tests with specific markers
+python -m pytest tests/ -m "asyncio" -v
+
+# Run tests with coverage report
+python -m pytest tests/ --cov=app --cov-report=term-missing
+```
+
 ## Test Coverage
 
-### Assignment Models Tests
+### Authentication Tests (`test_auth.py`)
+
+- Email/password login
+- Google OAuth authentication
+- User information retrieval
+- Token refresh
+- Logout functionality
+- Password management (set/reset)
+- Email verification
+
+### Assignment Model Tests (`test_assignment_models.py`, `test_assignment_basic.py`)
 
 - Assignment model creation and validation
 - Submission model creation and validation
 - Late submission calculation
 - Assignment status transitions
+- Schema validation
 
-### Assignment Service Tests
+### Assignment Service Tests (`test_assignment_service.py`)
 
 - Creating assignments
 - Retrieving assignments (by ID, by course)
@@ -56,7 +88,7 @@ python -m pytest tests/ -v
 - Grading submissions
 - Plagiarism checking
 
-### Assignment Routes Tests
+### Assignment API Tests (`test_assignment_api.py`, `test_assignment_routes.py`)
 
 - Assignment creation API
 - Assignment retrieval API
@@ -67,17 +99,76 @@ python -m pytest tests/ -v
 - Submission grading API
 - Plagiarism report API
 
-## Authentication
+### LLM Integration Tests (`test_llm.py`, `test_llm_validator.py`)
 
-The tests use JWT tokens for authentication. Test fixtures provide tokens for both faculty and student roles to test permission-based access control.
+- LLM input validation
+- Chat functionality
+- Function calling
+- Error handling
+- Web search integration
+- Input sanitization
+- Security validation (SQL injection, XSS, etc.)
 
-## Database
+### Chat Endpoint Tests (`test_chat.py`)
 
-Tests use an in-memory SQLite database to ensure they are isolated and don't affect any production data.
+- Chat history retrieval
+- Basic chat functionality
+- Function calling in chat
+- Error handling in chat
+- Web search function
+- Available functions retrieval
+- Direct function execution
 
-## File Uploads
+### Academic Integrity Tests (`test_academic_integrity.py`)
 
-For tests involving file uploads, a temporary directory (`./test_uploads`) is created and cleaned up after tests complete.
+- Flagged interactions retrieval
+- Flag status updates
+- Flag escalation
+- Flag statistics
+- Flag audit trail
+- LLM request validation
+- Submission flagging
+- Flag retrieval and updates
+
+### API Endpoint Tests (`test_api_endpoints.py`)
+
+- Root endpoint
+- Health endpoint
+- Metrics endpoint
+- Logs endpoint
+- Alerts management
+- System summary
+- Service status
+- Dashboard data
+
+### Analytics Tests (`test_analytics_service.py`)
+
+- Student performance analytics
+- Course analytics
+- Assignment analytics
+- Submission statistics
+
+## Test Fixtures
+
+The `conftest.py` file provides several fixtures that can be used across tests:
+
+- `client`: FastAPI TestClient for synchronous requests
+- `async_client`: AsyncClient for asynchronous requests
+- `db_session`: Database session for direct database operations
+- `test_users`: Pre-created faculty and student users
+- `tokens`: JWT tokens for faculty and student users
+- `test_assignment`: Sample assignment for testing
+- `test_submission`: Sample submission for testing
+
+## Mocking
+
+Many tests use the `unittest.mock` library to mock external dependencies:
+
+- Database operations
+- External API calls
+- LLM responses
+- Email sending
+- File operations
 
 ## Adding New Tests
 
@@ -87,4 +178,11 @@ When adding new tests:
 2. Follow the naming convention `test_*` for test functions
 3. Group related tests in the same file
 4. Use descriptive test names that explain what is being tested
-5. Add appropriate assertions to verify expected behavior 
+5. Add appropriate assertions to verify expected behavior
+6. Use `@pytest.mark.asyncio` for asynchronous tests
+7. Use `@pytest.mark.parametrize` for testing multiple inputs
+8. Use mocking to isolate the code being tested
+
+## Continuous Integration
+
+These tests are run automatically in the CI/CD pipeline on every pull request and merge to the main branch. All tests must pass before code can be merged. 

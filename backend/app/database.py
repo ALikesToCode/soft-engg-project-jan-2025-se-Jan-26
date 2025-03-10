@@ -37,7 +37,8 @@ engine = create_async_engine(
     connect_args={
         "ssl": ssl_mode == "require",
         "server_settings": {
-            "search_path": schema_name
+            "search_path": schema_name,
+            "application_name": "SE Team 26 API"
         }
     }
 )
@@ -86,100 +87,140 @@ async def init_db():
     from sqlalchemy import inspect, text
     
     try:
-        # First, ensure the schema exists
+        # First, ensure the schema exists - this needs to be in its own transaction
         async with engine.begin() as conn:
-            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
-            
-        # Check if tables already exist
+            try:
+                await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
+                await conn.execute(text(f"SET search_path TO {schema_name}"))
+            except Exception as e:
+                print(f"Warning: Schema creation issue: {e}")
+        
+        # Check if tables already exist - in a new transaction
+        tables = []
         async with engine.begin() as conn:
-            # Use run_sync to properly handle inspection on async connection
-            tables = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+            try:
+                # Use run_sync to properly handle inspection on async connection
+                tables = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+                print(f"Existing tables: {tables}")
+            except Exception as e:
+                print(f"Warning: Could not inspect tables: {e}")
+        
+        # Only create tables if they don't exist
+        if 'users' not in tables:
+            print("Creating database tables for the first time...")
             
-            # Only create tables if they don't exist
-            if 'users' not in tables:
-                print("Creating database tables for the first time...")
-                
-                # Create enum types first
-                try:
-                    await conn.execute(text("CREATE TYPE coursestatus AS ENUM ('DRAFT', 'ACTIVE', 'ARCHIVED')"))
-                except Exception as e:
-                    if "already exists" not in str(e):
+            # Create enum types first - in a separate transaction
+            try:
+                async with engine.begin() as conn:
+                    try:
+                        # Set search path explicitly for this connection
+                        await conn.execute(text(f"SET search_path TO {schema_name}"))
+                        
+                        # Try to create the enum type
+                        await conn.execute(text("""
+                            DO $$ 
+                            BEGIN
+                                IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'coursestatus') THEN
+                                    CREATE TYPE coursestatus AS ENUM ('DRAFT', 'ACTIVE', 'ARCHIVED');
+                                END IF;
+                            END $$;
+                        """))
+                    except Exception as e:
                         print(f"Warning: Could not create enum type: {e}")
-                
-                # Then create all tables
-                await conn.run_sync(Base.metadata.create_all)
-                
-                # Create default users only if tables were just created
+            except Exception as e:
+                print(f"Error in enum creation transaction: {e}")
+            
+            # Then create all tables - in a separate transaction
+            try:
+                async with engine.begin() as conn:
+                    # Set search path explicitly for this connection
+                    await conn.execute(text(f"SET search_path TO {schema_name}"))
+                    
+                    # Create all tables
+                    await conn.run_sync(Base.metadata.create_all)
+                    print("Tables created successfully")
+            except Exception as e:
+                print(f"Error creating tables: {e}")
+                return
+            
+            # Create default users only if tables were just created - in a separate transaction
+            try:
                 async with async_session() as session:
                     try:
                         # Check if support user exists
                         support_email = "support@study.iitm.ac.in"
-                        result = await session.execute(
-                            text("SELECT * FROM users WHERE email = :email"),
-                            {"email": support_email}
-                        )
-                        support_user = result.fetchone()
-                        
-                        if support_user:
-                            print(f"Support user already exists: {support_email}")
-                            # Update support user password if needed
-                            from app.utils.password import get_password_hash
-                            hashed_password = get_password_hash("support123")
-                            print(f"Updating support user password: {hashed_password[:10]}...")
-                            
-                            # Use a parameterized query with proper timestamp handling
-                            now_str = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
-                            await session.execute(
-                                text("UPDATE users SET hashed_password = :password, updated_at = :updated_at WHERE email = :email"),
-                                {"password": hashed_password, "updated_at": now_str, "email": support_email}
+                        try:
+                            result = await session.execute(
+                                text("SELECT * FROM users WHERE email = :email"),
+                                {"email": support_email}
                             )
-                            await session.commit()
-                        elif not tables:
-                            # Create default faculty user
-                            now = datetime.now(UTC)
-                            now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+                            support_user = result.fetchone()
                             
-                            # Use direct SQL to avoid ORM timezone issues
-                            faculty_id = str(uuid.uuid4())
-                            await session.execute(
-                                text("""
-                                    INSERT INTO users (id, email, name, role, created_at, updated_at) 
-                                    VALUES (:id, :email, :name, :role, :created_at, :updated_at)
-                                """),
-                                {
-                                    "id": faculty_id,
-                                    "email": "faculty@study.iitm.ac.in",
-                                    "name": "Default Faculty",
-                                    "role": "faculty",
-                                    "created_at": now_str,
-                                    "updated_at": now_str
-                                }
-                            )
-                            
-                            # Create default support user
-                            support_id = str(uuid.uuid4())
-                            await session.execute(
-                                text("""
-                                    INSERT INTO users (id, email, name, role, created_at, updated_at) 
-                                    VALUES (:id, :email, :name, :role, :created_at, :updated_at)
-                                """),
-                                {
-                                    "id": support_id,
-                                    "email": "support@study.iitm.ac.in",
-                                    "name": "Support Team",
-                                    "role": "support",
-                                    "created_at": now_str,
-                                    "updated_at": now_str
-                                }
-                            )
-                            
-                            await session.commit()
-                            print("Default users created successfully.")
+                            if support_user:
+                                print(f"Support user already exists: {support_email}")
+                                # Update support user password if needed
+                                from app.utils.password import get_password_hash
+                                hashed_password = get_password_hash("support123")
+                                print(f"Updating support user password: {hashed_password[:10]}...")
+                                
+                                # Use a parameterized query with proper timestamp handling
+                                now_str = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
+                                await session.execute(
+                                    text("UPDATE users SET hashed_password = :password, updated_at = :updated_at WHERE email = :email"),
+                                    {"password": hashed_password, "updated_at": now_str, "email": support_email}
+                                )
+                                await session.commit()
+                            else:
+                                # Create default users
+                                now = datetime.now(UTC)
+                                now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+                                
+                                # Use direct SQL to avoid ORM timezone issues
+                                faculty_id = str(uuid.uuid4())
+                                await session.execute(
+                                    text("""
+                                        INSERT INTO users (id, email, name, role, created_at, updated_at) 
+                                        VALUES (:id, :email, :name, :role, :created_at, :updated_at)
+                                    """),
+                                    {
+                                        "id": faculty_id,
+                                        "email": "faculty@study.iitm.ac.in",
+                                        "name": "Default Faculty",
+                                        "role": "faculty",
+                                        "created_at": now_str,
+                                        "updated_at": now_str
+                                    }
+                                )
+                                
+                                # Create default support user
+                                support_id = str(uuid.uuid4())
+                                await session.execute(
+                                    text("""
+                                        INSERT INTO users (id, email, name, role, created_at, updated_at) 
+                                        VALUES (:id, :email, :name, :role, :created_at, :updated_at)
+                                    """),
+                                    {
+                                        "id": support_id,
+                                        "email": "support@study.iitm.ac.in",
+                                        "name": "Support Team",
+                                        "role": "support",
+                                        "created_at": now_str,
+                                        "updated_at": now_str
+                                    }
+                                )
+                                
+                                await session.commit()
+                                print("Default users created successfully.")
+                        except Exception as e:
+                            await session.rollback()
+                            print(f"Error checking or creating users: {e}")
                     except Exception as e:
                         await session.rollback()
-                        print(f"Error creating default users: {e}")
-            else:
-                print("Database tables already exist, skipping initialization.")
+                        print(f"Error in user creation session: {e}")
+            except Exception as e:
+                print(f"Error creating default users: {e}")
+        else:
+            print("Database tables already exist, skipping initialization.")
     except Exception as e:
         print(f"Database initialization error: {e}")
 

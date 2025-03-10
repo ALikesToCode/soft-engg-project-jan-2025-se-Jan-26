@@ -5,6 +5,7 @@ from app.models.assignment import Assignment
 from datetime import datetime, UTC
 import enum
 import uuid
+from sqlalchemy.dialects.postgresql import ENUM
 
 # Enums for course and enrollment status
 class CourseStatus(str, enum.Enum):
@@ -40,14 +41,15 @@ class Course(Base):
     duration = Column(Integer, nullable=False)  # e.g., Weeks or Months
     semester = Column(String, nullable=False)
     year = Column(Integer, nullable=False)
-    status = Column(Enum(CourseStatus), nullable=False, default=CourseStatus.DRAFT)
-    start_date = Column(DateTime, nullable=True)
-    end_date = Column(DateTime, nullable=True)
+    # Use String type with enum validation instead of PostgreSQL ENUM type
+    status = Column(String, nullable=False, default=CourseStatus.DRAFT.value)
+    start_date = Column(DateTime(timezone=True), nullable=True)
+    end_date = Column(DateTime(timezone=True), nullable=True)
     enrollment_limit = Column(Integer, nullable=True)
     waitlist_limit = Column(Integer, nullable=True)
     image = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.now(UTC))
-    updated_at = Column(DateTime, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    created_at = Column(DateTime(timezone=True), default=datetime.now(UTC))
+    updated_at = Column(DateTime(timezone=True), default=datetime.now(UTC), onupdate=datetime.now(UTC))
     created_by = Column(UUID, ForeignKey("users.id"), nullable=False)
     faculty_id = Column(UUID, ForeignKey("users.id"), nullable=False)
 
@@ -71,7 +73,7 @@ class Course(Base):
             "duration": self.duration,
             "semester": self.semester,
             "year": self.year,
-            "status": self.status.value,
+            "status": self.status,
             "start_date": self.start_date.isoformat() if self.start_date else None,
             "end_date": self.end_date.isoformat() if self.end_date else None,
             "enrollment_limit": self.enrollment_limit,
@@ -87,12 +89,12 @@ class CourseEnrollment(Base):
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
     course_id = Column(UUID, ForeignKey("courses.id"), nullable=False)
     student_id = Column(UUID, ForeignKey("users.id"), nullable=False)
-    status = Column(Enum(EnrollmentStatus), nullable=False, default=EnrollmentStatus.ENROLLED)
-    enrollment_date = Column(DateTime, nullable=False, default=datetime.now(UTC))
-    completion_date = Column(DateTime)
+    status = Column(String, nullable=False, default=EnrollmentStatus.ENROLLED.value)
+    enrollment_date = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC))
+    completion_date = Column(DateTime(timezone=True))
     grade = Column(String)
-    created_at = Column(DateTime, nullable=False, default=datetime.now(UTC))
-    updated_at = Column(DateTime, nullable=False, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC), onupdate=datetime.now(UTC))
 
     # Relationships
     course = relationship("Course", back_populates="enrollments")

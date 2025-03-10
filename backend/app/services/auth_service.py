@@ -9,6 +9,7 @@ from app.utils.jwt_utils import create_access_token, decode_access_token
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -302,79 +303,139 @@ async def create_default_users(db: AsyncSession) -> None:
         to prevent application startup failures.
     """
     try:
-        # Check if support user exists
-        support_email = "support@study.iitm.ac.in"
-        support_user = await get_user(db, support_email)
-        
-        print(f"Checking for support user: {support_email}")
-        
-        if not support_user:
-            # Create support user
-            hashed_password = pwd_context.hash("support123")
-            print(f"Creating support user with hashed password: {hashed_password[:10]}...")
+        # First check if the users table exists
+        try:
+            from sqlalchemy import text, inspect
             
-            from datetime import datetime, UTC
-            now = datetime.now(UTC)
+            # Check if the users table exists
+            table_exists = False
+            try:
+                async with db.begin():
+                    result = await db.execute(text(
+                        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')"
+                    ))
+                    table_exists = result.scalar()
+            except Exception as e:
+                logger.error(f"Error checking if users table exists: {e}")
+                return
+                
+            if not table_exists:
+                logger.warning("Users table does not exist yet. Skipping default user creation.")
+                return
+                
+            # Check if support user exists
+            support_email = "support@study.iitm.ac.in"
+            support_user = None
             
-            support_user = User(
-                email=support_email,
-                name="Support Admin",
-                hashed_password=hashed_password,
-                is_google_user=False,
-                role="support",
-                created_at=now,
-                updated_at=now
-            )
-            db.add(support_user)
-            print(f"Created default support user: {support_email}")
-        else:
-            print(f"Support user already exists: {support_email}")
-            # Update password for existing user
-            hashed_password = pwd_context.hash("support123")
-            print(f"Updating support user password: {hashed_password[:10]}...")
+            try:
+                result = await db.execute(
+                    text("SELECT * FROM users WHERE email = :email"),
+                    {"email": support_email}
+                )
+                support_user = result.fetchone()
+            except Exception as e:
+                logger.error(f"Error querying for support user: {e}")
+                return
             
-            # Use direct SQL to avoid timezone issues
-            from sqlalchemy import text
-            from datetime import datetime, UTC
+            print(f"Checking for support user: {support_email}")
             
-            await db.execute(
-                text("UPDATE users SET hashed_password = :password, updated_at = :updated_at WHERE id = :user_id"),
-                {
-                    "password": hashed_password, 
-                    "updated_at": datetime.now(UTC), 
-                    "user_id": support_user.id
-                }
-            )
+            if not support_user:
+                # Create support user
+                hashed_password = pwd_context.hash("support123")
+                print(f"Creating support user with hashed password: {hashed_password[:10]}...")
+                
+                from datetime import datetime, UTC
+                now = datetime.now(UTC)
+                now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Use direct SQL to avoid ORM issues
+                support_id = str(uuid.uuid4())
+                await db.execute(
+                    text("""
+                        INSERT INTO users (id, email, name, hashed_password, is_google_user, role, created_at, updated_at) 
+                        VALUES (:id, :email, :name, :password, :is_google, :role, :created_at, :updated_at)
+                    """),
+                    {
+                        "id": support_id,
+                        "email": support_email,
+                        "name": "Support Admin",
+                        "password": hashed_password,
+                        "is_google": False,
+                        "role": "support",
+                        "created_at": now_str,
+                        "updated_at": now_str
+                    }
+                )
+                print(f"Created default support user: {support_email}")
+            else:
+                print(f"Support user already exists: {support_email}")
+                # Update password for existing user
+                hashed_password = pwd_context.hash("support123")
+                print(f"Updating support user password: {hashed_password[:10]}...")
+                
+                # Use direct SQL to avoid timezone issues
+                from sqlalchemy import text
+                from datetime import datetime, UTC
+                
+                now_str = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
+                await db.execute(
+                    text("UPDATE users SET hashed_password = :password, updated_at = :updated_at WHERE email = :email"),
+                    {
+                        "password": hashed_password, 
+                        "updated_at": now_str, 
+                        "email": support_email
+                    }
+                )
+                
+            # Check if faculty user exists
+            faculty_email = "faculty@study.iitm.ac.in"
+            faculty_user = None
             
-        # Check if faculty user exists
-        faculty_email = "faculty@study.iitm.ac.in"
-        faculty_user = await get_user(db, faculty_email)
-        
-        if not faculty_user:
-            # Create faculty user
-            hashed_password = pwd_context.hash("faculty123")
+            try:
+                result = await db.execute(
+                    text("SELECT * FROM users WHERE email = :email"),
+                    {"email": faculty_email}
+                )
+                faculty_user = result.fetchone()
+            except Exception as e:
+                logger.error(f"Error querying for faculty user: {e}")
             
-            from datetime import datetime, UTC
-            now = datetime.now(UTC)
+            if not faculty_user:
+                # Create faculty user
+                hashed_password = pwd_context.hash("faculty123")
+                
+                from datetime import datetime, UTC
+                now = datetime.now(UTC)
+                now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Use direct SQL to avoid ORM issues
+                faculty_id = str(uuid.uuid4())
+                await db.execute(
+                    text("""
+                        INSERT INTO users (id, email, name, hashed_password, is_google_user, role, created_at, updated_at) 
+                        VALUES (:id, :email, :name, :password, :is_google, :role, :created_at, :updated_at)
+                    """),
+                    {
+                        "id": faculty_id,
+                        "email": faculty_email,
+                        "name": "Default Faculty",
+                        "password": hashed_password,
+                        "is_google": False,
+                        "role": "faculty",
+                        "created_at": now_str,
+                        "updated_at": now_str
+                    }
+                )
+                print(f"Created default faculty user: {faculty_email}")
             
-            faculty_user = User(
-                email=faculty_email,
-                name="Default Faculty",
-                hashed_password=hashed_password,
-                is_google_user=False,
-                role="faculty",
-                created_at=now,
-                updated_at=now
-            )
-            db.add(faculty_user)
-            print(f"Created default faculty user: {faculty_email}")
-        
-        # Commit changes
-        await db.commit()
-        
+            # Commit changes
+            await db.commit()
+            
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error in user creation transaction: {e}")
+            
     except Exception as e:
-        await db.rollback()
-        print(f"Error creating default users: {e}")
         logger.error(f"Failed to create default users: {e}")
 
 def require_role(required_role: str) -> Callable:

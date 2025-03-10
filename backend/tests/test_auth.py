@@ -1,95 +1,312 @@
 import pytest
-import requests
+import json
+from unittest.mock import patch, MagicMock
 from fastapi import status
+from fastapi.testclient import TestClient
+from httpx import AsyncClient
 
-BASE_URL = "http://127.0.0.1:8000"
-LOGIN_ENDPOINT = "/api/v1/auth/login"
-GOOGLE_LOGIN_ENDPOINT = "/api/v1/auth/login/google"
-GOOGLE_CALLBACK_ENDPOINT = "/api/v1/auth/callback"
-USER_INFO_ENDPOINT = "/api/v1/auth/me"
-LOGOUT_ENDPOINT = "/api/v1/auth/logout"
-REFRESH_TOKEN_ENDPOINT = "/api/v1/auth/refresh"
-SET_PASSWORD_ENDPOINT = "/api/v1/auth/set-password"
-HEADERS = {"Content-Type": "application/x-www-form-urlencoded"}
+from app.models.user import User
+from app.utils.jwt_utils import create_access_token
+from main import app
 
+# Test constants
+BASE_URL = "/api/v1/auth"
+LOGIN_ENDPOINT = f"{BASE_URL}/login"
+GOOGLE_LOGIN_ENDPOINT = f"{BASE_URL}/login/google"
+GOOGLE_CALLBACK_ENDPOINT = f"{BASE_URL}/callback"
+USER_INFO_ENDPOINT = f"{BASE_URL}/me"
+LOGOUT_ENDPOINT = f"{BASE_URL}/logout"
+REFRESH_TOKEN_ENDPOINT = f"{BASE_URL}/refresh"
+SET_PASSWORD_ENDPOINT = f"{BASE_URL}/set-password"
+RESET_PASSWORD_ENDPOINT = f"{BASE_URL}/reset-password"
+VERIFY_EMAIL_ENDPOINT = f"{BASE_URL}/verify-email"
+
+# Test fixtures
+@pytest.fixture
+def client():
+    with TestClient(app) as c:
+        yield c
+
+@pytest.fixture
+async def async_client():
+    async with AsyncClient(base_url="http://testserver") as ac:
+        yield ac
+
+@pytest.fixture
+def faculty_token(test_users):
+    """Create a valid faculty token for testing"""
+    return create_access_token({
+        "email": "faculty@test.com",
+        "role": "faculty",
+        "sub": str(test_users["faculty"].id)
+    })
+
+@pytest.fixture
+def student_token(test_users):
+    """Create a valid student token for testing"""
+    return create_access_token({
+        "email": "student@test.com",
+        "role": "student",
+        "sub": str(test_users["student"].id)
+    })
+
+# Email/Password Login Tests
 @pytest.mark.parametrize("payload, expected_status", [
-    ({"username": "student@ds.study.iitm.ac.in", "password": "student123"}, status.HTTP_200_OK),
-    ({"username": "invalid@ds.study.iitm.ac.in", "password": "student123"}, status.HTTP_400_BAD_REQUEST),
-    ({"username": "student@ds.study.iitm.ac.in", "password": "wrongpassword"}, status.HTTP_400_BAD_REQUEST),
+    ({"username": "faculty@test.com", "password": "faculty123"}, status.HTTP_200_OK),
+    ({"username": "invalid@test.com", "password": "faculty123"}, status.HTTP_400_BAD_REQUEST),
+    ({"username": "faculty@test.com", "password": "wrongpassword"}, status.HTTP_400_BAD_REQUEST),
     ({"username": None, "password": None}, status.HTTP_422_UNPROCESSABLE_ENTITY),
 ])
-def test_email_password_login(payload, expected_status):
-    """Test the email/password login endpoint."""
-    response = requests.post(
-        BASE_URL + LOGIN_ENDPOINT,
-        data=payload,
-        headers=HEADERS,
-        timeout=10
+@patch('app.routes.auth.authenticate_user')
+async def test_email_password_login(mock_authenticate, payload, expected_status, client):
+    """Test the email/password login endpoint with various inputs"""
+    # Mock authentication based on expected status
+    if expected_status == status.HTTP_200_OK:
+        mock_user = MagicMock()
+        mock_user.id = "test-user-id"
+        mock_user.email = payload["username"]
+        mock_user.role = "faculty"
+        mock_authenticate.return_value = mock_user
+    else:
+        mock_authenticate.return_value = None if expected_status == status.HTTP_400_BAD_REQUEST else mock_authenticate.return_value
+    
+    # Send login request
+    response = client.post(
+        LOGIN_ENDPOINT,
+        data=payload if all(payload.values()) else {},
+        headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
-
-    print(f"Test case: {payload['username']} | Expected: {expected_status}, Got: {response.status_code}")
-    print(response.text)  
-
+    
+    # Check response
     assert response.status_code == expected_status
+    
+    # Verify successful login returns tokens
+    if expected_status == status.HTTP_200_OK:
+        data = response.json()
+        assert "access_token" in data
+        assert "refresh_token" in data
+        assert "token_type" in data
+        assert data["token_type"] == "bearer"
 
-
-@pytest.mark.parametrize("endpoint, params, expected_status", [
-    (GOOGLE_LOGIN_ENDPOINT, None, status.HTTP_200_OK),
-    (GOOGLE_CALLBACK_ENDPOINT, {"state": "UWfmFlFEpUFKjbB3cKMcpmHF9RKgb9%26code%3D4%252F0AQSTgQGeAGuEo5oRzC8-i77LP9NPoKQ9Eh09aJJsjqyUMMr1xHX1FH3AZOF5Ws8HkwFteA%26scope%3Demail%2Bprofile%2Bhttps%253A%252F%252Fwww.googleapis.com%252Fauth%252Fuserinfo.email%2Bhttps%253A%252F%252Fwww.googleapis.com%252Fauth%252Fuserinfo.profile%2Bopenid%26authuser%3D0%26hd%3Dds.study.iitm.ac.in%26prompt%3Dnone+HTTP%2F1.1 HTTP/1.1"}, status.HTTP_307_TEMPORARY_REDIRECT),
-    (GOOGLE_CALLBACK_ENDPOINT, {"state": "invalid_oauth_code"}, status.HTTP_400_BAD_REQUEST),
+# Google OAuth Tests
+@pytest.mark.parametrize("endpoint, params, expected_status, mock_return", [
+    (GOOGLE_LOGIN_ENDPOINT, None, status.HTTP_200_OK, None),
+    (GOOGLE_CALLBACK_ENDPOINT, {"state": "valid_state", "code": "valid_code"}, status.HTTP_307_TEMPORARY_REDIRECT, {"id": "google_user_id", "email": "user@gmail.com", "name": "Test User"}),
+    (GOOGLE_CALLBACK_ENDPOINT, {"state": "invalid_state"}, status.HTTP_400_BAD_REQUEST, None),
 ])
-def test_google_auth(endpoint, params, expected_status):
-    """Test the Google OAuth login and callback endpoints."""
-    response = requests.get(
-        BASE_URL + endpoint,
-        params=params,
-        timeout=10
+@patch('app.routes.auth.get_google_user_info')
+async def test_google_auth(mock_google_info, endpoint, params, expected_status, mock_return, client):
+    """Test the Google OAuth login and callback endpoints"""
+    # Mock Google user info response
+    mock_google_info.return_value = mock_return
+    
+    # Send request
+    response = client.get(endpoint, params=params)
+    
+    # Check response
+    assert response.status_code == expected_status
+    
+    # For successful callback, verify redirect
+    if endpoint == GOOGLE_CALLBACK_ENDPOINT and expected_status == status.HTTP_307_TEMPORARY_REDIRECT:
+        assert "Location" in response.headers
+        assert response.headers["Location"].startswith("/")
+
+# User Info Tests
+@pytest.mark.asyncio
+async def test_user_info_success(client, faculty_token):
+    """Test successful user info retrieval"""
+    # Send request with valid token
+    response = client.get(
+        USER_INFO_ENDPOINT,
+        headers={"Authorization": f"Bearer {faculty_token}"}
     )
+    
+    # Check response
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert "email" in data
+    assert "role" in data
+    assert data["role"] == "faculty"
 
-    print(f"Test case: {endpoint} | Params: {params} | Expected: {expected_status}, Got: {response.status_code}")
-    print(response.text)  
-    assert response.status_code == expected_status
+@pytest.mark.asyncio
+async def test_user_info_invalid_token(client):
+    """Test user info with invalid token"""
+    # Send request with invalid token
+    response = client.get(
+        USER_INFO_ENDPOINT,
+        headers={"Authorization": "Bearer invalid_token"}
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-@pytest.mark.parametrize("payload, expected_status", [
-    ("valid_token", status.HTTP_200_OK),
-    ("invalid_token", status.HTTP_401_UNAUTHORIZED),
-    (None, status.HTTP_401_UNAUTHORIZED),
-])
-def test_user_info(payload, expected_status):
-    """Test the /auth/me endpoint."""
-    headers = {"Authorization": f"Bearer {payload}"} if payload else {}
-    response = requests.get(BASE_URL + USER_INFO_ENDPOINT, headers=headers, timeout=10)
-    assert response.status_code == expected_status
+@pytest.mark.asyncio
+async def test_user_info_missing_token(client):
+    """Test user info with missing token"""
+    # Send request without token
+    response = client.get(USER_INFO_ENDPOINT)
+    
+    # Check response
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-@pytest.mark.parametrize("payload, expected_status", [
-    ("valid_token", status.HTTP_200_OK),
-    ("invalid_token", status.HTTP_401_UNAUTHORIZED),
-    (None, status.HTTP_401_UNAUTHORIZED),
-])
-def test_logout(payload, expected_status):
-    """Test the /auth/logout endpoint."""
-    headers = {"Authorization": f"Bearer {payload}"} if payload else {}
-    response = requests.get(BASE_URL + LOGOUT_ENDPOINT, headers=headers, timeout=10)
-    assert response.status_code == expected_status
+# Logout Tests
+@pytest.mark.asyncio
+async def test_logout_success(client, faculty_token):
+    """Test successful logout"""
+    # Send logout request with valid token
+    response = client.post(
+        LOGOUT_ENDPOINT,
+        headers={"Authorization": f"Bearer {faculty_token}"}
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert "message" in data
+    assert "logged out" in data["message"].lower()
 
-@pytest.mark.parametrize("payload, expected_status", [
-    ("valid_refresh_token", status.HTTP_200_OK),
-    ("expired_token", status.HTTP_401_UNAUTHORIZED),
-    ("invalid_token", status.HTTP_401_UNAUTHORIZED),
-])
-def test_refresh_token(payload, expected_status):
-    """Test the /auth/refresh endpoint."""
-    headers = {"Authorization": f"Bearer {payload}"} if payload else {}
-    response = requests.post(BASE_URL + REFRESH_TOKEN_ENDPOINT, headers=headers, timeout=10)
-    assert response.status_code == expected_status
+@pytest.mark.asyncio
+async def test_logout_invalid_token(client):
+    """Test logout with invalid token"""
+    # Send logout request with invalid token
+    response = client.post(
+        LOGOUT_ENDPOINT,
+        headers={"Authorization": "Bearer invalid_token"}
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
-@pytest.mark.parametrize("payload, expected_status", [
-    ({"token": "valid_token", "password": "NewPass123!"}, status.HTTP_200_OK),
-    ({"token": "valid_token", "password": "123"}, status.HTTP_400_BAD_REQUEST),
-    ({"token": "invalid_token", "password": "NewPass123!"}, status.HTTP_401_UNAUTHORIZED),
-])
-def test_set_password(payload, expected_status):
-    """Test the /auth/set-password endpoint."""
-    headers = {"Authorization": f"Bearer {payload['token']}"} if payload['token'] else {}
-    response = requests.post(BASE_URL + SET_PASSWORD_ENDPOINT, json={"password": payload["password"]}, headers=headers, timeout=10)
-    assert response.status_code == expected_status
+# Token Refresh Tests
+@pytest.mark.asyncio
+@patch('app.routes.auth.verify_refresh_token')
+async def test_refresh_token_success(mock_verify, client):
+    """Test successful token refresh"""
+    # Mock token verification
+    mock_verify.return_value = {"sub": "user-id", "email": "user@test.com", "role": "faculty"}
+    
+    # Send refresh request
+    response = client.post(
+        REFRESH_TOKEN_ENDPOINT,
+        headers={"Authorization": "Bearer valid_refresh_token"}
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert "access_token" in data
+    assert "token_type" in data
+    assert data["token_type"] == "bearer"
+
+@pytest.mark.asyncio
+@patch('app.routes.auth.verify_refresh_token')
+async def test_refresh_token_expired(mock_verify, client):
+    """Test refresh with expired token"""
+    # Mock token verification to raise exception
+    mock_verify.side_effect = Exception("Token expired")
+    
+    # Send refresh request
+    response = client.post(
+        REFRESH_TOKEN_ENDPOINT,
+        headers={"Authorization": "Bearer expired_token"}
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+# Password Management Tests
+@pytest.mark.asyncio
+@patch('app.routes.auth.get_user_by_id')
+@patch('app.routes.auth.update_user_password')
+async def test_set_password_success(mock_update, mock_get_user, client, faculty_token):
+    """Test successful password update"""
+    # Mock user retrieval
+    mock_user = MagicMock()
+    mock_user.id = "test-user-id"
+    mock_get_user.return_value = mock_user
+    
+    # Mock password update
+    mock_update.return_value = True
+    
+    # Send password update request
+    response = client.post(
+        SET_PASSWORD_ENDPOINT,
+        headers={"Authorization": f"Bearer {faculty_token}"},
+        json={"password": "NewSecurePassword123!"}
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert "message" in data
+    assert "password updated" in data["message"].lower()
+
+@pytest.mark.asyncio
+async def test_set_password_weak(client, faculty_token):
+    """Test password update with weak password"""
+    # Send password update request with weak password
+    response = client.post(
+        SET_PASSWORD_ENDPOINT,
+        headers={"Authorization": f"Bearer {faculty_token}"},
+        json={"password": "123"}
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+@pytest.mark.asyncio
+@patch('app.routes.auth.send_password_reset_email')
+async def test_reset_password_request(mock_send_email, client):
+    """Test password reset request"""
+    # Mock email sending
+    mock_send_email.return_value = True
+    
+    # Send password reset request
+    response = client.post(
+        RESET_PASSWORD_ENDPOINT,
+        json={"email": "user@test.com"}
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert "message" in data
+    assert "reset link" in data["message"].lower()
+
+# Email Verification Tests
+@pytest.mark.asyncio
+@patch('app.routes.auth.verify_email_token')
+@patch('app.routes.auth.update_user_verified')
+async def test_verify_email_success(mock_update, mock_verify, client):
+    """Test successful email verification"""
+    # Mock token verification
+    mock_verify.return_value = {"sub": "user-id", "email": "user@test.com"}
+    
+    # Mock user update
+    mock_update.return_value = True
+    
+    # Send verification request
+    response = client.get(
+        f"{VERIFY_EMAIL_ENDPOINT}?token=valid_verification_token"
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert "message" in data
+    assert "verified" in data["message"].lower()
+
+@pytest.mark.asyncio
+@patch('app.routes.auth.verify_email_token')
+async def test_verify_email_invalid_token(mock_verify, client):
+    """Test email verification with invalid token"""
+    # Mock token verification to raise exception
+    mock_verify.side_effect = Exception("Invalid token")
+    
+    # Send verification request
+    response = client.get(
+        f"{VERIFY_EMAIL_ENDPOINT}?token=invalid_token"
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_400_BAD_REQUEST

@@ -23,6 +23,26 @@ REDIS_PASSWORD
 2. The application has been updated to include REDIS_USERNAME and REDIS_PASSWORD in the Settings model.
 3. If you add new environment variables, make sure to add them to the Settings class as well.
 
+## PostgreSQL Enum Type Errors
+
+### Error: "no schema has been selected to create in"
+
+This error occurs when trying to create a PostgreSQL enum type without specifying a schema.
+
+**Example error:**
+```
+Warning: Could not create enum type: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.InvalidSchemaNameError'>: no schema has been selected to create in
+[SQL: CREATE TYPE coursestatus AS ENUM ('DRAFT', 'ACTIVE', 'ARCHIVED')]
+```
+
+**Solution:**
+
+1. The application has been updated to use String columns with enum validation instead of PostgreSQL ENUM types.
+2. If you need to use PostgreSQL ENUM types, make sure to:
+   - Set the search_path explicitly before creating the enum type
+   - Use PL/pgSQL to check if the enum type already exists before creating it
+   - Handle the transaction properly to avoid transaction aborts
+
 ## DateTime Errors
 
 ### Error: "can't subtract offset-naive and offset-aware datetimes"

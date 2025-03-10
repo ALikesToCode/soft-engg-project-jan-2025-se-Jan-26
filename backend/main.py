@@ -33,6 +33,14 @@ from app.middleware import LoggingMiddleware
 from contextlib import asynccontextmanager
 from app.routes.notification import router as notification
 
+# Apply Pydantic v1 patch for Python 3.13 compatibility
+from app.utils.pydantic_patch import apply_patch
+apply_patch()
+
+# Apply passlib bcrypt patch for newer bcrypt versions
+from app.utils.passlib_patch import apply_patch as apply_passlib_patch
+apply_passlib_patch()
+
 # Configure logging
 logger = configure_logging()
 logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
@@ -45,13 +53,19 @@ async def lifespan(app: FastAPI):
     """Lifespan event handler for application startup and shutdown"""
     try:
         # Initialize database on startup
+        logger.info("Initializing database...")
         await init_db()
         
         # Create default users
+        logger.info("Creating default users...")
         async with async_session() as session:
-            await create_default_users(session)
+            try:
+                await create_default_users(session)
+            except Exception as e:
+                logger.error(f"Error creating default users: {e}")
         
         # Start monitoring service background tasks
+        logger.info("Starting monitoring service...")
         await monitoring_service.start_background_tasks()
     except Exception as e:
         logger.error(f"Error during application startup: {e}")
@@ -60,6 +74,7 @@ async def lifespan(app: FastAPI):
     
     try:
         # Stop monitoring service background tasks on shutdown
+        logger.info("Stopping monitoring service...")
         await monitoring_service.stop_background_tasks()
     except Exception as e:
         logger.error(f"Error during application shutdown: {e}")

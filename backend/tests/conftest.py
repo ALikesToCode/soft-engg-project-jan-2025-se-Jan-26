@@ -11,6 +11,14 @@ from sqlalchemy import event, text
 from httpx import AsyncClient
 from urllib.parse import urlparse, parse_qs
 
+# Apply Pydantic v1 patch for Python 3.13 compatibility
+from app.utils.pydantic_patch import apply_patch
+apply_patch()
+
+# Apply passlib bcrypt patch for newer bcrypt versions
+from app.utils.passlib_patch import apply_patch as apply_passlib_patch
+apply_passlib_patch()
+
 from app.database import Base, get_db
 # Import all models to ensure they are registered with Base
 from app.models.user import User
