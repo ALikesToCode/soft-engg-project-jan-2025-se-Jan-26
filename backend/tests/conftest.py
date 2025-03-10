@@ -85,7 +85,7 @@ def database_url():
 
 # Session-scoped engine
 @pytest.fixture(scope="session")
-async def engine(database_url, test_schema):
+def engine(database_url, test_schema):
     """Create a database engine once per test session."""
     is_sqlite = database_url.startswith("sqlite")
     
@@ -110,54 +110,42 @@ async def engine(database_url, test_schema):
             }
         )
     
-    # Create schema and tables
-    async with engine.begin() as conn:
+    # Create schema and tables synchronously
+    import asyncio
+    loop = asyncio.new_event_loop()
+    
+    async def setup_db():
+        # Create test schema if using PostgreSQL
         if not is_sqlite:
-            # Create and use test schema for PostgreSQL
-            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {test_schema}"))
-            await conn.execute(text(f"SET search_path TO {test_schema}"))
+            # Create schema and set search path
+            async with engine.begin() as conn:
+                await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {test_schema}"))
+                await conn.execute(text(f"SET search_path TO {test_schema}"))
+            
+            # Set search path for all connections
+            @event.listens_for(engine.sync_engine, "connect")
+            def set_search_path(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute(f"SET search_path TO {test_schema}")
+                cursor.close()
         
         # Create all tables
-        await conn.run_sync(Base.metadata.create_all)
-        
-        # Verify tables were created
-        if not is_sqlite:
-            tables = await conn.run_sync(lambda sync_conn: sync_conn.dialect.get_table_names(sync_conn, schema=test_schema))
-            print(f"Created tables in schema {test_schema}: {tables}")
-            
-            if not tables:
-                print(f"WARNING: No tables were created in schema {test_schema}!")
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
     
-    # Set search path for PostgreSQL connections
-    if not is_sqlite:
-        @event.listens_for(engine.sync_engine, "connect")
-        def set_search_path(dbapi_connection, connection_record):
-            cursor = dbapi_connection.cursor()
-            cursor.execute(f"SET search_path TO {test_schema}")
-            cursor.close()
+    loop.run_until_complete(setup_db())
+    loop.close()
     
-    yield engine
-    
-    # Cleanup at the end of the session
-    async with engine.begin() as conn:
-        if not is_sqlite:
-            await conn.execute(text(f"DROP SCHEMA IF EXISTS {test_schema} CASCADE"))
-    
-    # Close all connections
-    await engine.dispose()
-    
-    # Clean up test upload directories at the end of the session
-    if os.path.exists(TEST_UPLOAD_DIR):
-        print("Cleaning up test uploads...")
-        shutil.rmtree(TEST_UPLOAD_DIR)
+    return engine
 
 # Session-scoped session factory
 @pytest.fixture(scope="session")
-def session_factory(engine):
-    """Create a session factory once per test session."""
+async def session_factory(engine):
+    """Create a session factory for the test database."""
     return sessionmaker(
-        engine, 
-        class_=AsyncSession, 
+        bind=engine,
+        class_=AsyncSession,
         expire_on_commit=False
     )
 
@@ -165,18 +153,23 @@ def session_factory(engine):
 @pytest.fixture
 async def db_session(session_factory):
     """Create a new database session for a test."""
-    async with session_factory() as session:
+    session = session_factory()
+    try:
         yield session
-        # Rollback any changes made during the test
         await session.rollback()
+    finally:
+        await session.close()
 
 # Override the get_db dependency
 @pytest.fixture(scope="session")
 def override_get_db(session_factory):
     """Override the get_db dependency for the entire test session."""
     async def _override_get_db():
-        async with session_factory() as session:
+        session = session_factory()
+        try:
             yield session
+        finally:
+            await session.close()
     
     app.dependency_overrides[get_db] = _override_get_db
     return _override_get_db
@@ -228,11 +221,13 @@ async def test_users(db_session):
         role="support"
     )
     
+    # Add users to the session
     db_session.add(faculty_user)
     db_session.add(student_user)
     db_session.add(support_user)
     await db_session.commit()
     
+    # Return a dictionary of users
     return {
         "faculty": faculty_user,
         "student": student_user,
@@ -274,12 +269,15 @@ async def tokens(test_users):
 @pytest.fixture
 async def test_assignment(db_session, test_users):
     """Create a test assignment."""
+    # Ensure test_users is awaited if it's a coroutine
+    users = await test_users if isinstance(test_users, object) and hasattr(test_users, "__await__") else test_users
+    
     assignment = Assignment(
         id=uuid.uuid4(),
         title="Test Assignment",
         description="This is a test assignment",
         course_id=uuid.uuid4(),
-        created_by=test_users["faculty"].id,
+        created_by=users["faculty"].id,
         due_date=datetime.now(UTC) + timedelta(days=7),
         points=100,
         status="published",
@@ -301,16 +299,20 @@ async def test_assignment(db_session, test_users):
 @pytest.fixture
 async def test_submission(db_session, test_assignment, test_users):
     """Create a test submission."""
+    # Ensure test_users and test_assignment are awaited if they're coroutines
+    users = await test_users if isinstance(test_users, object) and hasattr(test_users, "__await__") else test_users
+    assignment = await test_assignment if isinstance(test_assignment, object) and hasattr(test_assignment, "__await__") else test_assignment
+    
     submission = Submission(
         id=uuid.uuid4(),
-        assignment_id=test_assignment.id,
-        student_id=test_users["student"].id,
+        assignment_id=assignment.id,
+        student_id=users["student"].id,
         submitted_at=datetime.now(UTC),
         status="submitted",
-        content="This is a test submission content",
-        file_name="test_file.txt",
-        file_size=1024,
-        file_type="text/plain"
+        content="This is a test submission",
+        file_name="test.pdf",
+        file_type="application/pdf",
+        file_size=1024
     )
     
     db_session.add(submission)

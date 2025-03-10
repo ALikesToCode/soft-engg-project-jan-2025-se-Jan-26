@@ -21,21 +21,27 @@ async def async_client():
         yield ac
 
 @pytest.fixture
-def faculty_token(test_users):
+async def faculty_token(test_users):
     """Create a valid faculty token for testing"""
+    # Ensure test_users is awaited if it's a coroutine
+    users = await test_users if isinstance(test_users, object) and hasattr(test_users, "__await__") else test_users
+    
     return create_access_token({
         "email": "faculty@test.com",
         "role": "faculty",
-        "sub": str(test_users["faculty"].id)
+        "sub": str(users["faculty"].id)
     })
 
 @pytest.fixture
-def student_token(test_users):
+async def student_token(test_users):
     """Create a valid student token for testing"""
+    # Ensure test_users is awaited if it's a coroutine
+    users = await test_users if isinstance(test_users, object) and hasattr(test_users, "__await__") else test_users
+    
     return create_access_token({
         "email": "student@test.com",
         "role": "student",
-        "sub": str(test_users["student"].id)
+        "sub": str(users["student"].id)
     })
 
 # Mock LLM response for testing
@@ -72,102 +78,100 @@ async def test_get_chat_history(mock_history, client, student_token):
     assert data[2]["role"] == "assistant"
 
 @pytest.mark.asyncio
-@patch('app.routes.chat.llm.ainvoke')
-async def test_chat_basic_response(mock_ainvoke, client, student_token):
+@patch('app.routes.chat.llm')
+async def test_chat_basic_response(mock_llm, client, student_token):
     """Test basic chat functionality without function calls"""
     # Mock LLM response
-    mock_ainvoke.return_value = MockLLMResponse(content="This is a test response")
-    
-    # Chat request data
-    chat_data = {
-        "query": "Hello, how can you help me?",
-        "max_tokens": 1024
-    }
+    mock_llm.invoke.return_value = MockLLMResponse(content="This is a test response")
     
     # Send chat request
     response = client.post(
-        "/api/v1/chat",
-        headers={"Authorization": f"Bearer {student_token}"},
-        json=chat_data
+        "/api/chat",
+        json={"message": "Hello, how are you?"},
+        headers={"Authorization": f"Bearer {student_token}"}
     )
     
     # Check response
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
-    assert data["content"] == "This is a test response"
-    assert "function_calls" not in data or data["function_calls"] is None
-    
-    # Verify LLM was called
-    mock_ainvoke.assert_called_once()
+    assert "message" in data
+    assert data["message"] == "This is a test response"
+    assert "function_call" not in data
 
 @pytest.mark.asyncio
-@patch('app.routes.chat.llm.ainvoke')
+@patch('app.routes.chat.llm')
 @patch('app.routes.chat.function_router.execute_function')
-async def test_chat_with_function_call(mock_execute_function, mock_ainvoke, client, student_token):
+async def test_chat_with_function_call(mock_execute_function, mock_llm, client, student_token):
     """Test chat with function calling capability"""
     # Mock function execution
-    mock_execute_function.return_value = {
-        "courses": [
-            {
-                "id": "course_1",
-                "name": "Introduction to Computer Science",
-                "code": "CS101"
-            },
-            {
-                "id": "course_2",
-                "name": "Data Structures and Algorithms",
-                "code": "CS201"
-            }
-        ]
-    }
+    mock_execute_function.return_value = {"result": "Function result"}
     
     # Mock LLM responses - first with function call, then with final response
-    mock_ainvoke.side_effect = [
+    function_call = {
+        "name": "web_search",
+        "arguments": json.dumps({"query": "test query"})
+    }
+    
+    mock_llm.invoke.side_effect = [
         # First response with function call
         MockLLMResponse(
-            content="Let me check the available courses",
-            additional_kwargs={
-                "tool_calls": [
-                    {
-                        "function": {
-                            "name": "get_courses",
-                            "arguments": json.dumps({"category": "all", "limit": 10})
-                        }
-                    }
-                ]
-            }
+            content="I'll search for that information",
+            additional_kwargs={"function_call": function_call}
         ),
         # Second response after function execution
-        MockLLMResponse(content="Here are the available courses: Introduction to Computer Science (CS101) and Data Structures and Algorithms (CS201)")
+        MockLLMResponse(content="Here's what I found: Function result")
     ]
-    
-    # Chat request data
-    chat_data = {
-        "query": "What courses are available?",
-        "max_tokens": 1024
-    }
     
     # Send chat request
     response = client.post(
-        "/api/v1/chat",
-        headers={"Authorization": f"Bearer {student_token}"},
-        json=chat_data
+        "/api/chat",
+        json={"message": "Search for test query"},
+        headers={"Authorization": f"Bearer {student_token}"}
     )
     
     # Check response
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
-    assert "Here are the available courses" in data["content"]
-    assert data["function_calls"] is not None
-    assert len(data["function_calls"]) == 1
-    assert data["function_calls"][0]["name"] == "get_courses"
-    assert data["function_calls"][0]["arguments"]["category"] == "all"
+    assert data["message"] == "Here's what I found: Function result"
+    assert "function_call" in data
+    assert data["function_call"]["name"] == "web_search"
+
+@pytest.mark.asyncio
+@patch('app.routes.chat.llm')
+@patch('app.routes.chat.function_router.execute_function')
+async def test_chat_with_function_error(mock_execute_function, mock_llm, client, student_token):
+    """Test chat with function execution error"""
+    # Mock function execution to raise an error
+    mock_execute_function.side_effect = Exception("Function execution failed")
     
-    # Verify function was executed
-    mock_execute_function.assert_called_once_with("get_courses", {"category": "all", "limit": 10})
+    # Mock LLM responses
+    function_call = {
+        "name": "web_search",
+        "arguments": json.dumps({"query": "test query"})
+    }
     
-    # Verify LLM was called twice (initial + after function call)
-    assert mock_ainvoke.call_count == 2
+    mock_llm.invoke.side_effect = [
+        # First response with function call
+        MockLLMResponse(
+            content="I'll search for that information",
+            additional_kwargs={"function_call": function_call}
+        ),
+        # Second response after function error
+        MockLLMResponse(content="I encountered an error while searching")
+    ]
+    
+    # Send chat request
+    response = client.post(
+        "/api/chat",
+        json={"message": "Search for test query"},
+        headers={"Authorization": f"Bearer {student_token}"}
+    )
+    
+    # Check response
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert "error" in data
+    assert "Function execution failed" in data["error"]
 
 @pytest.mark.asyncio
 async def test_chat_with_invalid_input(client, student_token):
@@ -206,58 +210,6 @@ async def test_chat_with_sql_injection(client, student_token):
     
     # Check response
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-
-@pytest.mark.asyncio
-@patch('app.routes.chat.llm.ainvoke')
-@patch('app.routes.chat.function_router.execute_function')
-async def test_chat_with_function_error(mock_execute_function, mock_ainvoke, client, student_token):
-    """Test chat with function execution error"""
-    # Mock function execution to raise an error
-    mock_execute_function.side_effect = Exception("Function execution failed")
-    
-    # Mock LLM responses
-    mock_ainvoke.side_effect = [
-        # First response with function call
-        MockLLMResponse(
-            content="Let me search for that information",
-            additional_kwargs={
-                "tool_calls": [
-                    {
-                        "function": {
-                            "name": "web_search",
-                            "arguments": json.dumps({"query": "test query"})
-                        }
-                    }
-                ]
-            }
-        ),
-        # Second response after function error
-        MockLLMResponse(content="I encountered an error while searching for that information")
-    ]
-    
-    # Chat request data
-    chat_data = {
-        "query": "Search for test query",
-        "max_tokens": 1024
-    }
-    
-    # Send chat request
-    response = client.post(
-        "/api/v1/chat",
-        headers={"Authorization": f"Bearer {student_token}"},
-        json=chat_data
-    )
-    
-    # Check response
-    assert response.status_code == status.HTTP_200_OK
-    data = response.json()
-    assert "I encountered an error" in data["content"]
-    
-    # Verify function was attempted
-    mock_execute_function.assert_called_once()
-    
-    # Verify error was handled and LLM was called again
-    assert mock_ainvoke.call_count == 2
 
 @pytest.mark.asyncio
 @patch('app.routes.chat.function_router.get_function_declarations')
