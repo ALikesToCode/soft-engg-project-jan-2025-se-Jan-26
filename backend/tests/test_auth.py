@@ -8,7 +8,7 @@ from httpx import AsyncClient
 from app.models.user import User
 from app.utils.jwt_utils import create_access_token
 from main import app
-from app.schemas.user import UserCreate, UserLogin
+# from app.schemas.user import UserCreate, UserLogin
 from app.services.auth import verify_password, get_password_hash
 import uuid
 

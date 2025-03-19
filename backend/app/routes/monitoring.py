@@ -119,7 +119,7 @@ async def get_metrics(
     current_metrics = await monitoring_service.get_current_metrics()
     
     response = {
-        "current": current_metrics.dict()
+        "current": current_metrics
     }
     
     if history:

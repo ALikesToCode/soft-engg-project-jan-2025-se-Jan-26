@@ -5,7 +5,7 @@
 echo "Setting up test environment..."
 
 # Check Python version
-PYTHON_VERSION=$(python --version 2>&1)
+PYTHON_VERSION=$(python3 --version 2>&1)
 echo "Python version: $PYTHON_VERSION"
 
 # Check if Python 3.13 is being used

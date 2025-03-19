@@ -13,7 +13,7 @@ export REDIS_URL="redis://localhost:6379/0"
 export TEST_USE_SQLITE="true"
 
 # Check Python version
-PYTHON_VERSION=$(python --version 2>&1)
+PYTHON_VERSION=$(python3 --version 2>&1)
 PYTHON_3_13=false
 if [[ $PYTHON_VERSION == *"3.13"* ]]; then
     PYTHON_3_13=true
@@ -120,7 +120,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Build the command
-CMD="python -m pytest"
+CMD="python3 -m pytest"
 
 # Add specific tests if provided
 if [ -n "$SPECIFIC_TESTS" ]; then
