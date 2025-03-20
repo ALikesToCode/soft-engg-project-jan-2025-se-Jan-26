@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, UTC
 from fastapi import status
 from httpx import AsyncClient
 from fastapi.testclient import TestClient
+from app.utils.jwt_utils import create_access_token
 
 # Test create assignment endpoint
 @pytest.mark.asyncio
@@ -313,4 +314,110 @@ async def test_plagiarism_report_endpoint(client: TestClient, tokens, test_assig
         f"/api/v1/assignments/{test_assignment.id}/submissions/{uuid.uuid4()}/plagiarism",
         headers={"Authorization": f"Bearer {tokens['faculty']}"}
     )
-    assert response.status_code == status.HTTP_404_NOT_FOUND 
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+# Test downloading submission file
+@pytest.mark.asyncio
+async def test_download_submission_file_endpoint(client: TestClient, tokens, test_assignment, test_submission, monkeypatch):
+    """Test downloading a submission file"""
+    # Setup a mock file path and ensure file_path exists on the test_submission
+    from unittest.mock import patch, MagicMock
+    import os
+    
+    # Create a mock file for testing
+    test_file_content = b"This is test file content"
+    test_file_path = "test_submission_file.pdf"
+    
+    # Set file_path on the test submission
+    if not hasattr(test_submission, 'file_path') or not test_submission.file_path:
+        test_submission.file_path = test_file_path
+        
+    # Mock the os.path.exists function to return True for our test file
+    original_exists = os.path.exists
+    original_join = os.path.join
+    
+    def mock_exists(path):
+        if test_file_path in path:
+            return True
+        return original_exists(path)
+    
+    # Mock the FileResponse initialization to avoid actually reading a file
+    from fastapi.responses import FileResponse
+    original_file_response = FileResponse.__init__
+    
+    def mock_file_response_init(self, path, *args, **kwargs):
+        self.path = path
+        self.status_code = 200
+        
+    # Apply monkeypatches
+    monkeypatch.setattr(os.path, 'exists', mock_exists)
+    monkeypatch.setattr(FileResponse, '__init__', mock_file_response_init)
+    
+    # Test cases
+    
+    # Test Case 1: Faculty can download any submission file
+    response = client.get(
+        f"/api/v1/assignments/{test_assignment.id}/submissions/{test_submission.id}/download",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    # Not checking the file content as we mocked the FileResponse
+    assert response.status_code == status.HTTP_200_OK
+    
+    # Test Case 2: Student can download their own submission file
+    # Set up a student token that matches the submission's student_id
+    student_token = create_access_token({
+        "id": str(test_submission.student_id),
+        "email": "student@test.com",
+        "role": "student"
+    })
+    
+    response = client.get(
+        f"/api/v1/assignments/{test_assignment.id}/submissions/{test_submission.id}/download",
+        headers={"Authorization": f"Bearer {student_token}"}
+    )
+    assert response.status_code == status.HTTP_200_OK
+    
+    # Test Case 3: Different student cannot download someone else's file
+    other_student_token = create_access_token({
+        "id": str(uuid.uuid4()),  # Different student ID
+        "email": "other_student@test.com",
+        "role": "student"
+    })
+    
+    response = client.get(
+        f"/api/v1/assignments/{test_assignment.id}/submissions/{test_submission.id}/download",
+        headers={"Authorization": f"Bearer {other_student_token}"}
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert "You do not have permission to access this file" in response.text
+    
+    # Test Case 4: Invalid assignment ID
+    response = client.get(
+        f"/api/v1/assignments/{uuid.uuid4()}/submissions/{test_submission.id}/download",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Submission does not belong to this assignment" in response.text
+    
+    # Test Case 5: Invalid submission ID
+    response = client.get(
+        f"/api/v1/assignments/{test_assignment.id}/submissions/{uuid.uuid4()}/download",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert "Submission not found" in response.text
+    
+    # Test Case 6: Submission without file
+    # Temporarily remove file_path
+    original_file_path = test_submission.file_path
+    test_submission.file_path = None
+    
+    response = client.get(
+        f"/api/v1/assignments/{test_assignment.id}/submissions/{test_submission.id}/download",
+        headers={"Authorization": f"Bearer {tokens['faculty']}"}
+    )
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert "No file found for this submission" in response.text
+    
+    # Restore file_path for other tests
+    test_submission.file_path = original_file_path 
