@@ -25,6 +25,14 @@ class UserUpdate(BaseModel):
 
 
 async def create_user(db: AsyncSession, user_data: UserCreate) -> uuid.UUID:
+    # Check if a user with the given email already exists
+    existing_user_query = select(User).where(User.email == user_data.email)
+    result = await db.execute(existing_user_query)
+    existing_user = result.scalars().first()
+    
+    if existing_user:
+        raise HTTPException(status_code=400, detail="A user with this email already exists.")
+    
     user_dict = user_data.model_dump(exclude_unset=True)  # Remove unset fields
     
     # Extract password from user_dict to handle it separately

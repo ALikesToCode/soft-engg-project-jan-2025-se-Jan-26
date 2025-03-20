@@ -41,20 +41,65 @@ async def test_create_user(client: TestClient, tokens):
     # Store user ID for later tests
     return data["user_id"]
 
+@pytest.mark.asyncio
+async def test_create_user_invalid_role(client: TestClient, tokens):
+    # Login as support
+    token_data = await tokens if isinstance(tokens, object) and hasattr(tokens, "__await__") else tokens
+    headers = {"Authorization": f"Bearer {token_data['support']}"}
 
-    # response = await async_client.post(
-    #     "/users/add",
-    #     json={
-    #         "name": "New User",
-    #         "email": "newuser@example.com",
-    #         "password": "SecurePassword123!",
-    #         "role": "student"
-    #     },
-    #     headers=support_auth_headers
-    # )
-    # assert response.status_code == 200
-    # assert response.json()["name"] == "New User"
+    # Create a new user with invalid role
+    invaild_data = {
+        "name": "",
+        "email": "invalid-email",
+        "password": "123"
+    }
 
+    response = await client.post(
+        "api/v1/users/add",
+        headers=headers,
+        json=invaild_data
+    ) if isinstance(client, AsyncClient) else client.post(
+        "api/v1/users/add",
+        headers=headers,
+        json=invaild_data
+    )
+
+    # Check response
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    data = response.json()
+    assert "detail" in data
+    assert data["detail"][0]["msg"] == "value_error.missing"
+    assert data["detail"][1]["msg"] == "value_error.email"
+    assert data["detail"][2]["msg"] == "value_error.any_str.min_length"
+
+@pytest.mark.asyncio
+async def test_create_user_duplicate_email(client: TestClient, tokens):
+    # Login as support
+    token_data = await tokens if isinstance(tokens, object) and hasattr(tokens, "__await__") else tokens
+    headers = {"Authorization": f"Bearer {token_data['support']}"}
+
+    # Create a new user with duplicate email
+    user_data = {
+        "name": "Duplicate User",
+        "email": "newuser@example.com",
+        "password": "SecurePassword123!",
+        "role": "student"
+    }
+
+    response = await client.post(
+        "api/v1/users/add",
+        headers=headers,
+        json=user_data
+    ) if isinstance(client, AsyncClient) else client.post(
+        "api/v1/users/add",
+        headers=headers,
+        json=user_data
+    )
+
+    # Check response
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    data = response.json()
+    assert data["detail"] == "User with this email already exists"
 
 @pytest.mark.asyncio
 async def test_get_users(client: TestClient, tokens):
