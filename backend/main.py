@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from app.routes.auth import router as auth_router
 from app.routes.user import router as user_router
+from app.routes.user_routes import router as user_routers
 from app.routes.llm import router as chat
 from app.routes.assignment import router as assignment_router
 from app.routes.faq import router as faq_router
@@ -712,6 +713,7 @@ app.openapi = custom_openapi
 # Add routers with API prefix
 app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(user_router, prefix="/api/v1", tags=["User"])
+app.include_router(user_routers, prefix="/api/v1", tags=["User Management"])
 app.include_router(chat, prefix="/api/v1", tags=["Chat"])
 app.include_router(assignment_router, prefix="/api/v1", tags=["Assignments"])
 app.include_router(faq_router, tags=["FAQs"])

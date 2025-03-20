@@ -9,7 +9,7 @@ from app.models.user import User
 from sqlalchemy.future import select
 from typing import List
 
-router = APIRouter(tags=["User Courses"])
+router = APIRouter(tags=["User"])
 
 # User schema for response
 class UserResponse(BaseModel):
