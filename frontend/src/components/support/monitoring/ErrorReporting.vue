@@ -1,4 +1,5 @@
 <template>
+  <MockDataBanner />
   <div class="bg-white rounded-lg shadow-lg p-6">
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-gray-800">Error Logs</h2>
@@ -31,6 +32,7 @@
             <option value="api">API</option>
             <option value="database">Database</option>
             <option value="frontend">Frontend</option>
+            <option value="auth">Authentication</option>
           </select>
         </div>
         <div>
@@ -47,6 +49,11 @@
           <input type="text" v-model="filters.search" placeholder="Search logs..." 
                  class="w-full rounded border-gray-300">
         </div>
+      </div>
+      <div class="flex justify-end mt-4">
+        <button @click="applyFilters" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+          Apply Filters
+        </button>
       </div>
     </div>
 
@@ -82,7 +89,7 @@
               <button @click="viewDetails(error)" class="text-blue-600 hover:text-blue-900 mr-3">
                 Details
               </button>
-              <button @click="resolveError(error)" class="text-green-600 hover:text-green-900">
+              <button @click="resolveError(error.id)" class="text-green-600 hover:text-green-900">
                 Resolve
               </button>
             </td>
@@ -119,36 +126,25 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import monitoringService from '../../../services/monitoring.service';
+import MockDataBanner from './MockDataBanner.vue';
 
 export default {
   name: 'ErrorReporting',
+  components: {
+    MockDataBanner
+  },
   setup() {
     const showFilters = ref(false);
     const selectedError = ref(null);
+    const errors = ref([]);
     const filters = ref({
       severity: '',
       component: '',
       timeRange: '24h',
       search: ''
     });
-
-    // Mock data - replace with actual API calls
-    const errors = ref([
-      {
-        id: 1,
-        timestamp: new Date().getTime() - 3600000,
-        severity: 'error',
-        component: 'api',
-        message: 'Database connection timeout',
-        stackTrace: 'Error: Connection timeout\n    at Database.connect (/src/db.js:42)\n    at API.handleRequest (/src/api.js:15)',
-        context: {
-          database: 'primary',
-          attemptCount: 3
-        }
-      },
-      // Add more mock errors here
-    ]);
 
     const filteredErrors = computed(() => {
       return errors.value.filter(error => {
@@ -164,6 +160,9 @@ export default {
     });
 
     const formatDate = (timestamp) => {
+      if (typeof timestamp === 'string') {
+        return new Date(timestamp).toLocaleString();
+      }
       return new Date(timestamp).toLocaleString();
     };
 
@@ -176,28 +175,65 @@ export default {
       return classes[severity] || 'bg-gray-100 text-gray-800';
     };
 
+    const fetchErrors = async () => {
+      try {
+        // Convert timeRange to start/end time if necessary
+        const params = { ...filters.value };
+        delete params.search; // Remove search from API params
+        
+        const errorLogs = await monitoringService.getErrorLogs(params);
+        errors.value = errorLogs || [];
+      } catch (error) {
+        console.error('Error fetching error logs:', error);
+      }
+    };
+
+    const applyFilters = async () => {
+      await fetchErrors();
+    };
+
     const viewDetails = (error) => {
       selectedError.value = error;
     };
 
-    const resolveError = async (error) => {
-      // Implement error resolution logic
-      console.log('Resolving error:', error.id);
+    const resolveError = async (errorId) => {
+      try {
+        await monitoringService.resolveError(errorId);
+        errors.value = errors.value.filter(error => error.id !== errorId);
+      } catch (error) {
+        console.error('Error resolving error:', error);
+      }
     };
 
     const exportLogs = () => {
-      // Implement log export logic
-      const exportData = JSON.stringify(filteredErrors.value, null, 2);
-      const blob = new Blob([exportData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'error-logs.json';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      try {
+        // Implement log export logic through service
+        monitoringService.exportLogs(filters.value).then(blob => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'error-logs.json';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+      } catch (error) {
+        console.error('Error exporting logs:', error);
+      }
     };
+
+    onMounted(async () => {
+      await fetchErrors();
+      
+      // Set up polling for regular updates
+      const updateInterval = setInterval(fetchErrors, 60000); // Update every minute
+      
+      // Clean up on unmount
+      return () => {
+        clearInterval(updateInterval);
+      };
+    });
 
     return {
       showFilters,
@@ -208,7 +244,8 @@ export default {
       severityClass,
       viewDetails,
       resolveError,
-      exportLogs
+      exportLogs,
+      applyFilters
     };
   }
 };

@@ -24,48 +24,47 @@
     <div class="mb-8">
       <h3 class="text-lg font-semibold text-gray-700 mb-4">Performance Metrics</h3>
       <div class="h-64 bg-gray-50 rounded-lg p-4">
-        <!-- Placeholder for chart component -->
         <canvas ref="performanceChart"></canvas>
       </div>
     </div>
 
     <!-- Status Indicators -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div v-for="service in services" :key="service.name"
+      <div v-for="(status, name) in services" :key="name"
            class="p-4 rounded-lg border"
-           :class="{'bg-green-50 border-green-200': service.status === 'healthy',
-                   'bg-red-50 border-red-200': service.status === 'down',
-                   'bg-yellow-50 border-yellow-200': service.status === 'degraded'}">
+           :class="getServiceClass(status)">
         <div class="flex items-center space-x-2">
           <div :class="['w-3 h-3 rounded-full', 
-                      service.status === 'healthy' ? 'bg-green-500' :
-                      service.status === 'down' ? 'bg-red-500' : 'bg-yellow-500']"></div>
-          <span class="font-medium text-gray-700">{{ service.name }}</span>
+                      status === 'up' ? 'bg-green-500' :
+                      status === 'down' ? 'bg-red-500' : 'bg-yellow-500']"></div>
+          <span class="font-medium text-gray-700">{{ formatServiceName(name) }}</span>
         </div>
-        <div class="text-sm text-gray-500 mt-1">{{ service.message }}</div>
+        <div class="text-sm text-gray-500 mt-1">{{ getStatusMessage(status) }}</div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import Chart from 'chart.js/auto';
+import monitoringService from '../../../services/monitoring.service';
 
 export default {
   name: 'SystemHealth',
   setup() {
     const performanceChart = ref(null);
-    const uptime = ref(345600); // Example: 4 days in seconds
-    const avgResponseTime = ref(120);
-    const serverLoad = ref(65);
-    const services = ref([
-      { name: 'API Server', status: 'healthy', message: 'Running normally' },
-      { name: 'Database', status: 'healthy', message: 'Connected' },
-      { name: 'Cache', status: 'degraded', message: 'High memory usage' },
-      { name: 'File Storage', status: 'healthy', message: 'Available' }
-    ]);
+    const chartInstance = ref(null);
+    const uptime = ref(0);
+    const avgResponseTime = ref(0);
+    const serverLoad = ref(0);
+    const services = ref({});
+    const performanceData = ref({
+      labels: [],
+      responseTime: []
+    });
 
+    // Format uptime value from seconds to days, hours, minutes
     const formatUptime = computed(() => {
       const days = Math.floor(uptime.value / 86400);
       const hours = Math.floor((uptime.value % 86400) / 3600);
@@ -85,16 +84,39 @@ export default {
       return 'text-red-600';
     });
 
-    onMounted(() => {
-      // Initialize performance chart
+    const formatServiceName = (name) => {
+      // Convert service name to title case with spaces
+      return name.charAt(0).toUpperCase() + name.slice(1).replace(/_/g, ' ');
+    };
+
+    const getStatusMessage = (status) => {
+      if (status === 'up') return 'Running normally';
+      if (status === 'down') return 'Service unavailable';
+      if (status.includes('mock')) return 'Running in mock mode';
+      if (status === 'degraded') return 'Performance issues';
+      return 'Status unknown';
+    };
+
+    const getServiceClass = (status) => {
+      if (status === 'up') return 'bg-green-50 border-green-200';
+      if (status === 'down') return 'bg-red-50 border-red-200';
+      if (status.includes('mock')) return 'bg-blue-50 border-blue-200';
+      return 'bg-yellow-50 border-yellow-200';
+    };
+
+    const initChart = () => {
+      if (chartInstance.value) {
+        chartInstance.value.destroy();
+      }
+      
       const ctx = performanceChart.value.getContext('2d');
-      new Chart(ctx, {
+      chartInstance.value = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: ['12:00', '12:05', '12:10', '12:15', '12:20', '12:25', '12:30'],
+          labels: performanceData.value.labels,
           datasets: [{
             label: 'Response Time (ms)',
-            data: [100, 120, 115, 130, 125, 135, 120],
+            data: performanceData.value.responseTime,
             borderColor: 'rgb(59, 130, 246)',
             tension: 0.4
           }]
@@ -114,6 +136,88 @@ export default {
           }
         }
       });
+    };
+
+    const updateChart = () => {
+      if (chartInstance.value) {
+        chartInstance.value.data.labels = performanceData.value.labels;
+        chartInstance.value.data.datasets[0].data = performanceData.value.responseTime;
+        chartInstance.value.update();
+      }
+    };
+
+    const fetchSystemHealth = async () => {
+      try {
+        const healthData = await monitoringService.getSystemHealth();
+        
+        if (healthData.uptime) {
+          uptime.value = healthData.uptime;
+        }
+        
+        if (healthData.services) {
+          services.value = healthData.services;
+        }
+        
+        if (healthData.metrics && healthData.metrics.response_time) {
+          avgResponseTime.value = Math.round(healthData.metrics.response_time);
+        }
+        
+        if (healthData.metrics && healthData.metrics.cpu_usage) {
+          serverLoad.value = Math.round(healthData.metrics.cpu_usage);
+        }
+      } catch (error) {
+        console.error('Error fetching system health:', error);
+      }
+    };
+
+    const fetchPerformanceData = async () => {
+      try {
+        const metricsData = await monitoringService.getPerformanceMetrics('1h');
+        
+        if (metricsData && metricsData.history && metricsData.history.length > 0) {
+          // Format data for chart
+          const labels = [];
+          const responseTime = [];
+          
+          metricsData.history.forEach(point => {
+            const date = new Date(point.timestamp);
+            labels.push(date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}));
+            responseTime.push(point.response_time);
+          });
+          
+          performanceData.value = {
+            labels,
+            responseTime
+          };
+          
+          updateChart();
+        }
+      } catch (error) {
+        console.error('Error fetching performance data:', error);
+      }
+    };
+
+    onMounted(async () => {
+      await fetchSystemHealth();
+      await fetchPerformanceData();
+      initChart();
+      
+      // Set up polling for updates
+      const healthInterval = setInterval(fetchSystemHealth, 60000);
+      const performanceInterval = setInterval(fetchPerformanceData, 300000);
+      
+      // Clean up on unmount
+      return () => {
+        clearInterval(healthInterval);
+        clearInterval(performanceInterval);
+        if (chartInstance.value) {
+          chartInstance.value.destroy();
+        }
+      };
+    });
+
+    watch([performanceData], () => {
+      updateChart();
     });
 
     return {
@@ -123,7 +227,10 @@ export default {
       serverLoad,
       serverLoadClass,
       serverLoadTextClass,
-      services
+      services,
+      formatServiceName,
+      getStatusMessage,
+      getServiceClass
     };
   }
 };

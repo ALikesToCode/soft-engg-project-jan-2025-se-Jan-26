@@ -1,4 +1,6 @@
 <template>
+  <SupportRoleIndicator />
+  <MockDataBanner />
   <div class="bg-white rounded-lg shadow-lg p-6">
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-gray-800">Performance Metrics</h2>
@@ -116,13 +118,13 @@
                 {{ endpoint.path }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ endpoint.avgResponseTime }}ms
+                {{ endpoint.avg_response_time }}ms
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ endpoint.requestCount }}
+                {{ endpoint.request_count }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ endpoint.errorRate }}%
+                {{ endpoint.error_rate }}%
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span :class="getStatusClass(endpoint.status)" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
@@ -138,47 +140,38 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import Chart from 'chart.js/auto';
+import monitoringService from '../../../services/monitoring.service';
+import MockDataBanner from './MockDataBanner.vue';
+import SupportRoleIndicator from './SupportRoleIndicator.vue';
 
 export default {
   name: 'PerformanceMetrics',
+  components: {
+    MockDataBanner,
+    SupportRoleIndicator
+  },
   setup() {
     const timeRange = ref('24h');
     const apiChart = ref(null);
+    const chartInstance = ref(null);
     
-    // Mock data - replace with actual API calls
+    // Performance data
     const metrics = ref({
-      avgResponseTime: 120,
-      requestRate: 150,
-      errorRate: 0.5,
-      cpuUsage: 65,
-      memoryUsage: 78
+      avgResponseTime: 0,
+      requestRate: 0,
+      errorRate: 0,
+      cpuUsage: 0,
+      memoryUsage: 0
     });
 
-    const endpoints = ref([
-      {
-        path: '/api/v1/courses',
-        avgResponseTime: 85,
-        requestCount: 15000,
-        errorRate: 0.2,
-        status: 'healthy'
-      },
-      {
-        path: '/api/v1/users',
-        avgResponseTime: 95,
-        requestCount: 12000,
-        errorRate: 0.3,
-        status: 'healthy'
-      },
-      {
-        path: '/api/v1/assignments',
-        avgResponseTime: 150,
-        requestCount: 8000,
-        errorRate: 1.2,
-        status: 'degraded'
-      }
-    ]);
+    const endpoints = ref([]);
+    const performanceHistory = ref({
+      labels: [],
+      responseTime: [],
+      requestRate: []
+    });
 
     // Computed properties for trends
     const responseTimeTrend = computed(() => ({
@@ -220,28 +213,26 @@ export default {
       return classes[status] || 'bg-gray-100 text-gray-800';
     };
 
-    const refreshData = async () => {
-      // Implement data refresh logic
-      console.log('Refreshing data for timeRange:', timeRange.value);
-    };
-
-    onMounted(() => {
-      // Initialize performance chart
+    const initChart = () => {
+      if (chartInstance.value) {
+        chartInstance.value.destroy();
+      }
+      
       const ctx = apiChart.value.getContext('2d');
-      new Chart(ctx, {
+      chartInstance.value = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: ['12:00', '12:05', '12:10', '12:15', '12:20', '12:25', '12:30'],
+          labels: performanceHistory.value.labels,
           datasets: [
             {
               label: 'Response Time (ms)',
-              data: [100, 120, 115, 130, 125, 135, 120],
+              data: performanceHistory.value.responseTime,
               borderColor: 'rgb(59, 130, 246)',
               tension: 0.4
             },
             {
               label: 'Request Rate (req/s)',
-              data: [140, 145, 150, 148, 152, 148, 150],
+              data: performanceHistory.value.requestRate,
               borderColor: 'rgb(16, 185, 129)',
               tension: 0.4
             }
@@ -252,7 +243,7 @@ export default {
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              position: 'top'
+              position: 'top',
             }
           },
           scales: {
@@ -262,6 +253,98 @@ export default {
           }
         }
       });
+    };
+
+    const updateChart = () => {
+      if (chartInstance.value) {
+        chartInstance.value.data.labels = performanceHistory.value.labels;
+        chartInstance.value.data.datasets[0].data = performanceHistory.value.responseTime;
+        chartInstance.value.data.datasets[1].data = performanceHistory.value.requestRate;
+        chartInstance.value.update();
+      }
+    };
+
+    const fetchPerformanceData = async () => {
+      try {
+        // Fetch performance metrics
+        const performanceData = await monitoringService.getPerformanceMetrics(timeRange.value);
+        
+        if (performanceData && performanceData.current) {
+          metrics.value = {
+            avgResponseTime: Math.round(performanceData.current.response_time || 0),
+            requestRate: performanceData.current.request_rate || 0,
+            errorRate: performanceData.current.error_rate || 0,
+            // These might come from system metrics
+            cpuUsage: 65, // Mock data
+            memoryUsage: 78 // Mock data
+          };
+        }
+        
+        // Process history data for chart
+        if (performanceData && performanceData.history && performanceData.history.length > 0) {
+          const labels = [];
+          const responseTime = [];
+          const requestRate = [];
+          
+          performanceData.history.forEach(point => {
+            const date = new Date(point.timestamp);
+            labels.push(date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}));
+            responseTime.push(point.response_time);
+            requestRate.push(point.request_rate);
+          });
+          
+          performanceHistory.value = {
+            labels,
+            responseTime,
+            requestRate
+          };
+          
+          updateChart();
+        }
+        
+        // Fetch system metrics for resource usage
+        const systemMetrics = await monitoringService.getSystemMetrics();
+        if (systemMetrics && systemMetrics.current) {
+          metrics.value.cpuUsage = Math.round(systemMetrics.current.cpu_usage || 0);
+          metrics.value.memoryUsage = Math.round(systemMetrics.current.memory_usage || 0);
+        }
+        
+        // Fetch endpoint performance
+        const endpointData = await monitoringService.getEndpointPerformance();
+        if (endpointData && endpointData.length > 0) {
+          endpoints.value = endpointData;
+        }
+      } catch (error) {
+        console.error('Error fetching performance data:', error);
+      }
+    };
+
+    const refreshData = async () => {
+      await fetchPerformanceData();
+    };
+
+    onMounted(async () => {
+      await fetchPerformanceData();
+      initChart();
+      
+      // Set up polling for regular updates
+      const updateInterval = setInterval(fetchPerformanceData, 60000); // Update every minute
+      
+      // Clean up on unmount
+      return () => {
+        clearInterval(updateInterval);
+        if (chartInstance.value) {
+          chartInstance.value.destroy();
+        }
+      };
+    });
+
+    watch([timeRange], async () => {
+      await fetchPerformanceData();
+    });
+
+    watch([performanceHistory], () => {
+      updateChart();
     });
 
     return {
