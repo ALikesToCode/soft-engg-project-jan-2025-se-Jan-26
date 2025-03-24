@@ -472,12 +472,20 @@ export default {
     const saveDocumentContent = async (contentData, url) => {
       console.log('Uploading Document...')
       try {
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
         const data = {
           ...contentData,
           driveDocLink: driveLink.value,
         }
         console.log(data)
-        const response = await api.post(url, data)
+        const response = await api.post(url, data, headers)
         console.log('Upload successful:', response.data)
         return response.data
       } catch (error) {
@@ -490,6 +498,14 @@ export default {
       console.log('updating doc content')
       isLoading.value = true
       try {
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
         contentForm.value.moduleId = '0'
         const contentData = {
           ...contentForm.value,
@@ -498,7 +514,7 @@ export default {
         }
         console.log({ ...contentData })
         const url = '/courses/module/doc_content/lecture' //for content type = video/lecture
-        const response = await api.put(url, contentData)
+        const response = await api.put(url, contentData, headers)
       } catch (error) {
         isLoading.value = false
         throw error

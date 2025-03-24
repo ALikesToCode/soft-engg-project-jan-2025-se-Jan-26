@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { API_ROUTES } from '@/config/api.routes'
+import api from '@/utils/api'
 
 export const FacultyNotificationService = {
   // Get faculty notifications
@@ -8,8 +9,37 @@ export const FacultyNotificationService = {
   },
 
   // Create a new notification
-  async createNotification(notificationData) {
-    return axios.post(`${API_ROUTES.NOTIFICATIONS}/faculty`, notificationData)
+  async createNotification(notificationData, headers) {
+    console.log(`Inside notificationService.createNotification to send request at ${API_ROUTES.NOTIFICATIONS}/course/send`)
+    try {
+      console.log(notificationData)
+      const response = await api.post(
+        `${API_ROUTES.NOTIFICATIONS}/course/send`,
+        notificationData,
+        headers
+      );
+      return response;
+    } catch (error) {
+      console.error("Error sending notification:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  //Support System Notification
+  async createSystemNotification(notificationData, headers) {
+    try {
+      console.log(notificationData)
+      const response = await api.post(
+        `${API_ROUTES.NOTIFICATIONS}/system/send`,
+        notificationData,
+        headers
+      );
+      return response;
+    } catch (error) {
+      console.error("Error sending system notification:", error.response?.data || error.message);
+      throw error;
+
+    }
   },
 
   // Update notification status

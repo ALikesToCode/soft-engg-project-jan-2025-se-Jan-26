@@ -362,8 +362,8 @@ async def create_default_users(db: AsyncSession) -> None:
                         "password": hashed_password,
                         "is_google": False,
                         "role": "support",
-                        "created_at": now_str,
-                        "updated_at": now_str
+                        "created_at": now,
+                        "updated_at": now
                     }
                 )
                 print(f"Created default support user: {support_email}")
@@ -402,6 +402,7 @@ async def create_default_users(db: AsyncSession) -> None:
             
             if not faculty_user:
                 # Create faculty user
+                logger.info(f"Creating faculty user {faculty_email}")
                 hashed_password = pwd_context.hash("faculty123")
                 
                 from datetime import datetime, UTC
@@ -422,8 +423,8 @@ async def create_default_users(db: AsyncSession) -> None:
                         "password": hashed_password,
                         "is_google": False,
                         "role": "faculty",
-                        "created_at": now_str,
-                        "updated_at": now_str
+                        "created_at": now,
+                        "updated_at": now
                     }
                 )
                 print(f"Created default faculty user: {faculty_email}")

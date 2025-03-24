@@ -59,7 +59,7 @@ const userRoutes = {
             component: RoadmapView,
             props: true,
             meta: {
-                title: 'Learning Roadmap', 
+                title: 'Learning Roadmap',
                 hideNavbar: false,
                 hideFooter: true,
                 hideUserNavbar: false
@@ -70,14 +70,14 @@ const userRoutes = {
             component: ProfilePage,
             props: {
                 userType: 'student',
-                userInfo: {
-                    name: "John Doe",
-                    email: "john.doe@example.com",
-                    profilePictureUrl: dummyAvatar,
-                    coursesCount: 5,
-                    studentsCount: 0,
-                    rating: 4.5
-                },
+                // userInfo: {
+                //     name: "John Doe",
+                //     email: "john.doe@example.com",
+                //     profilePictureUrl: dummyAvatar,
+                //     coursesCount: 5,
+                //     studentsCount: 0,
+                //     rating: 4.5
+                // },
                 initialCourses: [
                     {
                         id: 1,

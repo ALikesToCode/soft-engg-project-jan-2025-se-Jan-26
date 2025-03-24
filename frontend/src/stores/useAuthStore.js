@@ -13,7 +13,7 @@ export default defineStore('auth', () => {
     // Parse token from localStorage, handling both string and JSON string formats
     const storedToken = localStorage.getItem('token');
     let parsedToken = null;
-    
+
     try {
         // Try to parse as JSON first
         parsedToken = storedToken ? JSON.parse(storedToken) : null;
@@ -21,7 +21,7 @@ export default defineStore('auth', () => {
         // If not valid JSON, use as is
         parsedToken = storedToken;
     }
-    
+
     const token = ref(parsedToken);
     const returnUrl = ref(null);
     const user = ref(new User(null, "", "", ""));
@@ -44,7 +44,7 @@ export default defineStore('auth', () => {
             // For development, just set a dummy token and keep current role
             token.value = "dummy-token";
             localStorage.setItem('token', JSON.stringify(token.value));
-            
+
             // Navigate based on current role
             navigateToRoleDashboard();
             return;
@@ -68,6 +68,7 @@ export default defineStore('auth', () => {
                 setUserRole(data.role);
                 localStorage.setItem('token', JSON.stringify(token.value));
                 navigateToRoleDashboard();
+                console.log(data)
             }
         } catch (error) {
             console.log("error = " + error);
@@ -77,7 +78,7 @@ export default defineStore('auth', () => {
 
     // Helper method to navigate based on role
     function navigateToRoleDashboard() {
-        switch(userRole.value) {
+        switch (userRole.value) {
             case ROLE.STUDENT:
                 router.push('/user/dashboard');
                 break;

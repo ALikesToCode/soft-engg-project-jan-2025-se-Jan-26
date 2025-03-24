@@ -1,13 +1,15 @@
 <template>
   <div class="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100">
     <SideNavBar />
-    
+
     <!-- Main Content Container -->
     <div class="flex-1 overflow-hidden flex flex-col">
       <!-- Loading State -->
       <div v-if="loading" class="flex-1 flex items-center justify-center">
         <div class="text-center">
-          <div class="w-16 h-16 border-4 border-maroon-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div
+            class="w-16 h-16 border-4 border-maroon-600 border-t-transparent rounded-full animate-spin mx-auto"
+          ></div>
           <p class="mt-4 text-gray-600">Loading course content...</p>
         </div>
       </div>
@@ -19,9 +21,10 @@
             <span class="material-icons text-6xl">error_outline</span>
           </div>
           <p class="mt-4 text-gray-800 font-medium">{{ error }}</p>
-          <button 
+          <button
             @click="retryLoading"
-            class="mt-4 px-4 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors">
+            class="mt-4 px-4 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors"
+          >
             Retry
           </button>
         </div>
@@ -29,7 +32,7 @@
 
       <template v-else>
         <!-- Course Header -->
-        <CourseTopNav 
+        <CourseTopNav
           :course="currentCourse"
           :is-bookmarked="isBookmarked"
           :progress="progress"
@@ -41,7 +44,7 @@
         <!-- Main Course Layout -->
         <div class="flex flex-1 overflow-hidden">
           <!-- Course Navigation Sidebar -->
-          <CourseSideNav 
+          <CourseSideNav
             :weeks="weeks"
             :selected-lecture="selectedLecture"
             :completed-lectures="completedLectures"
@@ -53,7 +56,7 @@
           />
 
           <!-- Main Content Area -->
-          <div 
+          <div
             class="flex-1 overflow-y-auto bg-gradient-to-b from-slate-50 to-white border-l border-slate-200"
             :class="{ 'lg:ml-0': !isSidebarCollapsed }"
           >
@@ -78,15 +81,15 @@
 
                 <!-- Video Player Section -->
                 <section aria-label="Lecture video" class="mb-4">
-                  <CourseVideoPlayer 
-                    :video-url="selectedLecture?.videoUrl || ''"
-                    :poster-image="selectedLecture?.thumbnailUrl || ''"
+                  <CourseVideoPlayer
+                    :video-url="selectedLecture.videoUrl || ''"
+                    :poster-image="selectedLecture.thumbnailUrl || ''"
                     :current-time="videoProgress"
                     :use-native-controls="true"
                     @time-update="updateVideoProgress"
                     @video-complete="handleVideoComplete"
                   />
-                  
+
                   <!-- Video Controls -->
                   <div class="flex items-center justify-between mt-2">
                     <div class="flex items-center space-x-4">
@@ -124,26 +127,50 @@
                     <div class="bg-white rounded-2xl shadow-lg p-6">
                       <div class="flex items-start justify-between">
                         <div class="space-y-3">
-                          <h2 class="text-2xl font-bold text-slate-900">{{ selectedLecture.title }}</h2>
-                          <p class="text-slate-600 leading-relaxed">{{ selectedLecture.description }}</p>
+                          <h2 class="text-2xl font-bold text-slate-900">
+                            {{ selectedLecture.title }}
+                          </h2>
+                          <p class="text-slate-600 leading-relaxed">
+                            {{ selectedLecture.description }}
+                          </p>
                         </div>
                         <div class="relative w-20 h-20">
                           <svg class="progress-ring" width="80" height="80">
-                            <circle class="text-slate-200" stroke-width="6" fill="transparent" r="37" cx="40" cy="40"></circle>
-                            <circle class="text-maroon-500" stroke-width="6" stroke-dasharray="NaN, 234" fill="transparent" r="37" cx="40" cy="40" 
-                                    style="filter: drop-shadow(0 0 8px rgba(139, 0, 0, 0.2));"></circle>
+                            <circle
+                              class="text-slate-200"
+                              stroke-width="6"
+                              fill="transparent"
+                              r="37"
+                              cx="40"
+                              cy="40"
+                            ></circle>
+                            <circle
+                              class="text-maroon-500"
+                              stroke-width="6"
+                              stroke-dasharray="NaN, 234"
+                              fill="transparent"
+                              r="37"
+                              cx="40"
+                              cy="40"
+                              style="filter: drop-shadow(0 0 8px rgba(139, 0, 0, 0.2))"
+                            ></circle>
                           </svg>
-                          <button class="absolute inset-0 flex items-center justify-center w-full h-full transition-transform duration-300 hover:scale-105">
-                            <span class="material-symbols-outlined text-3xl" 
-                                  :class="isLectureCompleted ? 'text-emerald-500' : 'text-maroon-500'">
+                          <button
+                            class="absolute inset-0 flex items-center justify-center w-full h-full transition-transform duration-300 hover:scale-105"
+                          >
+                            <span
+                              class="material-symbols-outlined text-3xl"
+                              :class="isLectureCompleted ? 'text-emerald-500' : 'text-maroon-500'"
+                            >
                               {{ isLectureCompleted ? 'check_circle' : 'play_circle' }}
                             </span>
                           </button>
                         </div>
                       </div>
                       <div class="mt-6 flex flex-wrap gap-3">
-                        <button class="px-5 py-2.5 bg-maroon-500 text-white rounded-xl hover:bg-maroon-600 
-                                     transition-all duration-300 flex items-center space-x-2 shadow-md hover:shadow-lg">
+                        <button
+                          class="px-5 py-2.5 bg-maroon-500 text-white rounded-xl hover:bg-maroon-600 transition-all duration-300 flex items-center space-x-2 shadow-md hover:shadow-lg"
+                        >
                           <span class="material-symbols-outlined">download</span>
                           <span>Resources</span>
                         </button>
@@ -154,10 +181,14 @@
                     <div class="bg-white rounded-2xl shadow-lg p-6">
                       <h3 class="text-xl font-bold text-slate-900 mb-5">Key Concepts</h3>
                       <ul class="space-y-4">
-                        <li v-for="(concept, index) in selectedLecture.concepts" 
-                            :key="index"
-                            class="flex items-start space-x-3 p-3 bg-slate-50/50 rounded-lg hover:bg-slate-50 transition-colors">
-                          <span class="material-symbols-outlined text-emerald-500 mt-1">check_circle</span>
+                        <li
+                          v-for="(concept, index) in selectedLecture.concepts"
+                          :key="index"
+                          class="flex items-start space-x-3 p-3 bg-slate-50/50 rounded-lg hover:bg-slate-50 transition-colors"
+                        >
+                          <span class="material-symbols-outlined text-emerald-500 mt-1"
+                            >check_circle</span
+                          >
                           <span class="text-slate-700 leading-relaxed">{{ concept }}</span>
                         </li>
                       </ul>
@@ -181,8 +212,9 @@
                               <span class="material-symbols-outlined">alternate_email</span>
                             </button>
                           </div>
-                          <button class="px-6 py-2.5 bg-maroon-500 text-white rounded-xl hover:bg-maroon-600 
-                                       transition-all duration-300 flex items-center space-x-2 shadow-md">
+                          <button
+                            class="px-6 py-2.5 bg-maroon-500 text-white rounded-xl hover:bg-maroon-600 transition-all duration-300 flex items-center space-x-2 shadow-md"
+                          >
                             <span class="material-symbols-outlined">send</span>
                             <span>Post</span>
                           </button>
@@ -197,15 +229,21 @@
                     <div class="bg-white rounded-2xl shadow-lg p-6">
                       <h3 class="text-xl font-bold text-slate-900 mb-5">Learning Toolkit</h3>
                       <ul class="space-y-3">
-                        <li v-for="(resource, index) in selectedLecture.resources" 
-                            :key="index"
-                            class="flex items-center justify-between p-3 bg-slate-50/50 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group">
+                        <li
+                          v-for="(resource, index) in selectedLecture.resources"
+                          :key="index"
+                          class="flex items-center justify-between p-3 bg-slate-50/50 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group"
+                        >
                           <div class="flex items-center space-x-3">
-                            <span class="material-symbols-outlined text-lg transform transition-all group-hover:scale-110"
-                                  :class="getResourceIcon(resource.type).color">
+                            <span
+                              class="material-symbols-outlined text-lg transform transition-all group-hover:scale-110"
+                              :class="getResourceIcon(resource.type).color"
+                            >
                               {{ getResourceIcon(resource.type).icon }}
                             </span>
-                            <span class="text-sm font-medium text-slate-700">{{ resource.title }}</span>
+                            <span class="text-sm font-medium text-slate-700">{{
+                              resource.title
+                            }}</span>
                           </div>
                           <button class="p-2 hover:bg-slate-200 rounded-lg transition-colors">
                             <span class="material-symbols-outlined text-maroon-500">download</span>
@@ -218,11 +256,15 @@
                     <div class="bg-white rounded-2xl shadow-lg p-6">
                       <h3 class="text-xl font-bold text-slate-900 mb-5">Skill Challenges</h3>
                       <ul class="space-y-4">
-                        <li v-for="(challenge, index) in selectedLecture.challenges" 
-                            :key="index"
-                            class="p-3 bg-slate-50/50 rounded-lg hover:bg-slate-50 transition-colors">
+                        <li
+                          v-for="(challenge, index) in selectedLecture.challenges"
+                          :key="index"
+                          class="p-3 bg-slate-50/50 rounded-lg hover:bg-slate-50 transition-colors"
+                        >
                           <div class="flex items-start space-x-3">
-                            <span class="flex-shrink-0 w-7 h-7 bg-maroon-100 text-maroon-600 rounded-lg flex items-center justify-center text-sm font-bold">
+                            <span
+                              class="flex-shrink-0 w-7 h-7 bg-maroon-100 text-maroon-600 rounded-lg flex items-center justify-center text-sm font-bold"
+                            >
                               {{ index + 1 }}
                             </span>
                             <p class="text-slate-700 leading-relaxed">{{ challenge.question }}</p>
@@ -262,7 +304,9 @@
                     <span class="material-symbols-outlined text-4xl text-maroon-600">school</span>
                   </div>
                   <h2 class="text-2xl font-bold text-slate-900">Begin Your Learning Journey</h2>
-                  <p class="text-slate-600">Select a module from the curriculum to start learning</p>
+                  <p class="text-slate-600">
+                    Select a module from the curriculum to start learning
+                  </p>
                   <button
                     @click="selectFirstLecture"
                     class="px-6 py-3 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors"
@@ -275,18 +319,23 @@
           </div>
 
           <!-- Notes Panel -->
-          <div 
+          <div
             v-if="showNotes"
             class="w-96 border-l border-slate-200 bg-white overflow-hidden flex flex-col transition-all duration-300"
           >
-            <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+            <div
+              class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50"
+            >
               <div class="flex items-center space-x-3">
                 <h2 class="text-lg font-semibold text-slate-900">Lecture Notes</h2>
-                <span class="text-xs text-slate-500 bg-slate-200 px-2 py-1 rounded-full" v-if="noteSaveStatus">
+                <span
+                  class="text-xs text-slate-500 bg-slate-200 px-2 py-1 rounded-full"
+                  v-if="noteSaveStatus"
+                >
                   {{ noteSaveStatus }}
                 </span>
               </div>
-              <button 
+              <button
                 @click="toggleNotes"
                 class="p-2 hover:bg-slate-200 rounded-lg transition-colors"
               >
@@ -297,8 +346,8 @@
             <!-- Formatting Toolbar -->
             <div class="border-b border-slate-200 p-2 bg-white">
               <div class="flex items-center space-x-1">
-                <button 
-                  v-for="tool in formattingTools" 
+                <button
+                  v-for="tool in formattingTools"
                   :key="tool.command"
                   @click="formatText(tool.command)"
                   class="p-2 rounded hover:bg-slate-100 transition-colors"
@@ -308,7 +357,7 @@
                   <span class="material-symbols-outlined text-sm">{{ tool.icon }}</span>
                 </button>
                 <div class="h-4 w-px bg-slate-200 mx-1"></div>
-                <button 
+                <button
                   @click="insertTimestamp"
                   class="p-2 rounded hover:bg-slate-100 transition-colors flex items-center space-x-1"
                   title="Insert current video timestamp"
@@ -329,9 +378,7 @@ Tips:
 • Click the timestamp button to mark important moments
 • Notes are automatically saved as you type
 • Use Ctrl/Cmd + B for bold, Ctrl/Cmd + I for italic"
-                class="w-full h-full p-4 border border-slate-200 rounded-lg resize-none 
-                       focus:ring-2 focus:ring-maroon-500 focus:border-transparent
-                       transition-all duration-300 font-mono text-slate-700 leading-relaxed"
+                class="w-full h-full p-4 border border-slate-200 rounded-lg resize-none focus:ring-2 focus:ring-maroon-500 focus:border-transparent transition-all duration-300 font-mono text-slate-700 leading-relaxed"
                 @input="handleNotesInput"
                 @keydown="handleKeyboardShortcuts"
               ></textarea>
@@ -341,14 +388,14 @@ Tips:
             <div class="border-t border-slate-200 p-3 bg-slate-50">
               <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                  <button 
+                  <button
                     @click="downloadNotes"
                     class="flex items-center space-x-1 text-sm text-slate-600 hover:text-maroon-600 transition-colors"
                   >
                     <span class="material-symbols-outlined text-sm">download</span>
                     <span>Download</span>
                   </button>
-                  <button 
+                  <button
                     @click="clearNotes"
                     class="flex items-center space-x-1 text-sm text-slate-600 hover:text-maroon-600 transition-colors"
                   >
@@ -356,9 +403,7 @@ Tips:
                     <span>Clear</span>
                   </button>
                 </div>
-                <span class="text-xs text-slate-500">
-                  {{ getWordCount }} words
-                </span>
+                <span class="text-xs text-slate-500"> {{ getWordCount }} words </span>
               </div>
             </div>
           </div>
@@ -378,22 +423,23 @@ import CourseVideoPlayer from '@/components/course/CourseVideoPlayer.vue'
 import CourseLectureContent from '@/components/course/CourseLectureContent.vue'
 import { useCourse } from '@/composables/useCourse'
 import { useNotification } from '@/composables/useNotification'
+import api from '@/utils/api'
 
 export default {
   name: 'CourseLectureView',
-  components: { 
+  components: {
     SideNavBar,
     CourseTopNav,
     CourseSideNav,
     CourseVideoPlayer,
-    CourseLectureContent
+    CourseLectureContent,
   },
-  
+
   setup() {
     const route = useRoute()
     const router = useRouter()
     const { notify } = useNotification()
-    
+
     // State
     const loading = ref(true)
     const error = ref(null)
@@ -402,7 +448,7 @@ export default {
     const captionsEnabled = ref(false)
     const videoProgress = ref(0)
     const autoSaveTimeout = ref(null)
-    
+
     // Course Data & Methods
     const courseId = route.params.courseId
     const {
@@ -420,7 +466,7 @@ export default {
       getFileIcon,
       saveNotes,
       completedLecturesCount,
-      fetchNotes
+      fetchNotes,
     } = useCourse(courseId)
 
     // Computed Properties
@@ -431,10 +477,10 @@ export default {
 
     const previousLecture = computed(() => {
       if (!selectedLecture.value || !weeks.value) return null
-      
+
       let prevLecture = null
       let foundCurrent = false
-      
+
       // Iterate through weeks in reverse to find previous lecture
       for (let weekIndex = weeks.value.length - 1; weekIndex >= 0; weekIndex--) {
         const week = weeks.value[weekIndex]
@@ -450,16 +496,16 @@ export default {
         }
         if (prevLecture) break
       }
-      
+
       return prevLecture
     })
 
     const nextLecture = computed(() => {
       if (!selectedLecture.value || !weeks.value) return null
-      
+
       let nextLecture = null
       let foundCurrent = false
-      
+
       // Iterate through weeks to find next lecture
       for (const week of weeks.value) {
         for (const lecture of week.lectures) {
@@ -473,7 +519,7 @@ export default {
         }
         if (nextLecture) break
       }
-      
+
       return nextLecture
     })
 
@@ -497,9 +543,22 @@ export default {
       try {
         loading.value = true
         // API call to load course data
+        const token = localStorage.getItem('token') // Retrieve token from localStorage
+        if (!token) throw new Error('No authentication token found')
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+        const response = await api.get(`/user/course/content?course_id=${courseId}`, headers)
+        currentCourse.value = response.data
+        console.log(currentCourse.value)
         loading.value = false
       } catch (err) {
         error.value = 'Failed to load course content. Please try again.'
+        notify.error('Failed to load course content')
+        loading.value = false
+      } finally {
         loading.value = false
       }
     }
@@ -560,30 +619,30 @@ export default {
       const icons = {
         pdf: {
           icon: 'description',
-          color: 'text-maroon-500'
+          color: 'text-maroon-500',
         },
         doc: {
           icon: 'article',
-          color: 'text-maroon-400'
+          color: 'text-maroon-400',
         },
         ppt: {
           icon: 'slideshow',
-          color: 'text-yellow-500'
+          color: 'text-yellow-500',
         },
         code: {
           icon: 'code',
-          color: 'text-yellow-600'
+          color: 'text-yellow-600',
         },
         zip: {
           icon: 'folder_zip',
-          color: 'text-yellow-400'
+          color: 'text-yellow-400',
         },
         video: {
           icon: 'play_circle',
-          color: 'text-maroon-600'
-        }
-      };
-      return icons[type] || { icon: 'insert_drive_file', color: 'text-slate-500' };
+          color: 'text-maroon-600',
+        },
+      }
+      return icons[type] || { icon: 'insert_drive_file', color: 'text-slate-500' }
     }
 
     // Notes Methods
@@ -591,9 +650,9 @@ export default {
       if (noteSaveTimeout.value) {
         clearTimeout(noteSaveTimeout.value)
       }
-      
+
       noteSaveStatus.value = 'Saving...'
-      
+
       noteSaveTimeout.value = setTimeout(async () => {
         try {
           if (!selectedLecture.value?.id) {
@@ -617,7 +676,7 @@ export default {
       const start = textarea.selectionStart
       const end = textarea.selectionEnd
       const selectedText = currentNotes.value.substring(start, end)
-      
+
       let formattedText = ''
       switch (command) {
         case 'bold':
@@ -636,12 +695,10 @@ export default {
           formattedText = `\`${selectedText}\``
           break
       }
-      
-      currentNotes.value = 
-        currentNotes.value.substring(0, start) +
-        formattedText +
-        currentNotes.value.substring(end)
-        
+
+      currentNotes.value =
+        currentNotes.value.substring(0, start) + formattedText + currentNotes.value.substring(end)
+
       // Update cursor position
       textarea.focus()
       textarea.selectionStart = start + formattedText.length
@@ -652,12 +709,12 @@ export default {
       const timestamp = formatTime(videoProgress.value)
       const textarea = document.querySelector('textarea')
       const cursorPos = textarea.selectionStart
-      
-      currentNotes.value = 
+
+      currentNotes.value =
         currentNotes.value.substring(0, cursorPos) +
         `[${timestamp}] ` +
         currentNotes.value.substring(cursorPos)
-        
+
       textarea.focus()
       textarea.selectionStart = cursorPos + timestamp.length + 3
       textarea.selectionEnd = cursorPos + timestamp.length + 3
@@ -727,7 +784,7 @@ export default {
     // Helper Methods
     const loadNotes = async (lectureId) => {
       if (!lectureId) return
-      
+
       try {
         noteSaveStatus.value = 'Loading...'
         const notes = await fetchNotes(lectureId)
@@ -742,7 +799,7 @@ export default {
 
     const updateBookmarkStatus = async (lectureId, status) => {
       if (!lectureId) return
-      
+
       // Implement API call to update bookmark status
       // This is a placeholder for the actual API implementation
       return new Promise((resolve) => {
@@ -759,7 +816,7 @@ export default {
         if (newId && showNotes.value) {
           loadNotes(newId)
         }
-      }
+      },
     )
 
     // Lifecycle Hooks
@@ -782,7 +839,7 @@ export default {
         if (newId && newId !== courseId) {
           loadCourseData()
         }
-      }
+      },
     )
 
     return {
@@ -793,7 +850,7 @@ export default {
       playbackSpeed,
       captionsEnabled,
       videoProgress,
-      
+
       // Course Data
       currentCourse,
       selectedLecture,
@@ -807,7 +864,7 @@ export default {
       previousLecture,
       nextLecture,
       isLectureCompleted,
-      
+
       // Methods
       selectLecture,
       toggleBookmark,
@@ -832,9 +889,9 @@ export default {
       handleKeyboardShortcuts,
       downloadNotes,
       clearNotes,
-      getWordCount
+      getWordCount,
     }
-  }
+  },
 }
 </script>
 
@@ -1082,7 +1139,9 @@ export default {
 }
 
 textarea {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
   line-height: 1.6;
   tab-size: 4;
 }
@@ -1114,8 +1173,14 @@ textarea {
 }
 
 @keyframes bookmark-pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.2); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 </style>

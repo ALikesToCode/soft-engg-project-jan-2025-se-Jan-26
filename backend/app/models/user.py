@@ -37,7 +37,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, 
                   comment="User's email address, used for authentication and communication")
     name = Column(String, 
-                 comment="User's display name")
+                 comment="User's display name", default="User Name")
     hashed_password = Column(String, nullable=True, 
                             comment="Bcrypt-hashed password, nullable for Google OAuth users")
     is_google_user = Column(Boolean, default=False, 

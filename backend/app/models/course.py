@@ -95,6 +95,7 @@ class CourseEnrollment(Base):
     grade = Column(String)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC))
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    certificate_url = Column(String, nullable=True)
 
     # Relationships
     course = relationship("Course", back_populates="enrollments")
@@ -107,7 +108,7 @@ class Module(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False)  # e.g., "Week 1"
-    position = Column(Integer, nullable=False)  # Ordering field
+    position = Column(Integer, nullable=False)  # 1 week 1, 2 week 2
     course = relationship("Course", back_populates="modules")
     lectures = relationship("Lecture", back_populates="module", cascade="all, delete-orphan")
 

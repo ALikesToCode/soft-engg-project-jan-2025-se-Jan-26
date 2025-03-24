@@ -384,9 +384,9 @@ export default {
     availableCategories() {
       const baseCategories = [
         { value: 'announcement', label: 'Announcement' },
-        { value: 'update', label: 'Update' },
-        { value: 'reminder', label: 'Reminder' },
-        { value: 'alert', label: 'Alert' },
+        { value: 'assignment', label: 'Assignment' },
+        // { value: 'reminder', label: 'Reminder' },
+        { value: 'grade', label: 'Grade' },
       ]
 
       if (this.notificationType === 'system') {
@@ -407,8 +407,8 @@ export default {
         if (!newValue && this.notificationType === 'system') {
           this.notificationType = 'course'
         }
-      }
-    }
+      },
+    },
   },
   methods: {
     async sendNotification() {
@@ -425,17 +425,18 @@ export default {
           category: this.category,
           title: this.title,
           message: this.message,
-          scheduleType: this.scheduleType,
-          scheduledDateTime: this.scheduledDateTime,
+          // scheduleType: this.scheduleType,
+          // scheduledDateTime: this.scheduledDateTime,
         }
 
         await this.$emit('send-notification', notification)
-        this.$toast.success(
-          `Notification ${this.scheduleType === 'schedule' ? 'scheduled' : 'sent'} successfully`,
-        )
+        // this.$toast.success(
+        //   `Notification ${this.scheduleType === 'schedule' ? 'scheduled' : 'sent'} successfully`,
+        // )
         this.resetForm()
       } catch (error) {
-        this.$toast.error('Failed to send notification')
+        // this.$toast.error('Failed to send notification')
+        console.log(error)
       }
     },
     resetForm() {
@@ -445,8 +446,8 @@ export default {
       this.category = 'announcement'
       this.title = ''
       this.message = ''
-      this.scheduleType = 'now'
-      this.scheduledDateTime = null
+      // this.scheduleType = 'now'
+      // this.scheduledDateTime = null
     },
     getPriorityClass(priority) {
       const classes = {

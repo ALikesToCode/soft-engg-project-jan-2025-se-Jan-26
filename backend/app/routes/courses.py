@@ -59,6 +59,7 @@ async def get_course_history(
         courses = await CourseService.get_user_course_history(db, current_user["sub"])
         return courses
     except Exception as e:
+        print("Error ==>", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/faculty/courses/{course_id}/enrollment",

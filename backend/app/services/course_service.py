@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import select
+from sqlalchemy import select, and_, String
 from app.models.course import Course, Module, LectureContent, Lecture, CourseEnrollment, LectureContentDoc
 from app.models.assignment import Assignment
 from app.models.user import User
@@ -15,6 +15,13 @@ import os
 import json
 import shutil
 import uuid
+import enum
+
+class EnrollmentStatus(str, enum.Enum):
+    ENROLLED = "enrolled"
+    COMPLETED = "completed"
+    DROPPED = "dropped"
+    WAITLISTED = "waitlisted"
 
 # Course Content Management Functions
 async def get_all_courses(db: AsyncSession, user_id: uuid.UUID = None):
@@ -31,9 +38,19 @@ async def get_all_courses(db: AsyncSession, user_id: uuid.UUID = None):
     try:
         if user_id:
             # Fetch all course objects for a specific faculty
-            result = await db.execute(
-                select(Course).where(Course.faculty_id == user_id)
+
+            user_result = await db.execute(
+                select(User).where(User.id == user_id)
             )
+            user = user_result.scalars().first()
+            if(user.role == 'support'):
+                result = await db.execute(
+                select(Course)
+            )
+            else:
+                result = await db.execute(
+                    select(Course).where(Course.faculty_id == user_id)
+                )
         else:
             # Fetch all course objects
             result = await db.execute(select(Course))
@@ -476,6 +493,8 @@ async def delete_module_by_id(module_id: int, db: AsyncSession, user_id: uuid.UU
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy import cast
 # Course Service Class for Enrollment and Assignment Management
 class CourseService:
     @staticmethod
@@ -495,11 +514,14 @@ class CourseService:
             .join(CourseEnrollment, Course.id == CourseEnrollment.course_id)
             .where(CourseEnrollment.student_id == user_id)
         )
-        
         result = await db.execute(query)
         courses = []
-        
+
+        total_course_count = 0
         for course, enrollment in result:
+            total_course_count += 1
+            instructor_data = await db.execute(select(User).where(User.id==course.faculty_id))
+            instructor_name = instructor_data.scalars().first().name
             courses.append({
                 "id": str(course.id),
                 "name": course.name,
@@ -507,7 +529,12 @@ class CourseService:
                 "semester": course.semester,
                 "status": enrollment.status,
                 "grade": enrollment.grade,
-                "credits": course.credits
+                "credits": course.credits,
+                "instructor":instructor_name,
+                "description":course.description,
+                "completion_date":enrollment.completion_date,
+                "certificate_url":enrollment.certificate_url,
+                "total_enrolled_course":total_course_count
             })
         
         return courses

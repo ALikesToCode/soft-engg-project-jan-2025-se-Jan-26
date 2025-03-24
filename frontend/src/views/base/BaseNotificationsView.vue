@@ -64,21 +64,21 @@ import formatDateFunc from '@/utils/formatDate'
 export default {
   name: 'BaseNotificationsView',
   components: {
-    NotificationForm
+    NotificationForm,
   },
   props: {
     courses: {
       type: Array,
-      required: true
+      required: true,
     },
     isAdmin: {
       type: Boolean,
-      default: false
+      default: false,
     },
     description: {
       type: String,
-      required: true
-    }
+      required: true,
+    },
   },
   data() {
     return {
@@ -101,8 +101,8 @@ export default {
           title: 'Course Update',
           message: 'Important updates have been made to the course materials.',
           createdAt: new Date('2024-01-19T15:30:00'),
-        }
-      ]
+        },
+      ],
     }
   },
   methods: {
@@ -115,7 +115,7 @@ export default {
 
       // For course notifications, verify the course exists
       if (notification.type === 'course') {
-        const courseExists = this.courses.some(course => course.id === notification.courseId)
+        const courseExists = this.courses.some((course) => course.id === notification.courseId)
         if (!courseExists) {
           console.warn('Attempted to send notification for non-existent course')
           return
@@ -123,7 +123,11 @@ export default {
       }
 
       // Emit the notification to parent component for processing
-      this.$emit('notification', notification)
+      try {
+        this.$emit('notification', notification)
+      } catch (error) {
+        throw error
+      }
 
       // For demo purposes, add to recent notifications
       this.recentNotifications.unshift({
@@ -152,7 +156,7 @@ export default {
         'bg-orange-100 text-orange-800': priority === 'high',
         'bg-red-100 text-red-800': priority === 'urgent',
       }
-    }
-  }
+    },
+  },
 }
-</script> 
+</script>

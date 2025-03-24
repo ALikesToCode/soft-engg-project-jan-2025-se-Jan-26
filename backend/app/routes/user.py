@@ -1,13 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from starlette.requests import Request
 from app.database import get_db
 from app.services.auth_service import get_current_user, require_auth, get_user
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.services.user_service import get_all_user_courses
+from app.services.user_service import get_all_user_courses, fetch_user_course_content
 from app.models.user import User
 from sqlalchemy.future import select
-from typing import List
+from typing import List, Optional
+import uuid
 
 router = APIRouter(tags=["User Courses"])
 
@@ -27,6 +28,13 @@ class UserResponse(BaseModel):
         if hasattr(obj, 'id') and obj.id:
             obj.id = str(obj.id)
         return super().from_orm(obj)
+
+class UserProfile(BaseModel):
+    id: str
+    name: str
+    email: EmailStr
+    role: str  # e.g., "student", "faculty", "support"
+    profile_pic_url: Optional[str] = None
 
 # Add a new endpoint to get all users
 @router.get("/users", 
@@ -184,7 +192,20 @@ async def get_user_profile(
     Raises:
         HTTPException: 401 error if the user is not authenticated
     """
-    return user
+    result = await db.execute(select(User).where(User.id == user["sub"]))
+    user = result.scalars().first()
+
+    if not user: 
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_profile = UserProfile(
+        id=str(user.id),
+        name=user.name, 
+        email=user.email,
+        role=user.role,
+        profile_pic_url=user.picture 
+    )
+    return user_profile
 
 @router.put("/user/profile", 
     summary="Update user profile",
@@ -331,6 +352,24 @@ async def fetch_user_courses(
         # Use the user ID from the database
         courses = await get_all_user_courses(db, user.id)  
         return courses
+    except Exception as e:
+        print("Error=> ", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/user/course/content",response_model=dict)
+async def get_user_course_content(
+    course_id: uuid.UUID = Query(..., description="ID of the course to fetch"),
+    db: AsyncSession = Depends(get_db), 
+    current_user=Depends(get_current_user)
+):
+    try:
+        user = await get_user(db, current_user["email"])
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        course_content = await fetch_user_course_content(db,course_id)
+        return course_content
     except Exception as e:
         print("Error=> ", e)
         raise HTTPException(status_code=500, detail=str(e))

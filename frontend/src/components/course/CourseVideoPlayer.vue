@@ -1,20 +1,30 @@
 <template>
   <div class="relative w-full aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-lg">
     <!-- Loading State -->
-    <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-slate-900/90 z-10">
+    <div
+      v-if="loading"
+      class="absolute inset-0 flex items-center justify-center bg-slate-900/90 z-10"
+    >
       <div class="text-center">
-        <div class="w-12 h-12 border-4 border-maroon-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-        <p class="mt-4 text-slate-200">Loading video...</p>
+        <div
+          class="w-12 h-12 border-4 border-maroon-500 border-t-transparent rounded-full animate-spin mx-auto"
+        ></div>
+        <p class="mt-4 text-slate-200">Loading video... {{ videoUrl }}</p>
       </div>
     </div>
 
     <!-- Error State -->
-    <div v-if="error" class="absolute inset-0 flex items-center justify-center bg-slate-900/90 z-10">
+    <div
+      v-if="error"
+      class="absolute inset-0 flex items-center justify-center bg-slate-900/90 z-10"
+    >
       <div class="text-center">
         <span class="material-symbols-outlined text-4xl text-red-500">error_outline</span>
         <p class="mt-2 text-slate-200">{{ error }}</p>
-        <button @click="retryLoading" 
-                class="mt-4 px-4 py-2 bg-maroon-500 text-white rounded-lg hover:bg-maroon-600 transition-colors">
+        <button
+          @click="retryLoading"
+          class="mt-4 px-4 py-2 bg-maroon-500 text-white rounded-lg hover:bg-maroon-600 transition-colors"
+        >
           Retry
         </button>
       </div>
@@ -32,26 +42,28 @@
       @error="handleError"
       :controls="useNativeControls"
     >
-      <source :src="videoUrl" type="video/mp4">
+      <source :src="videoUrl" type="video/mp4" />
       Your browser does not support the video tag.
     </video>
 
     <!-- Custom Controls (when not using native) -->
-    <div v-if="!useNativeControls" 
-         class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-900 to-transparent">
+    <div
+      v-if="!useNativeControls"
+      class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-900 to-transparent"
+    >
       <div class="flex items-center space-x-4">
-        <button @click="togglePlay" 
-                class="text-white hover:text-maroon-400 transition-colors">
+        <button @click="togglePlay" class="text-white hover:text-maroon-400 transition-colors">
           <span class="material-symbols-outlined text-2xl">
             {{ isPlaying ? 'pause' : 'play_arrow' }}
           </span>
         </button>
 
         <!-- Progress Bar -->
-        <div class="relative flex-1 h-1 bg-slate-700 rounded-full cursor-pointer"
-             @click="seek">
-          <div class="absolute inset-y-0 left-0 bg-gradient-to-r from-maroon-500 to-maroon-600 rounded-full"
-               :style="{ width: `${progress}%` }"></div>
+        <div class="relative flex-1 h-1 bg-slate-700 rounded-full cursor-pointer" @click="seek">
+          <div
+            class="absolute inset-y-0 left-0 bg-gradient-to-r from-maroon-500 to-maroon-600 rounded-full"
+            :style="{ width: `${progress}%` }"
+          ></div>
         </div>
 
         <!-- Time Display -->
@@ -61,23 +73,26 @@
 
         <!-- Volume Control -->
         <div class="flex items-center space-x-2">
-          <button @click="toggleMute" 
-                  class="text-white hover:text-maroon-400 transition-colors">
+          <button @click="toggleMute" class="text-white hover:text-maroon-400 transition-colors">
             <span class="material-symbols-outlined">
               {{ isMuted ? 'volume_off' : 'volume_up' }}
             </span>
           </button>
-          <input type="range" 
-                 v-model="volume" 
-                 min="0" 
-                 max="1" 
-                 step="0.1"
-                 class="w-20 accent-maroon-500">
+          <input
+            type="range"
+            v-model="volume"
+            min="0"
+            max="1"
+            step="0.1"
+            class="w-20 accent-maroon-500"
+          />
         </div>
 
         <!-- Fullscreen Toggle -->
-        <button @click="toggleFullscreen" 
-                class="text-white hover:text-maroon-400 transition-colors">
+        <button
+          @click="toggleFullscreen"
+          class="text-white hover:text-maroon-400 transition-colors"
+        >
           <span class="material-symbols-outlined">
             {{ isFullscreen ? 'fullscreen_exit' : 'fullscreen' }}
           </span>
@@ -99,30 +114,37 @@ const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 export default {
   name: 'CourseVideoPlayer',
   components: {
-    VuePlayer
+    VuePlayer,
   },
-  
+  data() {
+    return {
+      volume: false,
+      useNativeControls: true,
+      isFullscreen: true,
+    }
+  },
+
   props: {
     videoUrl: {
       type: String,
-      required: true
+      required: true,
     },
     posterImage: {
       type: String,
-      default: ''
+      default: '',
     },
     initialPlaybackRate: {
       type: Number,
-      default: 1
+      default: 1,
     },
     onProgress: {
       type: Function,
-      default: () => {}
+      default: () => {},
     },
     onComplete: {
       type: Function,
-      default: () => {}
-    }
+      default: () => {},
+    },
   },
 
   setup(props) {
@@ -159,17 +181,26 @@ export default {
 
     const saveVideoProgress = () => {
       try {
-        localStorage.setItem(cacheKey.value, JSON.stringify({
-          currentTime: currentTime.value,
-          timestamp: Date.now()
-        }))
+        localStorage.setItem(
+          cacheKey.value,
+          JSON.stringify({
+            currentTime: currentTime.value,
+            timestamp: Date.now(),
+          }),
+        )
       } catch (err) {
         console.error('Failed to save video progress:', err)
       }
     }
 
+    const handleMetadataLoaded = () => {
+      console.log('Metadata loaded! Calling onPlayerReady...')
+      onPlayerReady()
+    }
+
     // Player event handlers
     const onPlayerReady = () => {
+      console.log('here')
       loading.value = false
       error.value = null
       if (playerRef.value) {
@@ -182,7 +213,7 @@ export default {
       currentTime.value = time
       progress.value = (time / duration.value) * 100
       props.onProgress(time)
-      
+
       // Save progress every 5 seconds
       if (Math.floor(time) % 5 === 0) {
         saveVideoProgress()
@@ -297,9 +328,10 @@ export default {
       togglePlaybackRate,
       toggleFullscreen,
       formatTime,
-      retryLoading
+      retryLoading,
+      handleMetadataLoaded,
     }
-  }
+  },
 }
 </script>
 
@@ -313,7 +345,7 @@ export default {
 }
 
 /* Custom range input styling */
-input[type="range"] {
+input[type='range'] {
   -webkit-appearance: none;
   height: 4px;
   background: rgba(255, 255, 255, 0.2);
@@ -322,7 +354,7 @@ input[type="range"] {
   background-repeat: no-repeat;
 }
 
-input[type="range"]::-webkit-slider-thumb {
+input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
   height: 12px;
   width: 12px;
@@ -333,12 +365,12 @@ input[type="range"]::-webkit-slider-thumb {
   transition: all 0.3s ease-in-out;
 }
 
-input[type="range"]::-webkit-slider-thumb:hover {
+input[type='range']::-webkit-slider-thumb:hover {
   background: var(--maroon-600);
   transform: scale(1.2);
 }
 
-input[type="range"]::-webkit-slider-runnable-track {
+input[type='range']::-webkit-slider-runnable-track {
   -webkit-appearance: none;
   box-shadow: none;
   border: none;
@@ -393,4 +425,4 @@ input[type="range"]::-webkit-slider-runnable-track {
   transform: scale(1);
   opacity: 1;
 }
-</style> 
+</style>

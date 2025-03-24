@@ -1,6 +1,12 @@
 <script>
 import SideNavBar from '../../layouts/SideNavBar.vue'
 import ChatBotBox from '../../components/ChatBotBox.vue'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import { Course } from '@/models/Course'
+import api from '@/utils/api'
+const dummyAvatar =
+  'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=='
+
 export default {
   data() {
     return {
@@ -10,80 +16,84 @@ export default {
       filters: ['All', 'In Progress', 'Completed', 'Bookmarked'],
       activeFilters: ['All'],
       selectedCourse: null,
-      courses: [
-        {
-          id: 1,
-          title: 'Introduction to Python Programming',
-          description:
-            'Learn Python basics and programming fundamentals through hands-on projects and exercises.',
-          image: 'https://placehold.co/400x300',
-          level: 'Beginner',
-          duration: '8 weeks',
-          progress: 75,
-          isBookmarked: true,
-          instructor: {
-            name: 'Dr. Sarah Johnson',
-            avatar: 'https://placehold.co/100x100',
-          },
-          videoUrl: 'https://www.youtube.com/embed/example',
-          learningObjectives: [
-            'Understand Python syntax and basic concepts',
-            'Work with data structures and algorithms',
-            'Build simple applications',
-            'Debug and test code effectively',
-          ],
-          modules: [
-            {
-              title: 'Getting Started with Python',
-              duration: '1h 30m',
-              completed: true,
-            },
-            {
-              title: 'Data Types and Variables',
-              duration: '2h 15m',
-              completed: true,
-            },
-            {
-              title: 'Control Flow and Functions',
-              duration: '2h 45m',
-              completed: false,
-            },
-          ],
-        },
-        {
-          id: 2,
-          title: 'Web Development Fundamentals',
-          description: 'Master HTML, CSS, and JavaScript to build modern responsive websites.',
-          image: 'https://placehold.co/400x300',
-          level: 'Intermediate',
-          duration: '10 weeks',
-          progress: 30,
-          isBookmarked: false,
-          instructor: {
-            name: 'Alex Chen',
-            avatar: 'https://placehold.co/100x100',
-          },
-        },
-        {
-          id: 3,
-          title: 'Machine Learning Essentials',
-          description: 'Explore the fundamentals of machine learning and AI applications.',
-          image: 'https://placehold.co/400x300',
-          level: 'Advanced',
-          duration: '12 weeks',
-          progress: 15,
-          isBookmarked: true,
-          instructor: {
-            name: 'Dr. Michael Brown',
-            avatar: 'https://placehold.co/100x100',
-          },
-        },
-      ],
+      isCourseEnrolledDataLoading: false,
+      // courses: [
+      //   {
+      //     id: 1,
+      //     title: 'Introduction to Python Programming',
+      //     description:
+      //       'Learn Python basics and programming fundamentals through hands-on projects and exercises.',
+      //     image: 'https://placehold.co/400x300',
+      //     level: 'Beginner',
+      //     duration: '8 weeks',
+      //     progress: 75,
+      //     isBookmarked: true,
+      //     instructor: {
+      //       name: 'Dr. Sarah Johnson',
+      //       avatar: 'https://placehold.co/100x100',
+      //     },
+      //     videoUrl: 'https://www.youtube.com/embed/example',
+      //     learningObjectives: [
+      //       'Understand Python syntax and basic concepts',
+      //       'Work with data structures and algorithms',
+      //       'Build simple applications',
+      //       'Debug and test code effectively',
+      //     ],
+      //     modules: [
+      //       {
+      //         title: 'Getting Started with Python',
+      //         duration: '1h 30m',
+      //         completed: true,
+      //       },
+      //       {
+      //         title: 'Data Types and Variables',
+      //         duration: '2h 15m',
+      //         completed: true,
+      //       },
+      //       {
+      //         title: 'Control Flow and Functions',
+      //         duration: '2h 45m',
+      //         completed: false,
+      //       },
+      //     ],
+      //   },
+      //   {
+      //     id: 2,
+      //     title: 'Web Development Fundamentals',
+      //     description: 'Master HTML, CSS, and JavaScript to build modern responsive websites.',
+      //     image: 'https://placehold.co/400x300',
+      //     level: 'Intermediate',
+      //     duration: '10 weeks',
+      //     progress: 30,
+      //     isBookmarked: false,
+      //     instructor: {
+      //       name: 'Alex Chen',
+      //       avatar: 'https://placehold.co/100x100',
+      //     },
+      //   },
+      //   {
+      //     id: 3,
+      //     title: 'Machine Learning Essentials',
+      //     description: 'Explore the fundamentals of machine learning and AI applications.',
+      //     image: 'https://placehold.co/400x300',
+      //     level: 'Advanced',
+      //     duration: '12 weeks',
+      //     progress: 15,
+      //     isBookmarked: true,
+      //     instructor: {
+      //       name: 'Dr. Michael Brown',
+      //       avatar: 'https://placehold.co/100x100',
+      //     },
+      //   },
+      // ],
+      courses: [],
+      modules: [],
     }
   },
   components: {
     SideNavBar,
     ChatBotBox,
+    LoadingSpinner,
   },
   computed: {
     filteredCourses() {
@@ -185,6 +195,52 @@ export default {
         name: 'CourseLectureView',
         params: { courseId: course.id },
       })
+    },
+
+    //APIs
+    async getUserEnrolledCourses() {
+      try {
+        this.isCourseEnrolledDataLoading = true
+        const token = localStorage.getItem('token') // Retrieve token from localStorage
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+        const response = await api.get('/user/courses', headers)
+        if (response.status !== 200) throw new Error('Failed to fetch user course data')
+
+        response.data.forEach((c) => {
+          const course = new Course({
+            id: c.id,
+            title: c.title,
+            description: c.description,
+            status: c.status,
+            progress: 50,
+            duration: c.duration + ' Weeks',
+            studentsCount: 100,
+            instructor: { name: c.created_by, avatar: dummyAvatar },
+          })
+          this.courses.push(course)
+        })
+        this.isCourseEnrolledDataLoading = false
+        console.log('c = ' + this.courses)
+      } catch (error) {
+        this.isCourseEnrolledDataLoading = false
+        console.error('Error fetching user courses:', error)
+      }
+    },
+  },
+  mounted() {
+    this.getUserEnrolledCourses()
+  },
+  watch: {
+    $route(to, from) {
+      if (to.path === from.path) {
+        this.getUserEnrolledCourses() // Reload data when the same route is clicked
+      }
     },
   },
 }
@@ -414,6 +470,10 @@ export default {
       </div>
     </div>
   </div>
+  <!-- Loading Overlay -->
+  <div v-if="isCourseEnrolledDataLoading" class="loading-overlay">
+    <LoadingSpinner />
+  </div>
 </template>
 
 <style scoped>
@@ -432,5 +492,8 @@ export default {
 
 input:focus {
   outline: none;
+}
+.loading-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
 }
 </style>

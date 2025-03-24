@@ -27,8 +27,6 @@ export const MOCK_COURSES = [
       {
         id: 1,
         title: 'Getting Started with Python',
-        description: 'Introduction to Python programming and development environment setup',
-        duration: '1 week',
         isExpanded: true,
         progress: 100,
         lectures: [
@@ -175,15 +173,14 @@ export const MOCK_COURSES = [
     ]
   }
 ]
-
-export const getCourseById = (courseId) => {
+export const getCourseById = async (courseId) => {
   return MOCK_COURSES.find(course => course.id === courseId)
 }
 
 export const getLectureById = (courseId, lectureId) => {
   const course = getCourseById(courseId)
   if (!course) return null
-  
+
   for (const week of course.syllabus) {
     const lecture = week.lectures.find(lecture => lecture.id === lectureId)
     if (lecture) return lecture

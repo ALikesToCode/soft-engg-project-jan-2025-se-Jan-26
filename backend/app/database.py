@@ -83,6 +83,7 @@ async def init_db():
     from app.models.role import Role
     from app.models.faq import FAQ
     from app.models.system_settings import SystemSettings, Integration
+    from app.models.notification import CourseNotification, SystemNotification, UserNotificationStatus
     from datetime import datetime
     from sqlalchemy import inspect, text
     
@@ -105,9 +106,15 @@ async def init_db():
             except Exception as e:
                 print(f"Warning: Could not inspect tables: {e}")
         
+        #Add the new table names in the below list to get it created
+        required_tables = ['courses', 'system_settings', 'faqs', 'integrations', 'users', 'user_roles', 'roles',
+                            'assignments', 'user_courses', 'module', 'submissions', 'lecture', 'lecture_content',
+                            'course_enrollments', 'lecture_content_doc','course_notifications','system_notifications',
+                            'user_notification_status']
+
         # Only create tables if they don't exist
-        if 'users' not in tables:
-            print("Creating database tables for the first time...")
+        if any(table not in tables for table in required_tables):
+            print("Creating database tables...")
             
             # Create enum types first - in a separate transaction
             try:

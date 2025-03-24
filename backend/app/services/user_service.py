@@ -6,9 +6,9 @@ from app.models.user import User
 from app.models.course import Course, Module, LectureContent, Lecture, CourseEnrollment, LectureContentDoc
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Union
+from sqlalchemy.orm import selectinload
 import bcrypt
 import uuid
-
 class UserCreate(BaseModel):
     name: str
     email: EmailStr
@@ -22,6 +22,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     password: Optional[str] = None
     picture: Optional[str] = None
+
 
 
 async def create_user(db: AsyncSession, user_data: UserCreate) -> uuid.UUID:
@@ -119,13 +120,95 @@ async def get_all_user_courses(db: AsyncSession, user_id: uuid.UUID):
     """
     try:
         query = (
-        select(Course)
-        .join(CourseEnrollment, Course.id == CourseEnrollment.course_id)
-        .where(CourseEnrollment.student_id == user_id)
+            select(Course, User.name)
+            .join(CourseEnrollment, Course.id == CourseEnrollment.course_id)
+            .join(User, Course.created_by == User.id)
+            .where(CourseEnrollment.student_id == user_id)
+            .distinct()
         )
         result = await db.execute(query)
-        courses = result.scalars().all()
+        courses = result.all()
+        return [{**course.to_dict(), "created_by": faculty_name} for course, faculty_name in courses]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+async def fetch_user_course_content(db: AsyncSession, course_id: uuid.UUID):
+    """
+    Get course content for a specified course.
+    
+    Args:
+        db: Database session
+        course_id: Course ID of the faculty
         
-        return [course.to_dict() for course in courses]
+    Returns:
+        Dictionary containing course content
+    """
+    try:
+        # Fetch course with eager loading of modules and lectures
+        query = (
+            select(Course)
+            .where(Course.id == course_id)
+            .options(
+                selectinload(Course.modules).selectinload(Module.lectures)
+            )  # Eagerly load related data
+        )
+        result = await db.execute(query)
+        course = result.scalars().first()
+
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        # Fetch instructor separately
+        instructor_result = await db.execute(select(User).where(User.id == course.faculty_id))
+        instructor = instructor_result.scalars().first()
+        instructor_name = instructor.name if instructor else "Unknown"
+
+        syllabus = []
+        for module in course.modules:
+            all_lectures = []
+            for lecture in module.lectures:
+                # Fetch lecture content eagerly instead of separate queries
+                lecture_content_result = await db.execute(
+                    select(LectureContent).where(LectureContent.lecture_id == lecture.id)
+                )
+                lecture_content = lecture_content_result.scalars().first()
+
+                if lecture_content:  # Ensure lecture_content is not None
+                    lecture_content_data = {
+                        "id": lecture_content.id,
+                        "title": lecture_content.title,
+                        "type": lecture.content_type,
+                        "videoUrl": lecture_content.content_url,
+                        "description": lecture_content.content_desc,
+                        "lecture_seq":lecture.position,
+                        "week":module.position
+                    }
+                    all_lectures.append(lecture_content_data)
+
+            syllabus.append({
+                "id": module.id,
+                "title": module.title,
+                "lectures": all_lectures,
+                "week":module.position
+            })
+
+        response_data = {
+            "id": course.id,
+            "title": course.title,
+            "description": course.description,
+            "duration": course.duration,
+            "lastUpdated": str(course.updated_at),  
+            "instructor": {
+                "name": instructor_name,
+                "title": "Senior Python Developer & Educator",
+            },
+            "syllabus": syllabus,
+        }
+
+        print(response_data)
+        return response_data
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

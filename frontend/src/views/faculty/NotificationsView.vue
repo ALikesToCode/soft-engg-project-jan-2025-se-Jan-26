@@ -11,50 +11,99 @@
       />
     </div>
   </div>
+  <div v-if="isLoading" class="loading-overlay">
+    <LoadingSpinner />
+  </div>
 </template>
 
 <script>
 import BaseNotificationsView from '@/views/base/BaseNotificationsView.vue'
 import useAuthStore from '@/stores/useAuthStore'
 import SideNavBar from '@/layouts/SideNavBar.vue'
+import { useCourseStore } from '@/stores/courseStore'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import { FacultyNotificationService } from '@/services/facultyNotification.service'
 
 export default {
   name: 'FacultyNotificationsView',
   components: {
     BaseNotificationsView,
-    SideNavBar
+    SideNavBar,
+    LoadingSpinner,
   },
   data() {
     return {
-      enrolledCourses: [
-        // This would typically come from an API based on the faculty's enrollment
-        { id: 1, title: 'Advanced Algorithms' },
-        { id: 2, title: 'Machine Learning Fundamentals' }
-      ]
+      enrolledCourses: [],
+      isLoading: false,
+      isSendingNotif: false,
     }
   },
   computed: {
     userStore() {
       return useAuthStore()
-    }
+    },
+    courseStore() {
+      return useCourseStore()
+    },
   },
   methods: {
-    handleFacultyNotification(notification) {
+    async handleFacultyNotification(notification) {
       // Faculty can only send course-specific notifications
       if (!this.$refs.baseNotifications) return
-
+      this.isSendingNotif = true
       if (notification.type === 'course') {
         // Verify the course is one they're enrolled in
-        const isEnrolled = this.enrolledCourses.some(course => course.id === notification.courseId)
+        const isEnrolled = this.enrolledCourses.some(
+          (course) => course.id === notification.courseId,
+        )
         if (isEnrolled) {
-          this.$refs.baseNotifications.handleNotification(notification)
+          const token = localStorage.getItem('token')
+          if (!token) throw new Error('No authentication token found')
+
+          const headers = {
+            headers: {
+              Authorization: `Bearer ${token}`, // Add token to Authorization header
+            },
+          }
+          //API call to save faculty notification
+          try {
+            response = await FacultyNotificationService.createNotification(notification, headers)
+            console.log('here ' + response.data)
+            this.isSendingNotif = false
+          } catch (error) {
+            this.isSendingNotif = false
+          }
         } else {
           console.warn('Faculty attempted to send notification for non-enrolled course')
         }
       } else {
         console.warn('Faculty attempted to send system notification')
       }
-    }
-  }
+      this.isSendingNotif = false
+    },
+    async getFacultyCourses() {
+      this.isLoading = true
+      try {
+        const response = await this.courseStore.getFacultyCourses()
+        response.data.forEach((course) => {
+          this.enrolledCourses.push(course)
+        })
+        this.isLoading = false
+      } catch (error) {
+        this.isLoading = false
+        throw error
+      } finally {
+        this.isLoading = false
+      }
+    },
+  },
+  mounted() {
+    this.getFacultyCourses()
+  },
 }
 </script>
+<style scoped>
+.loading-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+}
+</style>
