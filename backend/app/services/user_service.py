@@ -26,6 +26,14 @@ class UserUpdate(BaseModel):
 
 
 async def create_user(db: AsyncSession, user_data: UserCreate) -> uuid.UUID:
+    # Check if a user with the given email already exists
+    existing_user_query = select(User).where(User.email == user_data.email)
+    result = await db.execute(existing_user_query)
+    existing_user = result.scalars().first()
+    
+    if existing_user:
+        raise HTTPException(status_code=400, detail="A user with this email already exists.")
+    
     user_dict = user_data.model_dump(exclude_unset=True)  # Remove unset fields
     
     # Extract password from user_dict to handle it separately
@@ -42,7 +50,10 @@ async def create_user(db: AsyncSession, user_data: UserCreate) -> uuid.UUID:
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    return user.id
+    return {
+        "message":"User created successfully",
+        "user_id": str(user.id)
+    }
 
 async def update_user(db: AsyncSession, user_id: Union[str, uuid.UUID], user_data: UserUpdate) -> User:
     # Convert string to UUID if needed
@@ -61,7 +72,10 @@ async def update_user(db: AsyncSession, user_id: Union[str, uuid.UUID], user_dat
         setattr(user, key, value)
     await db.commit()
     await db.refresh(user)
-    return user
+    return {
+        "message":"User updated successfully",
+        "user_id": str(user.id)
+    }
 
 async def delete_user(db: AsyncSession, user_id: Union[str, uuid.UUID]):
     # Convert string to UUID if needed
@@ -73,7 +87,7 @@ async def delete_user(db: AsyncSession, user_id: Union[str, uuid.UUID]):
         raise HTTPException(status_code=404, detail="User not found")
     await db.delete(user)
     await db.commit()
-    return {"message": "User deleted"}
+    return {"message": "User deleted successfully"}
 
 async def get_user_by_id(db: AsyncSession, user_id: Union[str, uuid.UUID]) -> User:
     """

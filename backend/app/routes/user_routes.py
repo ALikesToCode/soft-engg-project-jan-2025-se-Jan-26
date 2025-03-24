@@ -8,12 +8,13 @@ from app.database import get_db
 from app.models.user import User
 from pydantic import BaseModel, EmailStr, ConfigDict
 import bcrypt
+import uuid
 from typing import List, Optional
 
-router = APIRouter()
+router = APIRouter(tags=["User Management"])
 
 class UserSchema(BaseModel):
-    id: int
+    id: uuid.UUID
     name: str
     email: EmailStr
     role: str = "student" # Default role
@@ -33,18 +34,18 @@ async def create_user_endpoint(user_data: UserCreate, db: AsyncSession = Depends
     return await create_user(db, user_data)
 
 @router.get("/users/{user_id}", response_model=UserSchema, dependencies=[Depends(require_role("support"))])
-async def get_user_endpoint(user_id: int, db: AsyncSession = Depends(get_db)):
+async def get_user_endpoint(user_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
 @router.put("/users/{user_id}", response_model=UserSchema, dependencies=[Depends(require_role("support"))])
-async def update_user_endpoint(user_id: int, user_data: UserUpdate, db: AsyncSession = Depends(get_db)):
+async def update_user_endpoint(user_id: uuid.UUID, user_data: UserUpdate, db: AsyncSession = Depends(get_db)):
     return await update_user(db, user_id, user_data)
 
 @router.delete("/users/{user_id}", dependencies=[Depends(require_role("support"))])
-async def delete_user_endpoint(user_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_user_endpoint(user_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     return await delete_user(db, user_id)
 
 @router.post("/users/verify-email", dependencies=[Depends(require_role("support"))])

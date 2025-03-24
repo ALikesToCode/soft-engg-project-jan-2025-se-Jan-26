@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, Path
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 from app.services.monitoring_service import monitoring_service, SystemMetrics, Alert, ServiceStatus
 from app.services.auth_service import get_current_user, require_role
@@ -119,7 +119,7 @@ async def get_metrics(
     current_metrics = await monitoring_service.get_current_metrics()
     
     response = {
-        "current": current_metrics.dict()
+        "current": current_metrics
     }
     
     if history:
@@ -405,8 +405,8 @@ async def resolve_alert(
     )
 
 @router.get("/monitoring/dashboard",
-    summary="Get support dashboard data",
-    description="Returns comprehensive data for the support dashboard",
+    summary="Get dashboard data",
+    description="Returns aggregated dashboard data for the support dashboard",
     response_description="Dashboard data",
     responses={
         200: {
@@ -415,46 +415,13 @@ async def resolve_alert(
                 "application/json": {
                     "example": {
                         "active_users": 1250,
+                        "user_change": 12,
                         "open_issues": 8,
-                        "system_status": {
-                            "status": "healthy",
-                            "services": {
-                                "database": "up",
-                                "redis": "up",
-                                "api": "up"
-                            }
-                        },
+                        "new_issues": 3,
+                        "system_status": "Healthy",
+                        "status_message": "All systems operational",
                         "avg_response_time": 120,
-                        "performance_metrics": {
-                            "cpu_usage": 45.2,
-                            "memory_usage": 62.8,
-                            "disk_usage": 73.1
-                        },
-                        "performance_trends": {
-                            "cpu_trend": -5.2,
-                            "memory_trend": 2.8,
-                            "response_time_trend": -3.1
-                        },
-                        "error_summary": {
-                            "total_errors": 15,
-                            "errors_last_hour": 2,
-                            "errors_last_day": 8,
-                            "error_categories": {
-                                "database": 5,
-                                "api": 3,
-                                "authentication": 7
-                            }
-                        },
-                        "active_alerts": [
-                            {
-                                "id": "alert_1234567890",
-                                "type": "high_cpu_usage",
-                                "severity": "critical",
-                                "message": "CPU usage above threshold",
-                                "timestamp": "2024-03-05T12:00:00Z",
-                                "component": "Database Server"
-                            }
-                        ]
+                        "response_time_change": -5
                     }
                 }
             }
@@ -465,15 +432,371 @@ async def get_dashboard_data(
     current_user: dict = Depends(require_role("support"))
 ):
     """
-    Get comprehensive data for the support dashboard.
-    This endpoint aggregates various monitoring metrics and statuses.
+    Get aggregated dashboard data for the support dashboard
     """
-    try:
-        # Update user activity
-        await monitoring_service.update_user_activity(current_user["sub"])
-        
-        # Get dashboard data
-        dashboard_data = await monitoring_service.get_dashboard_data()
-        return dashboard_data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving dashboard data: {str(e)}") 
+    # Get system health
+    health_data = await monitoring_service.get_system_health()
+    
+    # Determine system status
+    system_status = "Healthy"
+    status_message = "All systems operational"
+    
+    if health_data["services"]:
+        services = health_data["services"].values()
+        if any(s == "down" for s in services):
+            system_status = "Critical"
+            status_message = "Some services are down"
+        elif any(s == "degraded" or "mock" in str(s) for s in services):
+            system_status = "Degraded"
+            status_message = "Some services are degraded"
+    
+    # Get active users (mock data)
+    active_users = monitoring_service.active_users
+    user_count = len(active_users)
+    previous_count = user_count - int(user_count * 0.12)  # Fake 12% increase
+    
+    # Get open issues (mock data)
+    open_issues = 8
+    new_issues = 3
+    
+    # Get average response time
+    metrics = await monitoring_service.get_current_metrics()
+    avg_response_time = metrics.response_time
+    
+    # Mock response time change
+    response_time_change = -5  # 5% decrease
+    
+    return {
+        "active_users": user_count,
+        "user_change": 12,  # Mock 12% increase
+        "open_issues": open_issues,
+        "new_issues": new_issues,
+        "system_status": system_status,
+        "status_message": status_message,
+        "avg_response_time": avg_response_time,
+        "response_time_change": response_time_change
+    }
+
+@router.get("/monitoring/performance", 
+    summary="Get performance metrics history",
+    description="Returns historical performance metrics for charting",
+    response_description="Performance metrics history",
+    responses={
+        200: {
+            "description": "Performance metrics retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "current": {
+                            "response_time": 120,
+                            "request_rate": 150,
+                            "error_rate": 0.5
+                        },
+                        "history": [
+                            {
+                                "timestamp": "2024-03-05T11:59:00Z",
+                                "response_time": 115,
+                                "request_rate": 145,
+                                "error_rate": 0.4
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+)
+async def get_performance_metrics(
+    time_range: str = Query("24h", description="Time range (1h, 24h, 7d, 30d)"),
+    current_user: dict = Depends(require_role("support"))
+):
+    """
+    Get performance metrics with history
+    
+    Args:
+        time_range: Time range for historical data
+    """
+    # Get current metrics
+    current_metrics = await monitoring_service.get_current_metrics()
+    
+    # Convert time_range to timedelta
+    now = datetime.now()
+    if time_range == "1h":
+        start_time = now - timedelta(hours=1)
+    elif time_range == "7d":
+        start_time = now - timedelta(days=7)
+    elif time_range == "30d":
+        start_time = now - timedelta(days=30)
+    else:  # Default to 24h
+        start_time = now - timedelta(days=1)
+    
+    # Get historical metrics
+    history = []
+    for metrics in monitoring_service.metrics_history:
+        if metrics.timestamp >= start_time:
+            history.append({
+                "timestamp": metrics.timestamp,
+                "response_time": metrics.response_time,
+                "request_rate": 150,  # Mock data
+                "error_rate": metrics.error_rate
+            })
+    
+    return {
+        "current": {
+            "response_time": current_metrics.response_time,
+            "request_rate": 150,  # Mock data
+            "error_rate": current_metrics.error_rate
+        },
+        "history": history
+    }
+
+@router.get("/monitoring/endpoints",
+    summary="Get endpoint performance metrics",
+    description="Returns performance metrics for individual API endpoints",
+    response_description="Endpoint performance metrics",
+    responses={
+        200: {
+            "description": "Endpoint performance metrics retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "path": "/api/v1/courses",
+                            "avg_response_time": 85,
+                            "request_count": 15000,
+                            "error_rate": 0.2,
+                            "status": "healthy"
+                        }
+                    ]
+                }
+            }
+        }
+    }
+)
+async def get_endpoint_performance(
+    current_user: dict = Depends(require_role("support"))
+):
+    """
+    Get performance metrics for individual API endpoints
+    """
+    # Mock endpoint performance data - in a real app this would come from monitoring
+    endpoints = [
+        {
+            "path": "/api/v1/courses",
+            "avg_response_time": 85,
+            "request_count": 15000,
+            "error_rate": 0.2,
+            "status": "healthy"
+        },
+        {
+            "path": "/api/v1/users",
+            "avg_response_time": 95,
+            "request_count": 12000,
+            "error_rate": 0.3,
+            "status": "healthy"
+        },
+        {
+            "path": "/api/v1/assignments",
+            "avg_response_time": 150,
+            "request_count": 8000,
+            "error_rate": 1.2,
+            "status": "degraded"
+        },
+        {
+            "path": "/api/v1/auth",
+            "avg_response_time": 110,
+            "request_count": 20000,
+            "error_rate": 0.1,
+            "status": "healthy"
+        }
+    ]
+    
+    return endpoints
+
+@router.post("/monitoring/alerts/{alert_id}/dismiss",
+    summary="Dismiss an alert",
+    description="Marks an alert as dismissed without resolving it",
+    response_description="Dismissed alert",
+    responses={
+        200: {
+            "description": "Alert dismissed successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "alert_1234567890",
+                        "message": "Alert dismissed successfully"
+                    }
+                }
+            }
+        }
+    }
+)
+async def dismiss_alert(
+    alert_id: str = Path(..., description="The ID of the alert to dismiss"),
+    current_user: dict = Depends(require_role("support"))
+):
+    """
+    Dismiss an alert without resolving it
+    
+    Args:
+        alert_id: The ID of the alert to dismiss
+    """
+    for i, alert in enumerate(monitoring_service.alerts):
+        if alert.id == alert_id:
+            # In a real app we might just mark it as dismissed rather than removing
+            monitoring_service.alerts.pop(i)
+            return {"id": alert_id, "message": "Alert dismissed successfully"}
+    
+    raise HTTPException(status_code=404, detail=f"Alert with ID {alert_id} not found")
+
+@router.get("/monitoring/errors",
+    summary="Get error logs",
+    description="Returns error logs with optional filtering",
+    response_description="Error logs",
+    responses={
+        200: {
+            "description": "Error logs retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": [
+                        {
+                            "id": 1,
+                            "timestamp": "2024-03-05T12:00:00Z",
+                            "severity": "error",
+                            "component": "api",
+                            "message": "Database connection timeout",
+                            "stackTrace": "Error: Connection timeout\n    at Database.connect",
+                            "context": {
+                                "database": "primary",
+                                "attemptCount": 3
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    }
+)
+async def get_error_logs(
+    severity: Optional[str] = Query(None, description="Filter by error severity"),
+    component: Optional[str] = Query(None, description="Filter by component"),
+    start_time: Optional[str] = Query(None, description="Filter by start time"),
+    end_time: Optional[str] = Query(None, description="Filter by end time"),
+    limit: int = Query(50, description="Maximum number of logs to return"),
+    current_user: dict = Depends(require_role("support"))
+):
+    """
+    Get error logs with filtering
+    
+    Args:
+        severity: Filter by error severity
+        component: Filter by component
+        start_time: Filter by start time
+        end_time: Filter by end time
+        limit: Maximum number of logs to return
+    """
+    # Mock error logs - in a real app this would come from a logging database
+    error_logs = [
+        {
+            "id": 1,
+            "timestamp": datetime.now() - timedelta(hours=1),
+            "severity": "error",
+            "component": "api",
+            "message": "Database connection timeout",
+            "stackTrace": "Error: Connection timeout\n    at Database.connect (/src/db.js:42)\n    at API.handleRequest (/src/api.js:15)",
+            "context": {
+                "database": "primary",
+                "attemptCount": 3
+            }
+        },
+        {
+            "id": 2,
+            "timestamp": datetime.now() - timedelta(hours=2),
+            "severity": "warning",
+            "component": "database",
+            "message": "Slow query detected",
+            "stackTrace": "Warning: Slow query\n    at Database.query (/src/db.js:85)",
+            "context": {
+                "query": "SELECT * FROM large_table",
+                "execution_time": 5.2
+            }
+        },
+        {
+            "id": 3,
+            "timestamp": datetime.now() - timedelta(hours=3),
+            "severity": "error",
+            "component": "auth",
+            "message": "Failed login attempts exceeded",
+            "stackTrace": "Error: Too many login attempts\n    at Auth.login (/src/auth.js:120)",
+            "context": {
+                "username": "user@example.com",
+                "ip": "192.168.1.1",
+                "attempts": 5
+            }
+        }
+    ]
+    
+    # Apply filters
+    filtered_logs = error_logs
+    
+    if severity:
+        filtered_logs = [log for log in filtered_logs if log["severity"] == severity]
+    
+    if component:
+        filtered_logs = [log for log in filtered_logs if log["component"] == component]
+    
+    if start_time:
+        start = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+        filtered_logs = [log for log in filtered_logs if log["timestamp"] >= start]
+    
+    if end_time:
+        end = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+        filtered_logs = [log for log in filtered_logs if log["timestamp"] <= end]
+    
+    # Sort by timestamp (descending) and limit results
+    filtered_logs.sort(key=lambda x: x["timestamp"], reverse=True)
+    filtered_logs = filtered_logs[:limit]
+    
+    # Format timestamps
+    for log in filtered_logs:
+        log["timestamp"] = log["timestamp"].isoformat()
+    
+    return filtered_logs
+
+@router.post("/monitoring/errors/{error_id}/resolve",
+    summary="Resolve an error",
+    description="Marks an error as resolved",
+    response_description="Resolution result",
+    responses={
+        200: {
+            "description": "Error resolved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": 1,
+                        "message": "Error resolved successfully"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Error not found"
+        }
+    }
+)
+async def resolve_error(
+    error_id: int = Path(..., description="The ID of the error to resolve"),
+    current_user: dict = Depends(require_role("support"))
+):
+    """
+    Resolve an error
+    
+    Args:
+        error_id: The ID of the error to resolve
+    """
+    # In a real app, this would update a database record
+    # For this demo, we'll just return a success response
+    return {
+        "id": error_id,
+        "message": "Error resolved successfully"
+    } 
