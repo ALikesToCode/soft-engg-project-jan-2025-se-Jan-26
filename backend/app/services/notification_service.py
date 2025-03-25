@@ -5,7 +5,8 @@ from app.models.course import CourseEnrollment
 from app.models.user import User
 from datetime import datetime
 from sqlalchemy.future import select
-from sqlalchemy import select
+from sqlalchemy import select, and_
+from typing import List, Dict
 from uuid import UUID
 import logging
 
@@ -151,5 +152,103 @@ class NotificationService:
             logger.error(f"Error saving notification: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
 
+    @staticmethod
+    async def markNotificationAsRead(notification_id: int, type:str, db: AsyncSession,user_id:UUID):
+        logger.info(f"In markNotificationAsRead in NotificationService class with id = {notification_id}, type={type}")
+        try:
+            result = await db.execute(select(CourseNotification)
+                                .where(
+                                    and_(CourseNotification.id == notification_id,
+                                          CourseNotification.type == type)
+                                    )
+                                )
+            notif = result.scalars().first()
+            if(notif):
+                logger.info(f"Course Notification found going to check and update in status table")
+                notif_status_result = await db.execute(select(UserNotificationStatus)
+                                      .where(
+                                        and_(UserNotificationStatus.notification_id == notification_id,
+                                            UserNotificationStatus.type == type,
+                                            UserNotificationStatus.user_id == user_id)
+                                        )
+                                    )
+                notif_status = notif_status_result.scalars().first()
+                if(notif_status):
+                    logger.info(f"Marking as read")
+                    notif_status.read = True
+                    db.add(notif_status)
+                    await db.commit()
+                    logger.info(f"Notification updated as read")
+                    return notif_status
+                else:
+                    logger.info(f"Sys notif record not found in status table")
+                    await db.rollback()
+            else:
+                logger.info(f"Course Notification not found going to check for sys")
+                sys_notif_result = await db.execute(select(SystemNotification)
+                                      .where(
+                                        and_(SystemNotification.id == notification_id,
+                                            SystemNotification.type == type)
+                                        )
+                                    )
+                sys_notif = sys_notif_result.scalars().first()
+                if(sys_notif):
+                    logger.info(f"Sys Notification found going to check and update in status table")
+                    sys_notif_status_result = await db.execute(select(UserNotificationStatus)
+                                      .where(
+                                        and_(UserNotificationStatus.notification_id == notification_id,
+                                            UserNotificationStatus.type == type,
+                                            UserNotificationStatus.user_id == user_id)
+                                        )
+                                    )
+                    sys_notif_status = sys_notif_status_result.scalars().first()
+                    if(sys_notif_status):
+                        logger.info(f"Going to update sys notif as read")
+                        sys_notif_status.read = True
+                        db.add(sys_notif_status)
+                        await db.commit()
+                        logger.info(f"Sys Notification updated as read")
+                        return sys_notif_status
+                    else:
+                        logger.info(f"Sys notif record not found in status table")
+                        await db.rollback()
+            await db.rollback() 
+            raise HTTPException(status_code=404, detail="Notification not found")
+        except Exception as e:
+            await db.rollback() 
+            logger.error(f"Error saving notification: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    
+    @staticmethod
+    async def markAllNotificationAsRead(notifications: List[Dict[str, str]], db: AsyncSession, user_id: str):
+        logger.info("Inside markAllNotificationAsRead in NotificationService")
+        try:
+            updated_notifications = []
+            for notif in notifications:
+                notification_id = notif.get("id")
+                notification_type = notif.get("type")
 
+                result = await db.execute(
+                    select(UserNotificationStatus).where(
+                        and_(UserNotificationStatus.notification_id == notification_id),
+                        (UserNotificationStatus.user_id == user_id), (UserNotificationStatus.type==notification_type)
+                    )
+                )
+                notif_status = result.scalars().first()
+                logger.info(f"Notification found Going to mark as read {notification_id}")
+                if notif_status:
+                    notif_status.read = True
+                    db.add(notif_status)
+                    updated_notifications.append(notif_status)
+                else:
+                    raise HTTPException(status_code=404, detail=f"Notification with id = {notification_id} not found")
+
+            await db.commit()
+            return updated_notifications
+        
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error marking notifications as read: {str(e)}")
+            raise HTTPException(status_code=500, detail="Database update failed")
 

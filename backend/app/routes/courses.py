@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.services.auth_service import get_current_user
+from app.services.auth_service import get_current_user, require_auth
 from app.routes.auth import require_role
 from app.services.course_service import CourseService
 from typing import List, Optional
@@ -61,6 +61,45 @@ async def get_course_history(
     except Exception as e:
         print("Error ==>", e)
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+@router.get("/user/recommended-courses")
+async def get_user_recommended_courses(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_auth)
+):
+    user_id = current_user['sub']
+    try:
+        courses = await CourseService.get_user_recommended_courses(db, user_id)
+        return courses
+    except Exception as e:
+        raise HTTPException(status=500, detail=str(e))
+    
+@router.get("/user/bookmarked-materials")
+async def get_user_bookmarked_materials(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_auth)
+):
+    user_id = current_user['sub']
+    try:
+        bookmarkeds = await CourseService.get_user_bookmarked_materials(db, user_id)
+        return bookmarkeds
+    except Exception as e:
+        raise HTTPException(status=500, detail=str(e))
+
+@router.delete("/user/bookmarked-materials/{bookmark_id}")
+async def delete_bookmarked_material(
+    bookmark_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_auth)
+):
+    user_id = current_user['sub']
+    try:
+        bookmarkeds = await CourseService.delete_bookmarked_material(db, user_id, bookmark_id)
+        return bookmarkeds
+    except Exception as e:
+        raise HTTPException(status=500, detail=str(e))
 
 @router.get("/faculty/courses/{course_id}/enrollment",
     summary="Get course enrollment",

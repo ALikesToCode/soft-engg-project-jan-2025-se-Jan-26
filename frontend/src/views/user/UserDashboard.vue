@@ -1,46 +1,24 @@
 <script>
 import SideNavBar from '@/layouts/SideNavBar.vue'
 import ChatBotWrapper from '@/components/ChatBotWrapper.vue'
-
+import api from '@/utils/api'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 export default {
   name: 'DashboardView',
   data() {
     return {
+      isDataLoading: false,
       queryEmpty: true,
       showSplitScreen: false,
       recommendedMaterials: [
-        {
-          id: 1,
-          title: 'Advanced Python Programming',
-          type: 'Course',
-          progress: 0,
-          thumbnail: 'https://placehold.co/100x100',
-          reason: 'Based on your interest in Programming',
-        },
-        {
-          id: 2,
-          title: 'Data Structures Practice',
-          type: 'Exercise',
-          progress: 0,
-          thumbnail: 'https://placehold.co/100x100',
-          reason: 'Recommended for your next topic',
-        },
-        {
-          id: 3,
-          title: 'Web Development Basics',
-          type: 'Tutorial',
-          progress: 0,
-          thumbnail: 'https://placehold.co/100x100',
-          reason: 'Popular in your field',
-        },
-        {
-          id: 4,
-          title: 'Algorithm Analysis',
-          type: 'Course',
-          progress: 0,
-          thumbnail: 'https://placehold.co/100x100',
-          reason: 'Next step in your learning path',
-        },
+        // {
+        //   id: 1,
+        //   title: 'Advanced Python Programming',
+        //   type: 'Course',
+        //   progress: 0,
+        //   thumbnail: 'https://placehold.co/100x100',
+        //   reason: 'Based on your interest in Programming',
+        // },
       ],
       personalizedRoadmaps: [
         {
@@ -73,20 +51,13 @@ export default {
         },
       ],
       bookmarkedMaterials: [
-        {
-          id: 1,
-          title: 'Design Patterns in Python',
-          type: 'Article',
-          author: 'Dr. Sarah Johnson',
-          dateBookmarked: '2024-01-15',
-        },
-        {
-          id: 2,
-          title: 'REST API Best Practices',
-          type: 'Tutorial',
-          author: 'Tech Academy',
-          dateBookmarked: '2024-01-20',
-        },
+        // {
+        //   id: 1,
+        //   title: 'Design Patterns in Python',
+        //   type: 'Article',
+        //   author: 'Dr. Sarah Johnson',
+        //   dateBookmarked: '2024-01-15',
+        // },
       ],
       isDevelopment: import.meta.env.VITE_NODE_ENV === 'development',
     }
@@ -94,6 +65,7 @@ export default {
   components: {
     SideNavBar,
     ChatBotWrapper,
+    LoadingSpinner,
   },
   computed: {
     mainContentClass() {
@@ -109,15 +81,87 @@ export default {
       console.log('Starting material:', material.title)
     },
     viewRoadmap(roadmap) {
-      this.$router.push(`/user/roadmap/${roadmap.id}`);
+      this.$router.push(`/user/roadmap/${roadmap.id}`)
     },
-    removeBookmark(material) {
+    removeBookmark(bookmark_id) {
       // TODO: Implement bookmark removal
-      this.bookmarkedMaterials = this.bookmarkedMaterials.filter((m) => m.id !== material.id)
+      this.deleteBookMarkedMaterial(bookmark_id)
     },
     toggleSplitScreen() {
       this.showSplitScreen = !this.showSplitScreen
     },
+    //API calls
+    async getRecommendedCourses() {
+      try {
+        this.isDataLoading = true
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.get('/user/recommended-courses', headers)
+        if (response.status !== 200) throw new Error('Failed to fetch user data')
+        console.log(response.data)
+        this.recommendedMaterials = response.data
+      } catch (error) {
+        throw error
+      } finally {
+        this.isDataLoading = false
+      }
+    },
+
+    async getBookMarkedMaterials() {
+      try {
+        this.isDataLoading = true
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.get('/user/bookmarked-materials', headers)
+        if (response.status !== 200) throw new Error('Failed to fetch user data')
+        console.log(response.data)
+        this.bookmarkedMaterials = response.data
+      } catch (error) {
+        throw error
+      } finally {
+        this.isDataLoading = false
+      }
+    },
+    async deleteBookMarkedMaterial(bookmarkId) {
+      try {
+        this.isDataLoading = true
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.delete(`/user/bookmarked-materials/${bookmarkId}`, headers)
+        if (response.status !== 200) throw new Error('Failed to delete the data')
+        console.log(response.data)
+        this.bookmarkedMaterials = response.data
+      } catch (error) {
+        throw error
+      } finally {
+        this.isDataLoading = false
+      }
+    },
+  },
+
+  mounted() {
+    this.getRecommendedCourses(), this.getBookMarkedMaterials()
   },
 }
 </script>
@@ -141,7 +185,7 @@ export default {
               >
                 <div class="flex items-start space-x-4">
                   <img
-                    :src="material.thumbnail"
+                    :src="material.thumbnail_path"
                     :alt="material.title"
                     class="w-16 h-16 rounded-lg object-cover"
                   />
@@ -217,11 +261,11 @@ export default {
                         <span class="text-sm text-gray-500 truncate">{{ material.author }}</span>
                       </div>
                       <div class="text-sm text-gray-500 mt-1">
-                        Bookmarked on {{ new Date(material.dateBookmarked).toLocaleDateString() }}
+                        Bookmarked on {{ new Date(material.date_bookmarked).toLocaleDateString() }}
                       </div>
                     </div>
                     <button
-                      @click="removeBookmark(material)"
+                      @click="removeBookmark(material.id)"
                       class="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <span class="material-icons">bookmark_remove</span>
@@ -242,6 +286,9 @@ export default {
       <!-- Floating Chat Bot (when not in split screen) -->
       <ChatBotWrapper v-if="!showSplitScreen" />
     </div>
+  </div>
+  <div v-if="isDataLoading" class="loading-overlay">
+    <LoadingSpinner />
   </div>
 </template>
 
@@ -273,5 +320,8 @@ export default {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+.loading-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
 }
 </style>

@@ -78,7 +78,7 @@ async def init_db():
     # Import models here to ensure they are registered with Base
     # but avoid circular imports
     from app.models.user import User
-    from app.models.course import Course, CourseEnrollment
+    from app.models.course import Course, CourseEnrollment, UserRecommendedCourses, BookmarkedMaterials
     from app.models.assignment import Assignment, Submission
     from app.models.role import Role
     from app.models.faq import FAQ
@@ -110,7 +110,7 @@ async def init_db():
         required_tables = ['courses', 'system_settings', 'faqs', 'integrations', 'users', 'user_roles', 'roles',
                             'assignments', 'user_courses', 'module', 'submissions', 'lecture', 'lecture_content',
                             'course_enrollments', 'lecture_content_doc','course_notifications','system_notifications',
-                            'user_notification_status']
+                            'user_notification_status','user_recommended_courses','bookmarked_materials']
 
         # Only create tables if they don't exist
         if any(table not in tables for table in required_tables):

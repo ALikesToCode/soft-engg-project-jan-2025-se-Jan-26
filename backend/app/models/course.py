@@ -87,8 +87,8 @@ class CourseEnrollment(Base):
     __tablename__ = "course_enrollments"
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
-    course_id = Column(UUID, ForeignKey("courses.id"), nullable=False)
-    student_id = Column(UUID, ForeignKey("users.id"), nullable=False)
+    course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status = Column(String, nullable=False, default=EnrollmentStatus.ENROLLED.value)
     enrollment_date = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC))
     completion_date = Column(DateTime(timezone=True))
@@ -184,6 +184,51 @@ class LectureContentDoc(Base):
             "file_type": self.file_type,
             "driveLink": self.content_doc,
             "content_desc": self.content_desc,
+        }
+
+
+class UserRecommendedCourses(Base):
+    __tablename__ = "user_recommended_courses"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # Links to the user
+    title = Column(String, nullable=False)  # Course title
+    type = Column(String, nullable=False)  # Course type
+    progress = Column(Integer, default=0)  # Progress percentage
+    thumbnail_path = Column(String, nullable=False, default="https://placehold.co/100x100")  # Default thumbnail
+    reason = Column(Text, nullable=True)  # Recommendation reason
+
+    def to_dict(self):
+        """Converts the UserRecommendedCourses object to a dictionary"""
+        return {
+            "id": self.id,
+            "user_id": str(self.user_id),  # Convert UUID to string
+            "title": self.title,
+            "type": self.type,
+            "progress": self.progress,
+            "thumbnail_path": self.thumbnail_path,
+            "reason": self.reason
+        }
+
+class BookmarkedMaterials(Base):
+    __tablename__ = "bookmarked_materials"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # Links to the user
+    title = Column(String, nullable=False)  # Material title
+    type = Column(String, nullable=False)  # e.g., Article, Video, Course
+    author = Column(String, nullable=True)  # Author name (optional)
+    date_bookmarked = Column(DateTime, default=datetime.utcnow)  # Timestamp of bookmarking
+
+    def to_dict(self):
+        """Converts the BookmarkedMaterials object to a dictionary"""
+        return {
+            "id": self.id,
+            "user_id": str(self.user_id),  # Convert UUID to string
+            "title": self.title,
+            "type": self.type,
+            "author": self.author,
+            "date_bookmarked": self.date_bookmarked.isoformat()  # Convert datetime to string
         }
 
 # Initialize Database Tables

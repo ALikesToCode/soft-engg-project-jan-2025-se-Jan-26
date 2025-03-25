@@ -15,7 +15,7 @@ class CourseNotification(Base):
     title = Column(String, nullable=False)
     message = Column(Text, nullable=False)
     timestamp = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
-    course_id = Column(UUID, ForeignKey("courses.id"), nullable=False)
+    course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
 
     def to_dict(self):
         return {
@@ -57,8 +57,9 @@ class UserNotificationStatus(Base):
     __tablename__ = "user_notification_status"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(UUID, ForeignKey("users.id"), nullable=False)
+    user_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     notification_id = Column(Integer, nullable=False)
+    type = Column(String, nullable=False, default='course')
     read = Column(Boolean, default=False)
 
     def to_dict(self):

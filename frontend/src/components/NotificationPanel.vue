@@ -206,8 +206,8 @@ export default {
     filteredNotifications() {
       return this.notifications.filter((notification) => {
         if (this.currentFilter === 'unread') return !notification.read
-        if (this.currentFilter === 'course') return notification.type === 'course'
-        if (this.currentFilter === 'system') return notification.type === 'system'
+        if (this.currentFilter === 'course') return notification.notification_type === 'course'
+        if (this.currentFilter === 'system') return notification.notification_type === 'system'
         return true
       })
     },
@@ -252,13 +252,16 @@ export default {
     },
     async markAsRead(notification) {
       // TODO: Implement API call
-      notification.read = true
+      // notification_id = notification_id.id
+      // notification.read = true
+      this.markNotificationAsRead(notification)
       this.$emit('update:unread-count', this.unreadCount)
     },
     async markAllAsRead() {
       // TODO: Implement API call
-      this.notifications.forEach((n) => (n.read = true))
-      this.$emit('update:unread-count', 0)
+      // this.notifications.forEach((n) => (n.read = true))
+      // this.$emit('update:unread-count', 0)
+      this.markAllNotificationsAsRead()
     },
     async removeNotification(notification) {
       // TODO: Implement API call
@@ -297,12 +300,63 @@ export default {
         response.data.forEach((notif) => {
           this.notifications.push(notif)
         })
-        this.isNotificationLoading = false
       } catch (error) {
-        this.isNotificationLoading = false
         throw error
       } finally {
         this.isNotificationLoading = false
+      }
+    },
+    async markNotificationAsRead(notification) {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+      try {
+        const type = notification.notification_type
+        const id = notification.notification_id
+        const response = await api.put(`/notification/${type}/${id}`, {}, headers)
+        if (response.data) {
+          console.log(response.data)
+          notification.read = true
+        }
+      } catch (error) {
+        throw error
+      } finally {
+      }
+    },
+    async markAllNotificationsAsRead() {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      // Collect all unread notification IDs
+      const unreadNotificationIds = this.notifications
+        .filter((n) => !n.read)
+        .map((n) => ({ id: n.notification_id, type: n.notification_type }))
+
+      if (unreadNotificationIds.length === 0) return // No unread notifications
+
+      try {
+        const response = await api.put(
+          '/notification/mark-all',
+          { notifications: unreadNotificationIds }, // Send an array of IDs
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          },
+        )
+
+        if (response.data.success) {
+          this.notifications.forEach((n) => (n.read = true)) // Mark all as read in UI
+          this.$emit('update:unread-count', 0)
+        }
+      } catch (error) {
+        console.error('Error marking notifications as read:', error)
       }
     },
   },

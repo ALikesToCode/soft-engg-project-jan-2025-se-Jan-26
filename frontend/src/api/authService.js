@@ -36,12 +36,12 @@ axiosInstance.interceptors.request.use(
         } else {
             logger.warn(`Request to ${config.url} - No token found`);
         }
-        
+
         // Log request details in development
         if (isDev) {
             logger.debug(`Request: ${config.method.toUpperCase()} ${config.url}`, config.data || {});
         }
-        
+
         return config;
     },
     (error) => {
@@ -53,15 +53,15 @@ axiosInstance.interceptors.request.use(
 // Add response interceptor for debugging
 axiosInstance.interceptors.response.use(
     (response) => {
-        logger.debug(`Response from ${response.config.url}: ${response.status}`, 
+        logger.debug(`Response from ${response.config.url}: ${response.status}`,
             isDev ? response.data : '');
         return response;
     },
     (error) => {
         if (error.response) {
-            logger.error(`Response error from ${error.config?.url || 'unknown'}: ${error.response.status}`, 
+            logger.error(`Response error from ${error.config?.url || 'unknown'}: ${error.response.status}`,
                 error.response.data);
-                
+
             // Handle 401 errors (unauthorized)
             if (error.response.status === 401) {
                 logger.warn('Unauthorized access detected - token may be invalid or expired');
@@ -80,11 +80,11 @@ export const authService = {
     // Initialize axios instance with credentials
     axiosInstance,
 
-   // Login with Email & Password  
+    // Login with Email & Password  
     async loginWithEmail(email, password) {
         try {
             logger.log('Logging in with email and password...');
-            
+
             // Convert to form-urlencoded format
             const formData = new URLSearchParams();
             formData.append('username', email);
@@ -138,12 +138,12 @@ export const authService = {
                 logger.warn('No token found in localStorage');
                 return null;
             }
-            
+
             // Log token details in development mode
             if (isDev) {
                 this.debugTokenStatus();
             }
-            
+
             const response = await this.axiosInstance.get('/auth/me');
             logger.log('Current user data retrieved successfully');
             logger.debug('User data:', response.data);
@@ -152,7 +152,7 @@ export const authService = {
             logger.error('Error getting current user:', error.message);
             if (error.response) {
                 logger.error(`Status: ${error.response.status}, Data:`, error.response.data);
-                
+
                 // If unauthorized, clear token
                 if (error.response.status === 401) {
                     logger.warn('Unauthorized - clearing invalid token');
@@ -182,14 +182,14 @@ export const authService = {
         try {
             logger.log('Attempting to refresh token...');
             const token = localStorage.getItem('token');
-            
+
             if (!token) {
                 logger.warn('Cannot refresh - no token found');
                 return false;
             }
-            
+
             const response = await this.axiosInstance.post('/auth/refresh');
-            
+
             if (response.data && response.data.access_token) {
                 logger.log('Token refreshed successfully');
                 localStorage.setItem('token', response.data.access_token);
@@ -231,7 +231,7 @@ export const authService = {
         try {
             logger.log('Setting user password...');
             const response = await this.axiosInstance.post('/auth/set-password', { password });
-            
+
             if (response.status === 200) {
                 logger.log('Password set successfully');
                 return { success: true, message: 'Password set successfully' };
@@ -241,8 +241,8 @@ export const authService = {
             logger.error('Error setting password:', error.message);
             if (error.response) {
                 logger.error(`Status: ${error.response.status}, Data:`, error.response.data);
-                return { 
-                    success: false, 
+                return {
+                    success: false,
                     message: error.response.data?.detail || 'Failed to set password',
                     status: error.response.status
                 };
@@ -255,11 +255,11 @@ export const authService = {
     debugTokenStatus() {
         const token = localStorage.getItem('token');
         logger.log('Token exists:', !!token);
-        
+
         if (!token) {
             return false;
         }
-        
+
         try {
             // Try to parse if it's stored as JSON
             let tokenValue = token;
@@ -276,7 +276,7 @@ export const authService = {
                 // Not JSON, just a string
                 logger.debug('Token is stored as plain string');
             }
-            
+
             // Show token details
             const tokenParts = tokenValue.split('.');
             if (tokenParts.length === 3) {
@@ -285,16 +285,16 @@ export const authService = {
                     const payload = JSON.parse(atob(tokenParts[1]));
                     const expiry = payload.exp ? new Date(payload.exp * 1000) : 'unknown';
                     const isExpired = payload.exp ? Date.now() > payload.exp * 1000 : false;
-                    
+
                     logger.debug('Token details:', {
                         subject: payload.sub || 'unknown',
                         expiry: expiry.toString(),
                         isExpired,
-                        timeRemaining: payload.exp ? 
-                            Math.floor((payload.exp * 1000 - Date.now()) / 1000) + ' seconds' : 
+                        timeRemaining: payload.exp ?
+                            Math.floor((payload.exp * 1000 - Date.now()) / 1000) + ' seconds' :
                             'unknown'
                     });
-                    
+
                     return !isExpired;
                 } catch (e) {
                     logger.warn('Failed to decode token payload:', e.message);
@@ -305,10 +305,10 @@ export const authService = {
         } catch (e) {
             logger.error('Error analyzing token:', e.message);
         }
-        
+
         return !!token;
     },
-    
+
     // Clear all auth data (for testing/debugging)
     clearAuthData() {
         logger.warn('Clearing all authentication data');

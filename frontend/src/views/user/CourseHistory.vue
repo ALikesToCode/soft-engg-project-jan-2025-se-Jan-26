@@ -408,4 +408,7 @@ export default {
   line-height: inherit;
   vertical-align: middle;
 }
+.loading-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+}
 </style>

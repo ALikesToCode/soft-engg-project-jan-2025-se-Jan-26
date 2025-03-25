@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, UUID4
 from fastapi.responses import JSONResponse
-from typing import Dict
+from typing import Dict, List
 from datetime import datetime
 from typing import Optional
 from app.services.auth_service import oauth2_scheme, get_current_user, require_auth
@@ -103,5 +103,43 @@ async def notify(sys_notification_content: SystemNotification,
     except Exception as e:
         logger.error(f"Error ==> {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.put('/{type}/{id}')
+async def markNotificationAsRead(
+    type: str,
+    id: int,
+    db: AsyncSession = Depends(get_db), 
+    current_user: dict = Depends(require_auth)
+):
+    user_id = current_user['sub']
+    try:
+        notification = await NotificationService.markNotificationAsRead(id,type, db, user_id)
+        return notification
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        logger.error(f"Error ==> {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class NotificationReadRequest(BaseModel):
+    notifications: List[dict]  # Expecting a list of {"id": <id>, "type": <type>}
+
+
+@router.put('/mark-all')
+async def markAllNotificationAsRead(
+    request:NotificationReadRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_auth)
+):
+    user_id = current_user["sub"]
+    try:
+        updated_notifications = await NotificationService.markAllNotificationAsRead(request.notifications, db, user_id)
+        return {"success": True, "updated_notifications": updated_notifications}
+    
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        logger.error(f"Error ==> {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not update notifications")
 
 

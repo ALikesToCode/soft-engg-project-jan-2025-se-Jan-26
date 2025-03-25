@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import select, and_, String
-from app.models.course import Course, Module, LectureContent, Lecture, CourseEnrollment, LectureContentDoc
+from app.models.course import Course, Module, LectureContent, \
+    Lecture, CourseEnrollment, LectureContentDoc, UserRecommendedCourses, BookmarkedMaterials
 from app.models.assignment import Assignment
 from app.models.user import User
 from app.database import get_db
@@ -620,3 +621,46 @@ class CourseService:
                 status_code=500, 
                 detail=f"Failed to retrieve course assignments: {str(e)}"
             )
+        
+    async def get_user_recommended_courses(db: AsyncSession, user_id: UUID):
+        try:
+            #validate if the user is student
+            result = await db.execute(select(UserRecommendedCourses).where(UserRecommendedCourses.user_id == user_id))
+            recommended_courses = result.scalars().all()
+            return [rc.to_dict() for rc in recommended_courses]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    async def get_user_bookmarked_materials(db: AsyncSession, user_id: UUID):
+        try:
+            #validate if the user is student
+            result = await db.execute(select(BookmarkedMaterials).where(BookmarkedMaterials.user_id == user_id))
+            bookmarked_materials = result.scalars().all()
+            return [bm.to_dict() for bm in bookmarked_materials]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    async def delete_bookmarked_material(db: AsyncSession, user_id: UUID, bookmark_id:int):
+        try:
+            #validate if the user is student
+            result = await db.execute(
+                select(BookmarkedMaterials).where(
+                    and_(
+                        BookmarkedMaterials.id == bookmark_id,
+                        BookmarkedMaterials.user_id == user_id
+                    )
+                )
+            )
+            bookmark = result.scalars().first()
+            if not bookmark:
+                raise HTTPException(status_code=404, detail="Bookmark not found")
+
+            # Delete the bookmark
+            await db.delete(bookmark)
+            await db.commit()
+
+            result = await db.execute(select(BookmarkedMaterials).where(BookmarkedMaterials.user_id == user_id))
+            bookmarked_materials = result.scalars().all()
+            return [bm.to_dict() for bm in bookmarked_materials]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
