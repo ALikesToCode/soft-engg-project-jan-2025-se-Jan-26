@@ -120,7 +120,7 @@ async def get_lecture_for_module(module_id: int, db: AsyncSession, user_id: uuid
         lectures = result.scalars().all()  
         return [lecture.to_dict() for lecture in lectures]
     except Exception as e:
-        print(f"Error fetching lectures: {str(e)}")
+        logger.error(f"Error fetching lectures: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 async def get_lecture_content_by_module(module_id: int, db: AsyncSession, user_id: uuid.UUID):

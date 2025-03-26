@@ -101,6 +101,8 @@ async def send_course_notification(
         logger.info("Going to save the notification to be sent")
         notification = await NotificationService.save_course_notification(notification_content, db, user_id)
         return notification
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
@@ -119,6 +121,8 @@ async def notify(sys_notification_content: SystemNotification,
         logger.info("Going to save the system notification to be sent")
         notification = await NotificationService.save_system_notification(sys_notification_content, db, user_id)
         return notification
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
@@ -136,6 +140,8 @@ async def markNotificationAsRead(
     try:
         notification = await NotificationService.markNotificationAsRead(id,type, db, user_id)
         return notification
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
@@ -156,7 +162,9 @@ async def markAllNotificationAsRead(
     try:
         updated_notifications = await NotificationService.markAllNotificationAsRead(request.notifications, db, user_id)
         return {"success": True, "updated_notifications": updated_notifications}
-    
+        
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:

@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.notification import CourseNotification, SystemNotification ,UserNotificationStatus
 from app.models.course import CourseEnrollment
 from app.models.user import User
+from app.validators.notification_validator import NotificationValidator
 from datetime import datetime
 from sqlalchemy.future import select
 from sqlalchemy import select, and_
@@ -115,6 +116,18 @@ class NotificationService:
     async def save_course_notification(notification_content,db: AsyncSession,user_id:UUID):
         logger.info("Just entered in save_course_notification in NotificationService class")
 
+        #Validate the input data
+        try:
+            logger.info("Going to validate the input data")
+            if not isinstance(notification_content, dict):
+                __notification_content = notification_content.__dict__  # Convert to dict if it's an object
+
+            validated_data = NotificationValidator.validate_course_notification(__notification_content)
+            logger.info(f"Validation successful: {validated_data}")
+        except ValueError as ve:
+            logger.info(f"Validation failed {str(ve)}")
+            raise HTTPException(status_code=400, detail=str(ve))  # Return 400 Bad Request if validation fails
+
         user_result = await db.execute(select(User).where(User.id == user_id))
         user = user_result.scalars().first()
         if user.role.lower() not in ['faculty', 'support']:
@@ -128,7 +141,8 @@ class NotificationService:
                 title=notification_content.title,
                 message=notification_content.message,
                 timestamp=datetime.utcnow(),
-                course_id=notification_content.courseId
+                course_id=notification_content.courseId,
+                sent_by = user_id
             )
             logger.info("Going to insert in CourseNotification table")
             db.add(notification)
@@ -159,6 +173,19 @@ class NotificationService:
     @staticmethod
     async def save_system_notification(sys_notification_content,db: AsyncSession,user_id:UUID):
         logger.info("In save_system_notification in NotificationService class")
+        
+        #Validate the input data
+        try:
+            logger.info("Going to validate the input data")
+            if not isinstance(sys_notification_content, dict):
+                __sys_notification_content = sys_notification_content.__dict__  # Convert to dict if it's an object
+
+            validated_data = NotificationValidator.validate_system_notification(__sys_notification_content)
+            logger.info(f"Sys notification Validation successful: {validated_data}")
+        except ValueError as ve:
+            logger.info(f"Sys notification Validation failed {str(ve)}")
+            raise HTTPException(status_code=400, detail=str(ve))  
+        
         user_result = await db.execute(select(User).where(User.id == user_id))
         user = user_result.scalars().first()
         if user.role.lower() not in ['support']:
@@ -172,6 +199,7 @@ class NotificationService:
                 title=sys_notification_content.title,
                 message=sys_notification_content.message,
                 timestamp=datetime.utcnow(),
+                sent_by = user_id
             )
             logger.info("Going to insert in SystemNotification table")
             db.add(sys_notification)
@@ -203,6 +231,10 @@ class NotificationService:
     @staticmethod
     async def markNotificationAsRead(notification_id: int, type:str, db: AsyncSession,user_id:UUID):
         logger.info(f"In markNotificationAsRead in NotificationService class with id = {notification_id}, type={type}")
+        
+        if not isinstance(type, str) or type.lower() not in ['system', 'course']:
+            raise ValueError("Notification type is invalid")
+        
         try:
             result = await db.execute(select(CourseNotification)
                                 .where(
@@ -271,6 +303,9 @@ class NotificationService:
     @staticmethod
     async def markAllNotificationAsRead(notifications: List[Dict[str, str]], db: AsyncSession, user_id: str):
         logger.info("Inside markAllNotificationAsRead in NotificationService")
+        
+        if not isinstance(type, str) or type.lower() not in ['system', 'course']:
+            raise ValueError("Notification type is invalid")
         try:
             updated_notifications = []
             for notif in notifications:
