@@ -209,7 +209,15 @@ export default {
 
     const fetchModuleContent = async () => {
       try {
-        const response = await api.get(`courses/module/${courseId}`)
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+        const response = await api.get(`courses/module/${courseId}`, headers)
         modules.value = response.data
         return response
       } catch (error) {
@@ -228,7 +236,17 @@ export default {
 
         loadingLectureData.value = true
         lectures.value = []
-        const response = await api.get(`courses/module/lecture/${moduleId}`)
+
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.get(`courses/module/lecture/${moduleId}`, headers)
         loadingLectureData.value = false
         lectures.value = response.data
         return response
@@ -242,8 +260,16 @@ export default {
 
     const fetchLectureContentData = async (lectureId) => {
       try {
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
         isDataLoading.value = true
-        const response = await api.get(`courses/lecture/content/${lectureId}`)
+        const response = await api.get(`courses/lecture/content/${lectureId}`, headers)
         isDataLoading.value = false
         console.log(response.data)
         emit('lecture-data-content', { isExistingData: true, ...response.data })
@@ -289,9 +315,22 @@ export default {
           title: 'Week ' + moduleForm.value.week,
           position: moduleForm.value.week,
         }
-        const response = await api.post('/courses/module', {
-          ...moduleData,
-        })
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.post(
+          '/courses/module',
+          {
+            ...moduleData,
+          },
+          headers,
+        )
         await loadModules()
         closeModuleModal()
       } catch (error) {

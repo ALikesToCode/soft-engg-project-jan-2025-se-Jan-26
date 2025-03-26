@@ -201,7 +201,9 @@ async def get_modules_for_course(course_id: str,
         }
     }
 )
-async def get_lecture_for_given_module(module_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(require_auth)):
+async def get_lecture_for_given_module(module_id: str, 
+                                       db: AsyncSession = Depends(get_db), 
+                                       current_user: dict = Depends(require_auth)):
     try:
         module_id = int(module_id)
         modules = await get_lecture_for_module(module_id,db, current_user['sub'])  
@@ -271,7 +273,7 @@ async def get_lecture_content(module_id: str, db: AsyncSession = Depends(get_db)
     # lecture_id = int(lecture_id)
     module_id  = int(module_id)
     try:
-        contents = await get_lecture_content_by_module(module_id,db, current_user['id'])
+        contents = await get_lecture_content_by_module(module_id,db, current_user['sub'])
         return contents
     except HTTPException as http_ex:
         raise http_ex
@@ -324,13 +326,14 @@ async def get_lecture_content(module_id: str, db: AsyncSession = Depends(get_db)
     }                   
 )
 async def get_video_lecture_content(lecture_id: str, db: AsyncSession = Depends(get_db), current_user: dict = Depends(require_auth)):
-    lecture_id = int(lecture_id)
     try:
-        content = await get_lecture_content_by_lecture(lecture_id, db, current_user['id'])
+        lecture_id = int(lecture_id)
+        content = await get_lecture_content_by_lecture(lecture_id, db, current_user['sub'])
         return content
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
+        print("Error => " + str(e))
         raise HTTPException(status_code=500, detail=str(e))
     
 @course_router.post("/courses/module/content/lecture", response_model=dict,
@@ -723,7 +726,9 @@ async def delete_module(module_id: str, db: AsyncSession = Depends(get_db), curr
         raise HTTPException(status_code=500, detail=str(e))
 
 @course_router.post("/courses", response_model=dict)
-async def create_course(course_data: CourseCreate, db: AsyncSession = Depends(get_db)):
+async def create_course(course_data: CourseCreate, 
+                        db: AsyncSession = Depends(get_db),
+                        current_user: dict = Depends(require_auth)):
     """
     Create a new course
     """

@@ -226,7 +226,7 @@ export default {
       searchQuery: '',
       sortBy: 'date',
       gradeFilter: 'all',
-      totalEnrolled: 10,
+      totalEnrolled: 0,
       isDataLoading: false,
       completedCourses: [
         // {

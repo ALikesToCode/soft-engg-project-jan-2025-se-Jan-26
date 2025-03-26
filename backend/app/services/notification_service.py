@@ -114,7 +114,12 @@ class NotificationService:
     @staticmethod
     async def save_course_notification(notification_content,db: AsyncSession,user_id:UUID):
         logger.info("Just entered in save_course_notification in NotificationService class")
-    
+
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() not in ['faculty', 'support']:
+            logger.info(f"You do not have permission to send this notification")
+            raise HTTPException(status_code=403, detail="You are forbidden to user the resource")
         try:
             notification = CourseNotification(
                 type=notification_content.type,
@@ -154,6 +159,11 @@ class NotificationService:
     @staticmethod
     async def save_system_notification(sys_notification_content,db: AsyncSession,user_id:UUID):
         logger.info("In save_system_notification in NotificationService class")
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() not in ['support']:
+            logger.info(f"You do not have permission to send this notification")
+            raise HTTPException(status_code=403, detail="You are forbidden to user the resource")
         try:
             sys_notification = SystemNotification(
                 type=sys_notification_content.type,

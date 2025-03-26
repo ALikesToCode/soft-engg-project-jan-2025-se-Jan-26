@@ -17,6 +17,9 @@ import json
 import shutil
 import uuid
 import enum
+import logging
+
+logger = logging.getLogger(__name__)
 
 class EnrollmentStatus(str, enum.Enum):
     ENROLLED = "enrolled"
@@ -54,11 +57,11 @@ async def get_all_courses(db: AsyncSession, user_id: uuid.UUID = None):
         else:
             # Fetch all course objects
             result = await db.execute(select(Course))
-            
+        logger.info("Courses fetched successfully...")
         courses = result.scalars().all()
         return [course.to_dict() for course in courses]
     except Exception as e:
-        print(f"Error fetching courses: {str(e)}")
+        logger.error(f"Error fetching courses: {str(e)}")
         raise HTTPException(status_code=500, detail="Error fetching courses")
 
 async def get_modules_by_course(course_id: str, db: AsyncSession, user_id: uuid.UUID):
@@ -80,7 +83,10 @@ async def get_modules_by_course(course_id: str, db: AsyncSession, user_id: uuid.
         raise HTTPException(status_code=404, detail="Course not found")
     
     #check if the faculty is created the course and raise error if not
-    if course.faculty_id != user_id:
+    faculty_id = UUID(str(course.faculty_id))
+    user_id_uuid = UUID(str(user_id))
+    if faculty_id != user_id_uuid:
+        logger.info(f"You are not the faculty of the course faculty_id={course.faculty_id} user_id={user_id}")
         raise HTTPException(status_code=403, detail="You are not authorized to view this course")
     
     # Fetch all modules for the given course and return as a list
@@ -158,22 +164,25 @@ async def get_lecture_content_by_lecture(lecture_id: int, db: AsyncSession, user
     Returns:
         Lecture Content for the given lecture
     """
+    logger.info("Inside get_lecture_content_by_lecture in course_service")
     try:
         # Fetch the lecture content for the given lecture
         result = await db.execute(select(LectureContent).where(LectureContent.lecture_id == lecture_id))
         content = result.scalars().first() 
         if not content:
+            logger.info("Checking for video content")
             #If the video content is not found, check for document content
             result = await db.execute(select(LectureContentDoc).where(LectureContentDoc.lecture_id == lecture_id))
             content = result.scalars().first()
 
             #Raise error if no content found
             if not content:
+                logger.info("Video content Not found...Checking for doc content")
                 raise HTTPException(status_code=404, detail="No content found for the given lecture")
         #if content is found, return the content
         return content.to_dict()
     except Exception as e:
-        print(f"Error fetching course content: {str(e)}")
+        logger.error(f"Error fetching course content: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 async def add_lecture_content_to_existing_course(content,db: AsyncSession, user_id: uuid.UUID):
@@ -189,6 +198,11 @@ async def add_lecture_content_to_existing_course(content,db: AsyncSession, user_
         Lecture Content added to the course
     """
     try:
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() not in ['faculty']:
+            raise HTTPException(status_code=403, detail="You are forbidden to use the resource")
+
         # Check if course exists and raise error if not found
         course = await db.execute(select(Course).where(Course.id == content.courseId))
         course = course.scalars().first()
@@ -246,7 +260,7 @@ async def add_lecture_content_to_existing_course(content,db: AsyncSession, user_
         return new_lecture_content.to_dict()
     
     except Exception as e:
-        print(e)
+        logger.error(f"Error ==> {str(e)}")
         await db.rollback()  # Rollback if error occurs
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -264,6 +278,11 @@ async def add_doc_content_to_existing_course(content,db: AsyncSession, user_id: 
     Returns:
         Lecture Content added to the course
     """
+    user_result = await db.execute(select(User).where(User.id == user_id))
+    user = user_result.scalars().first()
+    if user.role.lower() not in ['faculty']:
+        raise HTTPException(status_code=403, detail="You are forbidden to use the resource")
+
     try:
         # Check if course exists and raise error if not found
         course = await db.execute(select(Course).where(Course.id == content.courseId))
@@ -316,7 +335,7 @@ async def add_doc_content_to_existing_course(content,db: AsyncSession, user_id: 
         await db.refresh(new_lecture_content)
         return new_lecture_content.to_dict()
     except Exception as e:
-        print(e)
+        logger.error(f"Error ==> {str(e)}")
         await db.rollback()  # Rollback if error occurs
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -334,6 +353,11 @@ async def update_existing_lecture_doc_content(content,db: AsyncSession, user_id:
         Updated Lecture Content
     """
     try:
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() not in ['faculty']:
+            raise HTTPException(status_code=403, detail="You are forbidden to use the resource")
+
         # Check if course exists and raise error if not found
         course = await db.execute(select(Course).where(Course.id == content.courseId))
         course = course.scalars().first()
@@ -376,7 +400,7 @@ async def update_existing_lecture_doc_content(content,db: AsyncSession, user_id:
             await db.rollback()  
             raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        print("Error updating content2: ", str(e))
+        logger.error(f"Error ==> {str(e)}")
         await db.rollback() 
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -393,6 +417,11 @@ async def update_existing_lecture_content(content,db: AsyncSession, user_id: uui
         Updated Lecture Content
     """
     try:
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() not in ['faculty']:
+            raise HTTPException(status_code=403, detail="You are forbidden to use the resource")
+
         lecture_id = int(content.lectureId)
         # Check if the lecture exists and raise error if not found
         result = await db.execute(
@@ -425,7 +454,7 @@ async def update_existing_lecture_content(content,db: AsyncSession, user_id: uui
             await db.rollback()  
             raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        print("Error updating content2: ", str(e))
+        logger.error(f"Error ==> {str(e)}")
         await db.rollback()  # Rollback if error occurs
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -442,6 +471,11 @@ async def add_module(module_data, db: AsyncSession, user_id: uuid.UUID):
         Newly added Module
     """
     try:
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() not in ['faculty']:
+            raise HTTPException(status_code=403, detail="You are forbidden to use the resource")
+
         # Check if course exists and raise error if not found
         course = await db.execute(select(Course).where(Course.id == module_data.course_id))
         course = course.scalars().first()
@@ -449,7 +483,9 @@ async def add_module(module_data, db: AsyncSession, user_id: uuid.UUID):
             raise HTTPException(status_code=404, detail="Course not found")
         
         # Check if the faculty has created the course and raise error if not
-        if course.faculty_id != user_id:
+        faculty_id = UUID(str(course.faculty_id))
+        user_id_uuid = UUID(str(user_id))
+        if faculty_id != user_id_uuid:
             raise HTTPException(status_code=403, detail="You are not authorized to add modules to this course")
 
         # Create a new module object and add to the database
@@ -464,6 +500,7 @@ async def add_module(module_data, db: AsyncSession, user_id: uuid.UUID):
         return new_module
     except Exception as e:
         await db.rollback()
+        logger.error(f"Error ==> {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 async def delete_module_by_id(module_id: int, db: AsyncSession, user_id: uuid.UUID):
@@ -479,6 +516,11 @@ async def delete_module_by_id(module_id: int, db: AsyncSession, user_id: uuid.UU
         String message indicating the deletion status
     """
     try:
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() not in ['faculty']:
+            raise HTTPException(status_code=403, detail="You are forbidden to user the resource")
+
         # Fetch the module object and raise error if not found
         result = await db.execute(select(Module).filter(Module.id == module_id))
         module = result.scalars().first()
@@ -491,6 +533,7 @@ async def delete_module_by_id(module_id: int, db: AsyncSession, user_id: uuid.UU
         return {"message": "Module deleted successfully"}
     except Exception as e:
         await db.rollback()
+        logger.error(f"Error ==> {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 from sqlalchemy.dialects.postgresql import ENUM
@@ -520,6 +563,8 @@ class CourseService:
         total_course_count = 0
         for course, enrollment in result:
             total_course_count += 1
+            if(enrollment.status != 'COMPLETED'):
+                continue
             instructor_data = await db.execute(select(User).where(User.id==course.faculty_id))
             instructor_name = instructor_data.scalars().first().name
             courses.append({
@@ -536,7 +581,7 @@ class CourseService:
                 "certificate_url":enrollment.certificate_url,
                 "total_enrolled_course":total_course_count
             })
-        
+        courses[-1]["total_enrolled_course"] = total_course_count
         return courses
 
     @staticmethod
