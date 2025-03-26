@@ -23,6 +23,8 @@ import SideNavBar from '@/layouts/SideNavBar.vue'
 import { FacultyNotificationService } from '@/services/facultyNotification.service'
 import { useCourseStore } from '@/stores/courseStore'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import { useToast } from 'vue-toastification'
+
 export default {
   name: 'SupportNotificationsView',
   components: {
@@ -48,6 +50,15 @@ export default {
     },
   },
   methods: {
+    showSuccessToast(msg) {
+      const toast = useToast() // Call inside the method
+      toast.success(msg, { timeout: 3000 })
+    },
+    showErrorToast(error, defaultMessage) {
+      const toast = useToast()
+      const message = error.response?.data?.message || defaultMessage
+      toast.error(message)
+    },
     async handleSupportNotification(notification) {
       // Support staff can send both system-wide and course-specific notifications
       if (!this.$refs.baseNotifications) return
@@ -75,8 +86,10 @@ export default {
               headers,
             )
             console.log('support notification created => ' + response.data)
+            this.showSuccessToast('Notification Sent Successfully')
           } catch (error) {
             this.isSendingNotif = false
+            this.showErrorToast(error, 'Failed to Send Notification')
           }
         } else {
           //API call to save system notification for support
@@ -87,8 +100,10 @@ export default {
               headers,
             )
             console.log('support system notification created => ' + response.data)
+            this.showSuccessToast('Notification Sent Successfully')
           } catch (error) {
             this.isSendingNotif = false
+            this.showErrorToast(error, 'Failed to Send Notification')
           }
         }
         //API call to save faculty notification
@@ -106,6 +121,7 @@ export default {
         })
         this.isLoading = false
       } catch (error) {
+        this.showErrorToast(error, 'Failed to load the courses')
         this.isLoading = false
         throw error
       } finally {

@@ -424,6 +424,7 @@ import CourseLectureContent from '@/components/course/CourseLectureContent.vue'
 import { useCourse } from '@/composables/useCourse'
 import { useNotification } from '@/composables/useNotification'
 import api from '@/utils/api'
+import { useToast } from 'vue-toastification'
 
 export default {
   name: 'CourseLectureView',
@@ -436,6 +437,7 @@ export default {
   },
 
   setup() {
+    const toast = useToast()
     const route = useRoute()
     const router = useRouter()
     const { notify } = useNotification()
@@ -554,7 +556,10 @@ export default {
         currentCourse.value = response.data
         console.log(currentCourse.value)
         loading.value = false
+        toast.success('Course Content Loaded Successfully')
       } catch (err) {
+        const message = err.response?.data?.message || 'Failed to load course content'
+        toast.error(message)
         error.value = 'Failed to load course content. Please try again.'
         notify.error('Failed to load course content')
         loading.value = false

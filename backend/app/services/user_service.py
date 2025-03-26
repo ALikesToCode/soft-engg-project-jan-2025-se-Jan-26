@@ -220,8 +220,6 @@ async def fetch_user_course_content(db: AsyncSession, course_id: uuid.UUID):
             },
             "syllabus": syllabus,
         }
-
-        print(response_data)
         return response_data
 
     except Exception as e:

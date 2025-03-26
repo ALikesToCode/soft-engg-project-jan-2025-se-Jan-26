@@ -11,7 +11,7 @@
       />
     </div>
   </div>
-  <div v-if="isLoading" class="loading-overlay">
+  <div v-if="isLoading || isSendingNotif" class="loading-overlay">
     <LoadingSpinner />
   </div>
 </template>
@@ -23,6 +23,7 @@ import SideNavBar from '@/layouts/SideNavBar.vue'
 import { useCourseStore } from '@/stores/courseStore'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { FacultyNotificationService } from '@/services/facultyNotification.service'
+import { useToast } from 'vue-toastification'
 
 export default {
   name: 'FacultyNotificationsView',
@@ -47,6 +48,15 @@ export default {
     },
   },
   methods: {
+    showSuccessToast(msg) {
+      const toast = useToast() // Call inside the method
+      toast.success(msg, { timeout: 3000 })
+    },
+    showErrorToast(error, defaultMessage) {
+      const toast = useToast()
+      const message = error.response?.data?.message || defaultMessage
+      toast.error(message)
+    },
     async handleFacultyNotification(notification) {
       // Faculty can only send course-specific notifications
       if (!this.$refs.baseNotifications) return
@@ -67,11 +77,19 @@ export default {
           }
           //API call to save faculty notification
           try {
-            response = await FacultyNotificationService.createNotification(notification, headers)
+            const response = await FacultyNotificationService.createNotification(
+              notification,
+              headers,
+            )
             console.log('here ' + response.data)
+            if (!response || response.status !== 200) {
+              throw new Error('Unexpected response format')
+            }
             this.isSendingNotif = false
+            this.showSuccessToast('Notification sent successfully')
           } catch (error) {
             this.isSendingNotif = false
+            this.showErrorToast(error, 'Failed to send the notification')
           }
         } else {
           console.warn('Faculty attempted to send notification for non-enrolled course')
@@ -91,6 +109,7 @@ export default {
         this.isLoading = false
       } catch (error) {
         this.isLoading = false
+        this.showErrorToast(error, 'Failed to load the courses')
         throw error
       } finally {
         this.isLoading = false

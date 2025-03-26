@@ -72,6 +72,39 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Error fetching notification: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
+    
+    @staticmethod
+    async def get_recent_notifications_for_faculty_or_support(db: AsyncSession, user_id: UUID):
+        logger.info("Just entered in get_recent_notifications_for_faculty_or_support in NotificationService class")
+        try:
+            # Fetch recent course notifications sent by the user
+            course_result = await db.execute(
+                select(CourseNotification)
+                .where(CourseNotification.sent_by == user_id)
+                .order_by(CourseNotification.timestamp.desc())
+            )
+            course_notifications = course_result.scalars().all()
+
+            # Fetch recent system notifications sent by the user
+            system_result = await db.execute(
+                select(SystemNotification)
+                .where(SystemNotification.sent_by == user_id)
+                .order_by(SystemNotification.timestamp.desc())
+            )
+            system_notifications = system_result.scalars().all()
+
+            # Convert to dictionary format
+            notifications = [notif.to_dict() for notif in course_notifications] + [
+                notif.to_dict() for notif in system_notifications
+            ]
+
+            return notifications
+
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error getting recent notifications: {str(e)}")
+            raise HTTPException(status_code=500, detail="Could not fetch recent notifications")
+
 
     @staticmethod
     async def save_course_notification(notification_content,db: AsyncSession,user_id:UUID):

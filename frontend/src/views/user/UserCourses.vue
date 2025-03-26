@@ -4,6 +4,7 @@ import ChatBotBox from '../../components/ChatBotBox.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { Course } from '@/models/Course'
 import api from '@/utils/api'
+import { useToast } from 'vue-toastification'
 const dummyAvatar =
   'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=='
 
@@ -161,6 +162,15 @@ export default {
     },
   },
   methods: {
+    showSuccessToast(msg) {
+      const toast = useToast() // Call inside the method
+      toast.success(msg, { timeout: 3000 })
+    },
+    showErrorToast(error, defaultMessage) {
+      const toast = useToast()
+      const message = error.response?.data?.message || defaultMessage
+      toast.error(message)
+    },
     toggleFilter(filter) {
       if (filter === 'All') {
         this.activeFilters = ['All']
@@ -210,7 +220,10 @@ export default {
           },
         }
         const response = await api.get('/user/courses', headers)
-        if (response.status !== 200) throw new Error('Failed to fetch user course data')
+        if (response.status !== 200) {
+          this.showErrorToast('Failed to fetch user course data')
+          throw new Error('Failed to fetch user course data')
+        }
 
         response.data.forEach((c) => {
           const course = new Course({
@@ -227,8 +240,10 @@ export default {
         })
         this.isCourseEnrolledDataLoading = false
         console.log('c = ' + this.courses)
+        this.showSuccessToast('Course data fetched successfully')
       } catch (error) {
         this.isCourseEnrolledDataLoading = false
+        this.showErrorToast(error, 'Failed to Load course data')
         console.error('Error fetching user courses:', error)
       }
     },

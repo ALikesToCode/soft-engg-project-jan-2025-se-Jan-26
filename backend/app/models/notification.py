@@ -16,6 +16,7 @@ class CourseNotification(Base):
     message = Column(Text, nullable=False)
     timestamp = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    sent_by = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     def to_dict(self):
         return {
@@ -40,6 +41,7 @@ class SystemNotification(Base):
     title = Column(String, nullable=False)
     message = Column(Text, nullable=False)
     timestamp = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    sent_by = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     def to_dict(self):
         return {

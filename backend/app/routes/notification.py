@@ -61,9 +61,26 @@ async def get_notifications(
     try:
         notifications = await NotificationService.get_user_notification(db, user_id)
         return notifications
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         logger.error(f"Error ==> {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get('/recent-notifications')
+async def get_recent_notifications_for_faculty_or_support(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_auth)
+):
+    user_id = current_user["sub"]
+    try:
+        recent_notifications = await NotificationService.get_recent_notifications_for_faculty_or_support(db, user_id)
+        return recent_notifications
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        logger.error(f"Error ==> {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not get recent notifications")
     
 user_preferences: Dict[int, Dict] = {}
 
@@ -84,6 +101,8 @@ async def send_course_notification(
         logger.info("Going to save the notification to be sent")
         notification = await NotificationService.save_course_notification(notification_content, db, user_id)
         return notification
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         logger.error(f"Error ==> {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -100,6 +119,8 @@ async def notify(sys_notification_content: SystemNotification,
         logger.info("Going to save the system notification to be sent")
         notification = await NotificationService.save_system_notification(sys_notification_content, db, user_id)
         return notification
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         logger.error(f"Error ==> {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -141,5 +162,6 @@ async def markAllNotificationAsRead(
     except Exception as e:
         logger.error(f"Error ==> {str(e)}")
         raise HTTPException(status_code=500, detail="Could not update notifications")
+
 
 

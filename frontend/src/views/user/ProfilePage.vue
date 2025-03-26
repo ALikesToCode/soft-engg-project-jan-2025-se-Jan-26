@@ -19,6 +19,7 @@ import StudentCourseList from './components/StudentCourseList.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { Course } from '@/models/Course'
 import api from '@/utils/api'
+import { useToast } from 'vue-toastification'
 const dummyAvatar =
   'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=='
 
@@ -57,6 +58,15 @@ export default {
     }
   },
   methods: {
+    showSuccessToast(msg) {
+      const toast = useToast() // Call inside the method
+      toast.success(msg, { timeout: 3000 })
+    },
+    showErrorToast(error, defaultMessage) {
+      const toast = useToast()
+      const message = error.response?.data?.message || defaultMessage
+      toast.error(message)
+    },
     continueCourseToDashboard() {
       this.$router.push({ path: '/user/courses' })
     },
@@ -75,16 +85,18 @@ export default {
         }
 
         const response = await api.get('/user/profile', headers)
-        if (response.status !== 200) throw new Error('Failed to fetch user data')
+        if (response.status !== 200) throw new Error('Failed to fetch user profile data')
 
         this.userInfo.id = response.data.id
         this.userInfo.name = response.data.name
         this.userInfo.email = response.data.email
         this.userInfo.profilePictureUrl = response.data.profile_pic_url
         this.isProfileDataLoading = false
+        this.showSuccessToast('Successfully fetched user profile data')
         console.log(response.data)
       } catch (error) {
         this.isProfileDataLoading = false
+        this.showErrorToast(error, 'Failed to fetch user profile data')
         console.error('Error fetching user profile:', error)
       }
     },
@@ -116,10 +128,11 @@ export default {
           this.courses.push(course)
         })
         this.isCourseEnrolledDataLoading = false
-        console.log(response.data)
         console.log('c = ' + this.courses)
+        this.showSuccessToast('User course data fetched successfully')
       } catch (error) {
         this.isCourseEnrolledDataLoading = false
+        this.showErrorToast(error, 'Failed to fetch user course data')
         console.error('Error fetching user courses:', error)
       }
     },

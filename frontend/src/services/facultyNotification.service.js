@@ -8,6 +8,19 @@ export const FacultyNotificationService = {
     return axios.get(`${API_ROUTES.NOTIFICATIONS}/faculty`, { params: filters })
   },
 
+  async getRecentNotifications(headers) {
+    console.log(`Inside notificationService.getRecentNotifications to send request at ${API_ROUTES.NOTIFICATIONS}/recent-notifications`)
+    try {
+      const response = await api.get(
+        `${API_ROUTES.NOTIFICATIONS}/recent-notifications`,
+        headers
+      );
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
   // Create a new notification
   async createNotification(notificationData, headers) {
     console.log(`Inside notificationService.createNotification to send request at ${API_ROUTES.NOTIFICATIONS}/course/send`)
@@ -18,6 +31,7 @@ export const FacultyNotificationService = {
         notificationData,
         headers
       );
+      console.log("Notification Sent, Response:", response);
       return response;
     } catch (error) {
       console.error("Error sending notification:", error.response?.data || error.message);

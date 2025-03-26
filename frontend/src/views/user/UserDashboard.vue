@@ -3,6 +3,7 @@ import SideNavBar from '@/layouts/SideNavBar.vue'
 import ChatBotWrapper from '@/components/ChatBotWrapper.vue'
 import api from '@/utils/api'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import { useToast } from 'vue-toastification'
 export default {
   name: 'DashboardView',
   data() {
@@ -76,6 +77,15 @@ export default {
     },
   },
   methods: {
+    showSuccessToast(msg) {
+      const toast = useToast() // Call inside the method
+      toast.success(msg, { timeout: 3000 })
+    },
+    showErrorToast(error, defaultMessage) {
+      const toast = useToast()
+      const message = error.response?.data?.message || defaultMessage
+      toast.error(message)
+    },
     startMaterial(material) {
       // TODO: Implement navigation to material
       console.log('Starting material:', material.title)
@@ -107,7 +117,9 @@ export default {
         if (response.status !== 200) throw new Error('Failed to fetch user data')
         console.log(response.data)
         this.recommendedMaterials = response.data
+        this.showSuccessToast('Reccommended Courses fetched successfully')
       } catch (error) {
+        this.showErrorToast(error, 'Failed to Load Recommended Courses')
         throw error
       } finally {
         this.isDataLoading = false
@@ -130,7 +142,9 @@ export default {
         if (response.status !== 200) throw new Error('Failed to fetch user data')
         console.log(response.data)
         this.bookmarkedMaterials = response.data
+        this.showSuccessToast('Bookmarked Materials fetched successfully')
       } catch (error) {
+        this.showErrorToast(error, 'Failed to Load Bookmarked Materials')
         throw error
       } finally {
         this.isDataLoading = false
@@ -149,10 +163,15 @@ export default {
         }
 
         const response = await api.delete(`/user/bookmarked-materials/${bookmarkId}`, headers)
-        if (response.status !== 200) throw new Error('Failed to delete the data')
+        if (response.status !== 200) {
+          this.showErrorToast(error, 'Failed to delete the Bookmark')
+          throw new Error('Failed to delete the data')
+        }
         console.log(response.data)
         this.bookmarkedMaterials = response.data
+        this.showSuccessToast('Bookmark Deleted Successfully')
       } catch (error) {
+        this.showErrorToast(error, 'Failed to delete the Bookmark')
         throw error
       } finally {
         this.isDataLoading = false

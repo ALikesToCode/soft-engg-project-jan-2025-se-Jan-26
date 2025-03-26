@@ -39,7 +39,6 @@ async def get_all_courses(db: AsyncSession, user_id: uuid.UUID = None):
     try:
         if user_id:
             # Fetch all course objects for a specific faculty
-
             user_result = await db.execute(
                 select(User).where(User.id == user_id)
             )

@@ -213,6 +213,7 @@
 import SideNavBar from '@/layouts/SideNavBar.vue'
 import api from '@/utils/api'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import { useToast } from 'vue-toastification'
 
 export default {
   name: 'CourseHistory',
@@ -313,6 +314,15 @@ export default {
     },
   },
   methods: {
+    showSuccessToast(msg) {
+      const toast = useToast() // Call inside the method
+      toast.success(msg, { timeout: 3000 })
+    },
+    showErrorToast(error, defaultMessage) {
+      const toast = useToast()
+      const message = error.response?.data?.message || defaultMessage
+      toast.error(message)
+    },
     formatDate(date) {
       const d = new Date(date)
       const months = [
@@ -383,12 +393,14 @@ export default {
         }
 
         const response = await api.get('/user/courses/history', headers)
-        if (response.status !== 200) throw new Error('Failed to fetch user data')
+        if (response.status !== 200) throw new Error('Failed to fetch user course data')
         console.log(response.data)
         this.completedCourses = response.data
         this.totalEnrolled = response.data[response.data.length - 1].total_enrolled_course
         this.isDataLoading = false
+        this.showSuccessToast('User Course History Data Fecthed')
       } catch (error) {
+        this.showErrorToast(error, 'Failed to fetch user course data')
         this.isDataLoading = false
       } finally {
         this.isDataLoading = false

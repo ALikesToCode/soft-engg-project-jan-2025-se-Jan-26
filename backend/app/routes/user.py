@@ -352,6 +352,8 @@ async def fetch_user_courses(
         # Use the user ID from the database
         courses = await get_all_user_courses(db, user.id)  
         return courses
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         print("Error=> ", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -370,6 +372,8 @@ async def get_user_course_content(
         
         course_content = await fetch_user_course_content(db,course_id)
         return course_content
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         print("Error=> ", e)
         raise HTTPException(status_code=500, detail=str(e))

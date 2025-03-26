@@ -58,6 +58,8 @@ async def get_course_history(
     try:
         courses = await CourseService.get_user_course_history(db, current_user["sub"])
         return courses
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         print("Error ==>", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -85,6 +87,8 @@ async def get_user_bookmarked_materials(
     try:
         bookmarkeds = await CourseService.get_user_bookmarked_materials(db, user_id)
         return bookmarkeds
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         raise HTTPException(status=500, detail=str(e))
 
@@ -98,6 +102,8 @@ async def delete_bookmarked_material(
     try:
         bookmarkeds = await CourseService.delete_bookmarked_material(db, user_id, bookmark_id)
         return bookmarkeds
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         raise HTTPException(status=500, detail=str(e))
 
@@ -159,6 +165,8 @@ async def get_course_enrollment(
     try:
         enrollment = await CourseService.get_course_enrollment(db, course_id)
         return enrollment
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

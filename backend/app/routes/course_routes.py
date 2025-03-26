@@ -85,6 +85,8 @@ async def fetch_courses(
         #Implemente code to check if user is faculty
         courses = await get_all_courses(db, current_user["sub"]) 
         return courses
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e: 
         logger.error(f"Error ==> {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -204,6 +206,8 @@ async def get_lecture_for_given_module(module_id: str, db: AsyncSession = Depend
         module_id = int(module_id)
         modules = await get_lecture_for_module(module_id,db, current_user['sub'])  
         return modules
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -269,6 +273,8 @@ async def get_lecture_content(module_id: str, db: AsyncSession = Depends(get_db)
     try:
         contents = await get_lecture_content_by_module(module_id,db, current_user['id'])
         return contents
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -322,6 +328,8 @@ async def get_video_lecture_content(lecture_id: str, db: AsyncSession = Depends(
     try:
         content = await get_lecture_content_by_lecture(lecture_id, db, current_user['id'])
         return content
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
@@ -374,8 +382,13 @@ async def add_content(content: LectureContentData, db: AsyncSession = Depends(ge
     """
     Adds a new doc content to the lecture
     """
-    doc_content_added = await add_lecture_content_to_existing_course(content, db, current_user['sub'])
-    return doc_content_added
+    try:
+        doc_content_added = await add_lecture_content_to_existing_course(content, db, current_user['sub'])
+        return doc_content_added
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @course_router.post("/courses/module",
     summary="Add a new module to the course",
@@ -433,8 +446,13 @@ async def create_module(module_data: ModuleCreate, db: AsyncSession = Depends(ge
     """
     Adds a new module to the course
     """
-    new_module = await add_module(module_data, db, current_user['sub'])
-    return new_module
+    try:
+        new_module = await add_module(module_data, db, current_user['sub'])
+        return new_module
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @course_router.post("/courses/module/doc_content/lecture", response_model=dict,
     summary="Add document content to the lecture",
@@ -505,8 +523,13 @@ async def add_doc_content(content: DocumentLinkCreate, db: AsyncSession = Depend
     """
     Adds a new doc content to the lecture
     """
-    doc_content_added = await add_doc_content_to_existing_course(content, db, current_user['sub'])
-    return doc_content_added
+    try:
+        doc_content_added = await add_doc_content_to_existing_course(content, db, current_user['sub'])
+        return doc_content_added
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @course_router.put("/courses/module/content/lecture", response_model=dict,
     summary="Update lecture content",
@@ -567,8 +590,13 @@ async def update_content(content: UpdateLectureContentData, db: AsyncSession = D
     """
     Updates an existing lecture content in the module of a course
     """
-    updated_content = await update_existing_lecture_content(content, db, current_user['sub'])
-    return updated_content
+    try:
+        updated_content = await update_existing_lecture_content(content, db, current_user['sub'])
+        return updated_content
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @course_router.put("/courses/module/doc_content/lecture", response_model=dict,
     summary="Update document content",
@@ -638,8 +666,13 @@ async def update_doc_content(content: UpdateDocumentLinkCreate, db: AsyncSession
     """
     Updates an existing doc content in the module of a course
     """
-    updated_content = await update_existing_lecture_doc_content(content, db, current_user['sub'])
-    return updated_content
+    try:
+        updated_content = await update_existing_lecture_doc_content(content, db, current_user['sub'])
+        return updated_content
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @course_router.delete("/courses/module/{module_id}",
@@ -684,6 +717,8 @@ async def delete_module(module_id: str, db: AsyncSession = Depends(get_db), curr
             return {"message": "Module deleted successfully"}
         else:
             raise HTTPException(status_code=404, detail="Module not found")
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -715,6 +750,8 @@ async def create_course(course_data: CourseCreate, db: AsyncSession = Depends(ge
         await db.refresh(new_course)
         
         return new_course.to_dict()
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
