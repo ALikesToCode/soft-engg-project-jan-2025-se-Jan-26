@@ -170,6 +170,29 @@ async def markAllNotificationAsRead(
     except Exception as e:
         logger.error(f"Error ==> {str(e)}")
         raise HTTPException(status_code=500, detail="Could not update notifications")
+    
 
+@router.delete('/delete/{type}/{id}')
+async def markNotificationAsRead(
+    type: str,
+    id: int,
+    db: AsyncSession = Depends(get_db), 
+    current_user: dict = Depends(require_auth)
+):
+    user_id = current_user["sub"]
+    _id = id
+    try:
+        deleted_notifications = await NotificationService.delete_notification_by_id(_id, type, db, user_id)
+        return {"success": True, "deleted_notifications": deleted_notifications}
+        
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        logger.error(f"Error ==> {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not update notifications")
+    
+    
 
 

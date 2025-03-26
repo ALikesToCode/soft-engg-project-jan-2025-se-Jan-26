@@ -131,7 +131,7 @@
                 <button
                   @click="removeNotification(notification)"
                   class="p-1 hover:bg-gray-200 rounded-full transition-colors"
-                  title="Remove notification"
+                  title="Delete Notification"
                 >
                   <span class="material-icons text-gray-400 text-sm">delete</span>
                 </button>
@@ -163,6 +163,7 @@
 import { formatDistanceToNow } from 'date-fns'
 import api from '@/utils/api'
 import miniLoader from './common/miniLoader.vue'
+import { useToast } from 'vue-toastification'
 
 export default {
   name: 'NotificationPanel',
@@ -200,6 +201,7 @@ export default {
       hasMoreNotifications: false,
       page: 1,
       isNotificationLoading: false,
+      isDeleting: false,
     }
   },
   computed: {
@@ -219,6 +221,15 @@ export default {
     },
   },
   methods: {
+    showSuccessToast(msg) {
+      const toast = useToast() // Call inside the method
+      toast.success(msg, { timeout: 2000 })
+    },
+    showErrorToast(error, defaultMessage) {
+      const toast = useToast()
+      const message = error.response?.data?.message || defaultMessage
+      toast.error(message)
+    },
     getNotificationTypeClasses(type) {
       const classes = {
         course: {
@@ -265,8 +276,32 @@ export default {
     },
     async removeNotification(notification) {
       // TODO: Implement API call
-      this.notifications = this.notifications.filter((n) => n.id !== notification.id)
-      this.$emit('update:unread-count', this.unreadCount)
+      console.log('Deleting notification')
+      this.isDeleting = true
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
+      console.log(notification)
+      try {
+        const type = notification.notification_type
+        const id = notification.notification_id
+        const response = await api.delete(`/notification/delete/${type}/${id}`, headers)
+        this.notifications = this.notifications.filter(
+          (n) => n.notification_id !== notification.notification_id,
+        )
+        this.$emit('update:unread-count', this.unreadCount)
+        this.showSuccessToast('Notification has been deleted')
+      } catch (error) {
+        this.showErrorToast(error, 'Failed to Delete the Notification')
+        throw error
+      } finally {
+        this.isDeleting = false
+      }
     },
     handleAction(notification) {
       if (notification.actionUrl) {

@@ -333,5 +333,76 @@ class NotificationService:
         except Exception as e:
             await db.rollback()
             logger.error(f"Error marking notifications as read: {str(e)}")
-            raise HTTPException(status_code=500, detail="Database update failed")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @staticmethod
+    async def delete_notification_by_id(notification_id: int, type:str, db: AsyncSession,user_id:UUID):
+        logger.info(f"In delete_notification_by_id in NotificationService class with id = {notification_id}, type={type}")
+        
+        if not isinstance(type, str) or type.lower() not in ['system', 'course']:
+            raise ValueError("Notification type is invalid")
+        
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() not in ['support', 'faculty']:
+            logger.info(f"You do not have permission to delete this notification")
+            raise HTTPException(status_code=403, detail="You are forbidden to user the resource")
+        
+        course_notification_found = True
+
+        try:
+            result = await db.execute(select(CourseNotification)
+                                .where(
+                                    and_(CourseNotification.id == notification_id,
+                                          CourseNotification.type == type)
+                                    )
+                                )
+            notif = result.scalars().first()
+            if not notif:
+                logger.info("CourseNotification not found. Will check for sys notification")
+                course_notification_found = False
+            
+            if not course_notification_found:
+                sys_notif_result = await db.execute(select(SystemNotification)
+                                    .where(
+                                        and_(SystemNotification.id == notification_id,
+                                            SystemNotification.type == type)
+                                        )
+                                    )
+                sys_notif = sys_notif_result.scalars().first()
+
+                if not sys_notif:
+                    raise HTTPException(status_code=404, detail="No Nodification found")
+            
+            logger.info("Notification found, checking UserNotificationStatus before deletion.")
+            notif_status_result = await db.execute(select(UserNotificationStatus)
+                                      .where(
+                                        and_(UserNotificationStatus.notification_id == notification_id,
+                                            UserNotificationStatus.type == type,
+                                            UserNotificationStatus.user_id == user_id)
+                                        )
+                                    )
+            notif_status = notif_status_result.scalars().first()
+            # Delete both records
+            if notif_status:
+                await db.delete(notif_status)
+                logger.info("Deleted UserNotificationStatus record.")
+            
+            if not course_notification_found and sys_notif:
+                await db.delete(sys_notif)
+                logger.info("Deleted Sys notifiction record.")
+
+            if course_notification_found and notif:
+                await db.delete(notif)
+                logger.info("Deleted CourseNotification record.")
+
+            # Commit the transaction
+            await db.commit()
+            return 
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error deleting the notification : {str(e)}")
+            raise HTTPException(status_code=500, detail="Notification deletion failed")
+               
+
 
