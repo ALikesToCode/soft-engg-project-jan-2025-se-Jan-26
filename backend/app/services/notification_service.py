@@ -93,10 +93,15 @@ class NotificationService:
             )
             system_notifications = system_result.scalars().all()
 
-            # Convert to dictionary format
-            notifications = [notif.to_dict() for notif in course_notifications] + [
-                notif.to_dict() for notif in system_notifications
-            ]
+            # Combine and format notifications
+            notifications = []
+            
+            for notif in course_notifications + system_notifications:
+                notif_dict = notif.to_dict()
+                notif_dict["timestamp"] = notif.timestamp.isoformat()
+                notifications.append(notif_dict)
+
+            logger.info("Successfully fetched %d notifications", len(notifications))
 
             return notifications
 

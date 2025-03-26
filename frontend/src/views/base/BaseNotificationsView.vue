@@ -42,7 +42,7 @@
                 </span>
               </div>
               <span class="text-sm text-gray-500">
-                {{ formatDate(notification.createdAt) }}
+                {{ formatDate(notification.timestamp) }}
               </span>
             </div>
             <h3 class="font-semibold text-gray-800">{{ notification.title }}</h3>
@@ -60,6 +60,7 @@
 <script>
 import NotificationForm from '@/components/NotificationForm.vue'
 import formatDateFunc from '@/utils/formatDate'
+import { FacultyNotificationService } from '@/services/facultyNotification.service'
 
 export default {
   name: 'BaseNotificationsView',
@@ -83,25 +84,15 @@ export default {
   data() {
     return {
       recentNotifications: [
-        {
-          id: 1,
-          type: 'system',
-          priority: 'urgent',
-          category: 'maintenance',
-          title: 'Scheduled Maintenance',
-          message: 'The system will be under maintenance this Sunday from 2 AM to 4 AM.',
-          createdAt: new Date('2024-01-20T10:00:00'),
-        },
-        {
-          id: 2,
-          type: 'course',
-          courseId: 1,
-          priority: 'high',
-          category: 'announcement',
-          title: 'Course Update',
-          message: 'Important updates have been made to the course materials.',
-          createdAt: new Date('2024-01-19T15:30:00'),
-        },
+        // {
+        //   id: 1,
+        //   type: 'system',
+        //   priority: 'urgent',
+        //   category: 'maintenance',
+        //   title: 'Scheduled Maintenance',
+        //   message: 'The system will be under maintenance this Sunday from 2 AM to 4 AM.',
+        //   createdAt: new Date('2024-01-20T10:00:00'),
+        // },
       ],
     }
   },
@@ -157,6 +148,39 @@ export default {
         'bg-red-100 text-red-800': priority === 'urgent',
       }
     },
+    async getRecentNotifications() {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
+      try {
+        const response = await FacultyNotificationService.getRecentNotifications(headers)
+        if (!response || response.status !== 200) {
+          throw new Error('Unexpected response format')
+        }
+        response.data.forEach((notif) => {
+          let date = notif.timestamp
+
+          if (!(date instanceof Date)) {
+            date = new Date(date) // Only convert if it's NOT already a Date object
+          }
+          if (isNaN(date.getTime())) {
+            console.error('Invalid date format received:', notif.timestamp)
+          } else {
+            this.recentNotifications.push(notif)
+          }
+        })
+      } catch (error) {
+        console.error('errpr')
+      }
+    },
+  },
+  mounted() {
+    this.getRecentNotifications()
   },
 }
 </script>
