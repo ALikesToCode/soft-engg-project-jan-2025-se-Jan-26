@@ -4,10 +4,12 @@ import ChatBotWrapper from '@/components/ChatBotWrapper.vue'
 import api from '@/utils/api'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { useToast } from 'vue-toastification'
+import AlertMessage from '@/components/common/AlertMessage.vue'
 export default {
   name: 'DashboardView',
   data() {
     return {
+      showAlertMessage: false,
       isDataLoading: false,
       queryEmpty: true,
       showSplitScreen: false,
@@ -51,15 +53,7 @@ export default {
           completedSteps: 9,
         },
       ],
-      bookmarkedMaterials: [
-        // {
-        //   id: 1,
-        //   title: 'Design Patterns in Python',
-        //   type: 'Article',
-        //   author: 'Dr. Sarah Johnson',
-        //   dateBookmarked: '2024-01-15',
-        // },
-      ],
+      bookmarkedMaterials: [],
       isDevelopment: import.meta.env.VITE_NODE_ENV === 'development',
     }
   },
@@ -67,6 +61,7 @@ export default {
     SideNavBar,
     ChatBotWrapper,
     LoadingSpinner,
+    AlertMessage,
   },
   computed: {
     mainContentClass() {
@@ -88,6 +83,15 @@ export default {
     },
     startMaterial(material) {
       // TODO: Implement navigation to material
+      if (material.tutorial_url === null) {
+        this.showAlertMessage = true
+        setTimeout(() => {
+          this.showAlertMessage = false
+        }, 3000)
+      } else {
+        //open a new window to the material
+        window.open(material.tutorial_url, '_blank')
+      }
       console.log('Starting material:', material.title)
     },
     viewRoadmap(roadmap) {
@@ -308,6 +312,9 @@ export default {
   </div>
   <div v-if="isDataLoading" class="loading-overlay">
     <LoadingSpinner />
+  </div>
+  <div v-if="showAlertMessage">
+    <AlertMessage :message="'Please send mail to support to add this course.'" type="info" />
   </div>
 </template>
 

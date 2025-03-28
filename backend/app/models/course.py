@@ -44,7 +44,7 @@ class Course(Base):
     # Use String type with enum validation instead of PostgreSQL ENUM type
     # status = Column(String, nullable=False, default=CourseStatus.DRAFT.value)
     status = Column(ENUM(CourseStatus, name="coursestatus"), nullable=False, default=CourseStatus.DRAFT)
-
+    level = Column(String, nullable=True, default="Beginner")
     start_date = Column(DateTime(timezone=True), nullable=True)
     end_date = Column(DateTime(timezone=True), nullable=True)
     enrollment_limit = Column(Integer, nullable=True)
@@ -81,6 +81,7 @@ class Course(Base):
             "enrollment_limit": self.enrollment_limit,
             "waitlist_limit": self.waitlist_limit,
             "image": self.image,
+            "level": self.level,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
@@ -199,6 +200,7 @@ class UserRecommendedCourses(Base):
     progress = Column(Integer, default=0)  # Progress percentage
     thumbnail_path = Column(String, nullable=False, default="https://placehold.co/100x100")  # Default thumbnail
     reason = Column(Text, nullable=True)  # Recommendation reason
+    tutorial_url = Column(String, nullable=False)  # for Tutorial type else Null
 
     def to_dict(self):
         """Converts the UserRecommendedCourses object to a dictionary"""
@@ -209,7 +211,8 @@ class UserRecommendedCourses(Base):
             "type": self.type,
             "progress": self.progress,
             "thumbnail_path": self.thumbnail_path,
-            "reason": self.reason
+            "reason": self.reason,
+            "tutorial_url": self.tutorial_url
         }
 
 class BookmarkedMaterials(Base):

@@ -257,6 +257,7 @@ async def add_new_course(course_data, db: AsyncSession, user_id: uuid.UUID):
             description=course_data.description,
             start_date=course_data.start_date,
             end_date=course_data.end_date,
+            level=course_data.level,
         )
         db.add(new_course)
         await db.commit()

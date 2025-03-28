@@ -233,7 +233,8 @@ export default {
             title: c.title,
             description: c.description,
             status: c.status,
-            progress: 50,
+            // progress: 50,
+            level: c.level,
             duration: c.duration + ' Weeks',
             studentsCount: 100,
             instructor: { name: c.created_by, avatar: dummyAvatar },
@@ -368,7 +369,8 @@ export default {
               </div>
               <h3 class="text-lg font-semibold text-gray-800 mb-2">{{ course.title }}</h3>
               <p class="text-gray-600 text-sm mb-4">{{ course.description }}</p>
-              <div class="space-y-3">
+              <!-- Course progress -->
+              <!-- <div class="space-y-3">
                 <div class="flex items-center justify-between text-sm">
                   <span class="text-gray-600">Progress</span>
                   <span class="font-medium">{{ course.progress }}%</span>
@@ -379,7 +381,7 @@ export default {
                     :style="{ width: `${course.progress}%` }"
                   ></div>
                 </div>
-              </div>
+              </div> -->
               <div class="mt-4 flex items-center justify-between">
                 <div class="flex items-center space-x-2">
                   <img
