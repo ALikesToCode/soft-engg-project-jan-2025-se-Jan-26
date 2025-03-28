@@ -13,13 +13,23 @@ export const useUserStore = defineStore('user', () => {
   async function fetchUsers() {
     try {
       loading.value = true
-      if (import.meta.env.DEV) {
-        return [] // Mock users can be added here if needed
-      }
-      const response = await axios.get(`${API_URL}${API_PREFIX}/users`)
+      // console.log('Fetching users from:', `${API_URL}${API_PREFIX}/users`)
+      const token = localStorage.getItem('token');
+      // console.log('Token:', token);
+      const response = await axios.get(`${API_URL}${API_PREFIX}/users`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+      // console.log('API Response:', response.data)
+      // if (import.meta.env.DEV) {
+      //   return [] // Mock users can be added here if needed
+      // }
+      // const response = await axios.get(`${API_URL}${API_PREFIX}/users`)
       users.value = response.data
       return response.data
     } catch (err) {
+      console.error('Error fetching users:', err)
       error.value = err.message
       throw err
     } finally {
@@ -30,7 +40,12 @@ export const useUserStore = defineStore('user', () => {
   async function createUser(userData) {
     try {
       loading.value = true
-      const response = await axios.post(`${API_URL}${API_PREFIX}/users/add`, userData)
+      const token = localStorage.getItem('token')
+      const response = await axios.post(`${API_URL}${API_PREFIX}/users/add`, userData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
       users.value.push(response.data)
       return response.data
     } catch (err) {
@@ -44,7 +59,12 @@ export const useUserStore = defineStore('user', () => {
   async function updateUser(userId, userData) {
     try {
       loading.value = true
-      const response = await axios.put(`${API_URL}${API_PREFIX}/users/${userId}`, userData)
+      const token = localStorage.getItem('token')
+      const response = await axios.put(`${API_URL}${API_PREFIX}/users/${userId}`, userData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
       const index = users.value.findIndex(u => u.id === userId)
       if (index !== -1) {
         users.value[index] = response.data
@@ -61,7 +81,12 @@ export const useUserStore = defineStore('user', () => {
   async function deleteUser(userId) {
     try {
       loading.value = true
-      await axios.delete(`${API_URL}${API_PREFIX}/users/${userId}`)
+      const token = localStorage.getItem('token')
+      await axios.delete(`${API_URL}${API_PREFIX}/users/${userId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
       users.value = users.value.filter(u => u.id !== userId)
     } catch (err) {
       error.value = err.message

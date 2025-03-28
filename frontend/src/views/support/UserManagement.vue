@@ -146,12 +146,12 @@
                       </span>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {{ formatDate(user.lastActive) }}
+                      {{ user.lastActive? formatDate(user.lastActive) : 'N/A' }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div class="flex justify-end space-x-3">
                         <button
-                          @click="editUser(user)"
+                          @click="openUserModal(user)"
                           class="text-blue-600 hover:text-blue-900"
                         >
                           Edit
@@ -169,6 +169,14 @@
                           class="text-green-600 hover:text-green-900"
                         >
                           Activate
+                        </button>
+                        <button
+                          @click="handleDeleteUser(user)"
+                          class="p-2 text-red-600 hover:text-red-900"
+                        >
+                          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                          </svg>
                         </button>
                       </div>
                     </td>
@@ -468,6 +476,9 @@ export default {
 
     // Methods
     function formatDate(date) {
+      if (!date || isNaN(new Date(date))) {
+        return 'N/A' // Fallback text for invalid dates
+      }
       return format(new Date(date), 'MMM d, yyyy HH:mm')
     }
 
@@ -548,6 +559,18 @@ export default {
       }
     }
 
+    async function handleDeleteUser(user) {
+      if (confirm(`Are you sure you want to delete ${user.name}? This action cannot be undone.`)) {
+        try {
+          await userStore.deleteUser(user.id)
+          toast.success('User deleted successfully')
+          await loadUsers() // Refresh the user list
+        } catch (error) {
+          toast.error(error.message || 'Failed to delete user')
+        }
+      }
+    }
+
     async function deactivateUser(user) {
       if (confirm(`Are you sure you want to deactivate ${user.name}?`)) {
         try {
@@ -613,6 +636,7 @@ export default {
       openUserModal,
       closeUserModal,
       saveUser,
+      handleDeleteUser,
       deactivateUser,
       activateUser,
       previousPage,

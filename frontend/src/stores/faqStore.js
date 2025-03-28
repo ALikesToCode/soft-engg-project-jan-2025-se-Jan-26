@@ -2,6 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
 
+const API_URL = import.meta.env.VITE_API_URL
+const API_PREFIX = import.meta.env.VITE_API_PREFIX || ''
+
 export const useFaqStore = defineStore('faq', () => {
   // State
   const faqs = ref([])
@@ -34,10 +37,17 @@ export const useFaqStore = defineStore('faq', () => {
   async function fetchFaqs() {
     try {
       loading.value = true
-      const response = await axios.get('/api/v1/faqs')
+      const token = localStorage.getItem('token');
+      // console.log('Token:', token);
+      const response = await axios.get(`${API_URL}${API_PREFIX}/faqs`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
       faqs.value = response.data
       return response
     } catch (err) {
+      console.error('Error fetching users:', err)
       error.value = err.message
       throw err
     } finally {
@@ -48,7 +58,12 @@ export const useFaqStore = defineStore('faq', () => {
   async function createFaq(faqData) {
     try {
       loading.value = true
-      const response = await axios.post('/api/v1/faqs', faqData)
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${API_URL}${API_PREFIX}/faqs`, faqData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
       faqs.value.push(response.data)
       return response
     } catch (err) {
@@ -62,7 +77,12 @@ export const useFaqStore = defineStore('faq', () => {
   async function updateFaq(faqId, faqData) {
     try {
       loading.value = true
-      const response = await axios.put(`/api/v1/faqs/${faqId}`, faqData)
+      const token = localStorage.getItem('token');
+      const response = await axios.put(`${API_URL}${API_PREFIX}/faqs/${faqId}`, faqData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
       const index = faqs.value.findIndex(f => f.id === faqId)
       if (index !== -1) {
         faqs.value[index] = response.data
@@ -79,7 +99,12 @@ export const useFaqStore = defineStore('faq', () => {
   async function deleteFaq(faqId) {
     try {
       loading.value = true
-      await axios.delete(`/api/v1/faqs/${faqId}`)
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_URL}${API_PREFIX}/faqs/${faqId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
       faqs.value = faqs.value.filter(f => f.id !== faqId)
     } catch (err) {
       error.value = err.message
@@ -92,7 +117,12 @@ export const useFaqStore = defineStore('faq', () => {
   async function rateFaq(faqId, isHelpful) {
     try {
       loading.value = true
-      const response = await axios.post(`/api/v1/faqs/${faqId}/rate`, { isHelpful })
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${API_URL}${API_PREFIX}/faqs/${faqId}/rate`, { isHelpful }, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
       const index = faqs.value.findIndex(f => f.id === faqId)
       if (index !== -1) {
         faqs.value[index] = {
