@@ -7,6 +7,13 @@ from app.services.course_service import CourseService
 from typing import List, Optional
 from uuid import UUID
 from app.services.function_router import function_router
+from pydantic import BaseModel
+
+class CourseBookmarkData(BaseModel):
+    course_id: UUID
+    type: str
+    title: str
+    author: str
 
 router = APIRouter(tags=["User Courses"])
 @router.get("/user/courses/history",
@@ -91,6 +98,22 @@ async def get_user_bookmarked_materials(
         raise http_ex
     except Exception as e:
         raise HTTPException(status=500, detail=str(e))
+
+@router.post("/user/bookmarked-materials")
+async def add_user_bookmarked_materials(
+    bookmark_data: CourseBookmarkData,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_auth)
+):
+    user_id = current_user['sub']
+    try:
+        bookmarkeds = await CourseService.add_user_bookmarked_materials(bookmark_data,db, user_id)
+        return bookmarkeds
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status=500, detail=str(e))
+
 
 @router.delete("/user/bookmarked-materials/{bookmark_id}")
 async def delete_bookmarked_material(

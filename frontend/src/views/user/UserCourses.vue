@@ -6,6 +6,7 @@ import { Course } from '@/models/Course'
 import api from '@/utils/api'
 import { useToast } from 'vue-toastification'
 import ChatBotWrapper from '@/components/ChatBotWrapper.vue'
+import miniLoader from '@/components/common/miniLoader.vue'
 const dummyAvatar =
   'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=='
 
@@ -90,6 +91,7 @@ export default {
       // ],
       courses: [],
       modules: [],
+      isBookmarking: false,
     }
   },
   components: {
@@ -97,6 +99,7 @@ export default {
     ChatBotBox,
     LoadingSpinner,
     ChatBotWrapper,
+    miniLoader,
   },
   computed: {
     filteredCourses() {
@@ -195,8 +198,38 @@ export default {
         }
       }
     },
-    toggleBookmark(course) {
-      course.isBookmarked = !course.isBookmarked
+    async toggleBookmark(course) {
+      //API call to toggle the boomark status
+      this.isBookmarking = true
+      const data = {
+        course_id: course.id,
+        type: 'Course',
+        title: course.title,
+        author: course.instructor.name,
+      }
+      const token = localStorage.getItem('token') // Retrieve token from localStorage
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
+
+      try {
+        const response = await api.post('/user/bookmarked-materials', { ...data }, headers)
+        if (response.status == 200) {
+          this.showSuccessToast('Course bookmarked successfully')
+          course.isBookmarked = !course.isBookmarked
+        } else {
+          throw new Error('Bookmarking failed. Try Again...')
+        }
+      } catch (error) {
+        this.showErrorToast(error, 'Bookmarking failed. Try Again...')
+        console.error('Error bookmarking the courses:', error)
+      } finally {
+        this.isBookmarking = false
+      }
       // If we're filtering by bookmarked, update the view
       if (this.activeFilters.includes('Bookmarked')) {
         this.$forceUpdate()
@@ -226,8 +259,8 @@ export default {
           this.showErrorToast('Failed to fetch user course data')
           throw new Error('Failed to fetch user course data')
         }
-
         response.data.forEach((c) => {
+          console.log('course = ' + c.is_bookmarked + ' ' + c.title)
           const course = new Course({
             id: c.id,
             title: c.title,
@@ -237,12 +270,12 @@ export default {
             level: c.level,
             duration: c.duration + ' Weeks',
             studentsCount: 100,
+            is_bookmarked: c.is_bookmarked,
             instructor: { name: c.created_by, avatar: dummyAvatar },
           })
           this.courses.push(course)
         })
         this.isCourseEnrolledDataLoading = false
-        console.log('c = ' + this.courses)
         this.showSuccessToast('Course data fetched successfully')
       } catch (error) {
         this.isCourseEnrolledDataLoading = false
@@ -337,6 +370,7 @@ export default {
               <img :src="course.image" :alt="course.title" class="w-full h-48 object-cover" />
               <div class="absolute top-4 right-4">
                 <button
+                  :disabled="course.isBookmarked"
                   @click="toggleBookmark(course)"
                   class="p-2 rounded-full bg-white shadow-md hover:bg-gray-50"
                 >
@@ -344,7 +378,7 @@ export default {
                     :class="[
                       'fas',
                       course.isBookmarked
-                        ? 'fa-bookmark text-blue-600'
+                        ? 'fa-bookmark text-blue-900'
                         : 'fa-bookmark text-gray-400',
                     ]"
                   ></i>
@@ -492,6 +526,12 @@ export default {
   <!-- Loading Overlay -->
   <div v-if="isCourseEnrolledDataLoading" class="loading-overlay">
     <LoadingSpinner />
+  </div>
+  <div
+    v-if="isBookmarking"
+    class="fixed top-[140px] left-1/2 transform -translate-x-1/2 bg-opacity-50 z-50 bg-gray-200 px-2 py-4 rounded-md"
+  >
+    <miniLoader>Bookmarking in progress...</miniLoader>
   </div>
 </template>
 

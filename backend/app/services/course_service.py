@@ -767,6 +767,31 @@ class CourseService:
             return [bm.to_dict() for bm in bookmarked_materials]
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+    
+    async def add_user_bookmarked_materials(bookmark_data,db, user_id):
+        try:
+            #validate if the user is student
+            result = await db.execute(select(User).where(User.id == user_id))
+            user = result.scalars().first()
+            if user is None:
+                raise HTTPException(status_code=404, detail="You are not Authorized")
+            
+            # Create a new bookmark object and add to the database
+            new_bookmark = BookmarkedMaterials(
+                user_id=user_id,
+                title=bookmark_data.title,
+                type=bookmark_data.type,
+                date_bookmarked=datetime.datetime.now(),
+                author=bookmark_data.author,
+                course_id=bookmark_data.course_id,
+            )
+            db.add(new_bookmark)
+            await db.commit()
+            await db.refresh(new_bookmark)
+            return new_bookmark.to_dict()
+        except Exception as e:
+            logger.error(f"Error while saving bookmar ==> {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     async def delete_bookmarked_material(db: AsyncSession, user_id: UUID, bookmark_id:int):
         try:

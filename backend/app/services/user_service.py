@@ -3,12 +3,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import select
 from app.models.user import User
-from app.models.course import Course, Module, LectureContent, Lecture, CourseEnrollment, LectureContentDoc
+from app.models.course import Course, Module, LectureContent, Lecture, CourseEnrollment, LectureContentDoc, BookmarkedMaterials
+from app.services.course_service import CourseService
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Union
 from sqlalchemy.orm import selectinload
 import bcrypt
 import uuid
+import logging
 class UserCreate(BaseModel):
     name: str
     email: EmailStr
@@ -24,6 +26,7 @@ class UserUpdate(BaseModel):
     picture: Optional[str] = None
 
 
+logger = logging.getLogger(__name__)
 
 async def create_user(db: AsyncSession, user_data: UserCreate) -> uuid.UUID:
     # Check if a user with the given email already exists
@@ -132,6 +135,7 @@ async def get_all_user_courses(db: AsyncSession, user_id: uuid.UUID):
     Returns:
         List of Courses with their details
     """
+    logger.info(f"Fetching courses for user with ID: {user_id}")
     try:
         query = (
             select(Course, User.name)
@@ -142,8 +146,28 @@ async def get_all_user_courses(db: AsyncSession, user_id: uuid.UUID):
         )
         result = await db.execute(query)
         courses = result.all()
-        return [{**course.to_dict(), "created_by": faculty_name} for course, faculty_name in courses]
+        # Check if the course is bookmarked by the user
+        logger.info(f"Found {len(courses)} courses for user with ID: {user_id}")
+        logger.info(f"Checking if the course is bookmarked for user")
+
+        courses_data = []
+        for course, faculty_name in courses:
+            result = await db.execute(select(BookmarkedMaterials).where(BookmarkedMaterials.course_id == course.id))
+            is_bookmarked = result.scalars().first() is not None  # Convert to boolean
+            
+            # Convert SQLAlchemy object to dictionary before adding extra fields
+            course_dict = {**course.__dict__}  
+            course_dict.pop("_sa_instance_state", None)  # Remove SQLAlchemy metadata
+            course_dict["is_bookmarked"] = is_bookmarked
+            course_dict["created_by"] = faculty_name  
+
+            courses_data.append(course_dict)
+
+        logger.info(f"Final course data prepared for user: {user_id}")
+        return courses_data  # Return as JSON response
+
     except Exception as e:
+        logger.error(f"Error fetching courses for user with error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

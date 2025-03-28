@@ -224,7 +224,7 @@ class BookmarkedMaterials(Base):
     type = Column(String, nullable=False)  # e.g., Article, Video, Course
     author = Column(String, nullable=True)  # Author name (optional)
     date_bookmarked = Column(DateTime, default=datetime.utcnow)  # Timestamp of bookmarking
-
+    course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=True)  # Links to the course (optional)
     def to_dict(self):
         """Converts the BookmarkedMaterials object to a dictionary"""
         return {

@@ -25,7 +25,7 @@ export class Course {
         status = "inactive",
         progress = 0,
         level = 'Beginner',
-        isBookmarked = true,
+        is_bookmarked = true,
         duration = "Unknown",
         studentsCount = 0,
         instructor = { name: "Unknown", avatar: "" },
@@ -36,7 +36,7 @@ export class Course {
         this.description = description;
         this.status = status;
         this.level = level;
-        this.isBookmarked = isBookmarked;
+        this.isBookmarked = is_bookmarked;
         this.progress = progress;
         this.duration = duration;
         this.studentsCount = studentsCount;
