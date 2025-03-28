@@ -10,6 +10,8 @@ from fastapi import HTTPException, UploadFile, Form, File, Depends
 from sqlalchemy.orm import joinedload
 from sqlalchemy.sql.expression import and_
 from app.utils.content_type import ContentType
+import datetime
+from app.models.course import CourseStatus
 from uuid import UUID
 from typing import List, Dict, Any
 import os
@@ -26,6 +28,42 @@ class EnrollmentStatus(str, enum.Enum):
     COMPLETED = "completed"
     DROPPED = "dropped"
     WAITLISTED = "waitlisted"
+
+
+async def get_new_course_code(db: AsyncSession, user_id: uuid.UUID):
+    """
+    Get unique course code    
+    Args:
+        db: Database session
+        user_id: user id of the faculty (optional)
+    Returns:
+        Unique course code
+    """
+    try:
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() not in ['faculty']:
+            raise HTTPException(status_code=403, detail="You are forbidden to use the resource")
+        
+        # Fetch existing course codes
+        result = await db.execute(select(Course))
+        course_codes = [course.code for course in result.scalars().all() if course.code.startswith("COURSE")]
+
+        # Extract numeric part and find the highest number
+        course_numbers = [
+            int(code.replace("COURSE", "")) for code in course_codes if code.replace("COURSE", "").isdigit()
+        ]
+
+        next_number = max(course_numbers, default=100) + 1  # Start from COURSE101 if no courses exist
+
+        new_course_code = f"COURSE{next_number}"
+
+        return new_course_code
+
+    except Exception as e:
+        logger.error(f"Error generating course code: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error generating course code")
+
 
 # Course Content Management Functions
 async def get_all_courses(db: AsyncSession, user_id: uuid.UUID = None):
@@ -184,6 +222,51 @@ async def get_lecture_content_by_lecture(lecture_id: int, db: AsyncSession, user
     except Exception as e:
         logger.error(f"Error fetching course content: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+async def add_new_course(course_data, db: AsyncSession, user_id: uuid.UUID):
+    """
+    Add a new course to the database.
+        
+    Args:
+        course_data: Course data to be added
+        db: Database session
+        user_id: user id of the faculty
+            
+    Returns:
+        Newly added course
+    """
+    try:
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() not in ['faculty']:
+            raise HTTPException(status_code=403, detail="You are forbidden to use the resource")
+        
+        # Create a new course object and add to the database
+        new_course = Course(
+            name=course_data.name,
+            code=course_data.code,
+            title=course_data.title,
+            credits=course_data.credits,
+            duration=course_data.duration,
+            semester=course_data.semester,
+            year=course_data.year,
+            faculty_id=user_id,
+            created_by=user_id,
+            syllabus=course_data.syllabus,
+            description=course_data.description,
+            start_date=course_data.start_date,
+            end_date=course_data.end_date,
+        )
+        db.add(new_course)
+        await db.commit()
+        await db.refresh(new_course)
+        return new_course
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error ==> {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 async def add_lecture_content_to_existing_course(content,db: AsyncSession, user_id: uuid.UUID):
     """

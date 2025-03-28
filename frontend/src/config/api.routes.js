@@ -5,7 +5,7 @@ export const API_ROUTES = {
   ASSIGNMENTS: '/api/v1/assignments',
   SUBMISSIONS: '/api/v1/assignments',
   ACADEMIC_INTEGRITY: '/api/v1/academic-integrity',
-  LLM: '/api/v1/llm',
+  LLM: '',//'/api/v1/llm',
   NOTIFICATIONS: '/notification'
 }
 

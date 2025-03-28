@@ -10,6 +10,7 @@ from app.models.course import Course, CourseStatus
 from uuid import UUID
 import uuid
 from pydantic import BaseModel
+from datetime import date
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,12 +23,27 @@ class CourseCreate(BaseModel):
     duration: int
     semester: str
     year: int
-    faculty_id: UUID
-    created_by: UUID
     syllabus: str | None = None
     description: str | None = None
+    start_date: date
+    end_date: date
+    level: str
+class CourseCodeResponse(BaseModel):
+    course_code: str
 
 course_router = APIRouter(tags=["Faculty Courses"])
+
+@course_router.get("/course-code", response_model=CourseCodeResponse)
+async def get_unique_course_code(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_auth)):
+    try:
+        code = await get_new_course_code(db, current_user["sub"])
+        return CourseCodeResponse(course_code=code)
+    except Exception as e:
+        logger.error(f"Error ==> {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @course_router.get("/courses", response_model=list[dict],
     summary="Get faculty's courses",
@@ -732,28 +748,9 @@ async def create_course(course_data: CourseCreate,
     """
     Create a new course
     """
+    user_id = current_user["sub"]
     try:
-        # Create new course object
-        new_course = Course(
-            name=course_data.name,
-            code=course_data.code,
-            title=course_data.title,
-            credits=course_data.credits,
-            duration=course_data.duration,
-            semester=course_data.semester,
-            year=course_data.year,
-            faculty_id=course_data.faculty_id,
-            created_by=course_data.created_by,
-            syllabus=course_data.syllabus,
-            description=course_data.description,
-            status=CourseStatus.DRAFT
-        )
-        
-        # Add to database
-        db.add(new_course)
-        await db.commit()
-        await db.refresh(new_course)
-        
+        new_course = await add_new_course(course_data, db, user_id)
         return new_course.to_dict()
     except HTTPException as http_ex:
         raise http_ex

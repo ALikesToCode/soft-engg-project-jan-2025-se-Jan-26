@@ -4,9 +4,17 @@
     <div class="flex-1 overflow-y-auto p-6">
       <div class="max-w-7xl mx-auto">
         <!-- Header -->
-        <div class="mb-8">
-          <h1 class="text-2xl font-bold text-gray-900">Course Content Management</h1>
-          <p class="text-gray-800 mt-2">Create and manage your course materials</p>
+        <div class="mb-8 flex justify-between items-center">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900">Course Content Management</h1>
+            <p class="text-gray-800 mt-2">Create and manage your course materials</p>
+          </div>
+          <p
+            @click="openAddCourseModal"
+            class="bg-maroon-500 hover:bg-gra-600 px-4 py-2 text-gray-100 rounded cursor-pointer"
+          >
+            Add New Course +
+          </p>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -183,6 +191,19 @@
       @confirm="confirmAction"
       @cancel="showConfirmDialog = false"
     />
+    <!-- Add Course Modal -->
+    <div
+      v-if="showAddCourseModal"
+      class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto"
+    >
+      <div class="bg-white py-4 rounded-lg shadow-lg relative">
+        <addCourse
+          @close="closeAddCourseModal"
+          @course-submitted="handleNewCourseDataSubmit"
+          @course-code-error="handleCourseCodeError"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -200,6 +221,7 @@ import { useContentStore } from '@/stores/contentStore'
 import { useCourseStore } from '@/stores/courseStore'
 import { useQuizStore } from '@/stores/quizStore'
 import { useAssignmentStore } from '@/stores/assignmentStore'
+import addCourse from './components/addCourse.vue'
 import api from '@/utils/api'
 
 export default {
@@ -212,6 +234,7 @@ export default {
     FileUploader,
     QuizBuilder,
     AssignmentBuilder,
+    addCourse,
   },
   setup() {
     const toast = useToast()
@@ -221,6 +244,7 @@ export default {
     const assignmentStore = useAssignmentStore()
 
     // State Management
+    const showAddCourseModal = ref(false)
     const isSavingData = ref(false)
     const isLoading = ref(false)
     const showConfirmDialog = ref(false)
@@ -230,7 +254,6 @@ export default {
     const selectedModule = ref(null)
     const previewMode = ref(false)
     const courses = ref([])
-
     const selectedCourseId = ref(null)
     const selectedWeek_ = ref(null)
     const selectedModuleId = ref(null)
@@ -297,6 +320,48 @@ export default {
           visibility: 'hidden',
         },
       }
+    }
+
+    //New Course Data addition methods
+    const openAddCourseModal = () => {
+      showAddCourseModal.value = true
+    }
+    const closeAddCourseModal = () => {
+      showAddCourseModal.value = false
+    }
+
+    const handleNewCourseDataSubmit = async (newCourseData) => {
+      isSavingData.value = true
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.post(
+          '/courses',
+          {
+            ...newCourseData,
+          },
+          headers,
+        )
+        if (response.status === 200) {
+          toast.success('Course has been added successfully...')
+        }
+      } catch (err) {
+        console.log(err)
+        toast.error('Failed to add the course...')
+      } finally {
+        isSavingData.value = false
+      }
+    }
+
+    const handleCourseCodeError = (msg) => {
+      toast.error(msg)
     }
 
     const handleLectureContentData = (data) => {
@@ -616,6 +681,12 @@ export default {
       selectedLectureId,
       driveLink,
       updateDocumentContent,
+      //New Course Data addition
+      showAddCourseModal,
+      openAddCourseModal,
+      closeAddCourseModal,
+      handleNewCourseDataSubmit,
+      handleCourseCodeError,
     }
   },
 }

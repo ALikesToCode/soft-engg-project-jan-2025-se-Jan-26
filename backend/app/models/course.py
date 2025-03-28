@@ -42,7 +42,9 @@ class Course(Base):
     semester = Column(String, nullable=False)
     year = Column(Integer, nullable=False)
     # Use String type with enum validation instead of PostgreSQL ENUM type
-    status = Column(String, nullable=False, default=CourseStatus.DRAFT.value)
+    # status = Column(String, nullable=False, default=CourseStatus.DRAFT.value)
+    status = Column(ENUM(CourseStatus, name="coursestatus"), nullable=False, default=CourseStatus.DRAFT)
+
     start_date = Column(DateTime(timezone=True), nullable=True)
     end_date = Column(DateTime(timezone=True), nullable=True)
     enrollment_limit = Column(Integer, nullable=True)

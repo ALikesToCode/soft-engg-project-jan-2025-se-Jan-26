@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { API_ROUTES } from '@/config/api.routes'
 import { withLLMValidation } from '@/utils/llmValidator'
+import api from '@/utils/api'
 
 export const ChatService = {
   /**
@@ -10,7 +11,7 @@ export const ChatService = {
    */
   async sendMessage(message) {
     try {
-      const response = await axios.post(`${API_ROUTES.LLM}/chat`, {
+      const response = await api.post(`${API_ROUTES.LLM}/chat`, {
         query: message
       })
       return response.data

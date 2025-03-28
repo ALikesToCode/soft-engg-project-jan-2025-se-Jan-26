@@ -76,7 +76,9 @@
             <div class="space-y-6 sm:space-y-8 text-center lg:text-left">
               <h1 class="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight">
                 Your Personal
-                <span class="text-yellow-400 block sm:inline" style="color: #FFD700 !important;">AI Academic Guide</span>
+                <span class="text-yellow-400 block sm:inline" style="color: #ffd700 !important"
+                  >AI Academic Guide</span
+                >
               </h1>
               <p class="text-base sm:text-lg text-gray-200 max-w-2xl mx-auto lg:mx-0">
                 Enhance your learning journey in the IITM program with personalized AI assistance.
@@ -88,17 +90,17 @@
               >
                 <router-link
                   to="/login"
-                  class="px-6 sm:px-8 py-3 bg-white text-maroon-600 font-semibold rounded-lg shadow-lg hover:bg-gray-100 transform hover:scale-105 transition duration-200 flex items-center justify-center"
+                  class="px-6 sm:px-8 py-3 border-2 border-white text-white font-semibold rounded-lg transform hover:scale-105 transition duration-200 flex items-center justify-center"
                 >
-                  <span class="material-icons mr-2 text-maroon-600">login</span>
-                  <span class="text-maroon-600">Get Started</span>
+                  <span class="material-icons mr-2 text-white hover:text-maroon-600">login</span>
+                  <span class="text-white">Get Started</span>
                 </router-link>
                 <router-link
                   to="/about"
-                  class="px-6 sm:px-8 py-3 border-2 border-white text-white font-semibold rounded-lg hover:bg-white hover:text-maroon-600 transform hover:scale-105 transition duration-200 flex items-center justify-center"
+                  class="px-6 sm:px-8 py-3 border-2 border-white text-white font-semibold rounded-lg transform hover:scale-105 transition duration-200 flex items-center justify-center"
                 >
-                  <span class="material-icons mr-2 text-white">info</span>
-                  <span class="text-white hover:text-maroon-600">Learn More</span>
+                  <span class="material-icons mr-2 text-white hover:text-maroon-600">info</span>
+                  <span class="text-white">Learn More</span>
                 </router-link>
               </div>
             </div>
