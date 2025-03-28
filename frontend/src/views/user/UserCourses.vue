@@ -260,7 +260,6 @@ export default {
           throw new Error('Failed to fetch user course data')
         }
         response.data.forEach((c) => {
-          console.log('course = ' + c.is_bookmarked + ' ' + c.title)
           const course = new Course({
             id: c.id,
             title: c.title,
@@ -280,7 +279,6 @@ export default {
       } catch (error) {
         this.isCourseEnrolledDataLoading = false
         this.showErrorToast(error, 'Failed to Load course data')
-        console.error('Error fetching user courses:', error)
       }
     },
   },

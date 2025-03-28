@@ -541,6 +541,13 @@ export default {
     ])
 
     // Methods
+
+    const selectFirstLecture = () => {
+      if (weeks.value && weeks.value.length > 0) {
+        selectLecture(weeks.value[0].lectures[0])
+      }
+    }
+
     const loadCourseData = async () => {
       try {
         loading.value = true
@@ -554,7 +561,6 @@ export default {
         }
         const response = await api.get(`/user/course/content?course_id=${courseId}`, headers)
         currentCourse.value = response.data
-        console.log(currentCourse.value)
         loading.value = false
         toast.success('Course Content Loaded Successfully')
       } catch (err) {
@@ -895,6 +901,8 @@ export default {
       downloadNotes,
       clearNotes,
       getWordCount,
+
+      selectFirstLecture,
     }
   },
 }
