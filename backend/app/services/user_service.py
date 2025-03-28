@@ -50,10 +50,11 @@ async def create_user(db: AsyncSession, user_data: UserCreate) -> uuid.UUID:
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    return {
-        "message":"User created successfully",
-        "user_id": str(user.id)
-    }
+    return user
+    # return {
+    #     "message":"User created successfully",
+    #     "user_id": str(user.id)
+    # }
 
 async def update_user(db: AsyncSession, user_id: Union[str, uuid.UUID], user_data: UserUpdate) -> User:
     # Convert string to UUID if needed
@@ -72,10 +73,11 @@ async def update_user(db: AsyncSession, user_id: Union[str, uuid.UUID], user_dat
         setattr(user, key, value)
     await db.commit()
     await db.refresh(user)
-    return {
-        "message":"User updated successfully",
-        "user_id": str(user.id)
-    }
+    return user
+    # return {
+    #     "message":"User updated successfully",
+    #     "user_id": str(user.id)
+    # }
 
 async def delete_user(db: AsyncSession, user_id: Union[str, uuid.UUID]):
     # Convert string to UUID if needed

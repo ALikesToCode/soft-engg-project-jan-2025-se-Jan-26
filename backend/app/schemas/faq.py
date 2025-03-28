@@ -33,7 +33,10 @@ class FAQBase(BaseModel):
 
 class FAQCreate(FAQBase):
     """Schema for creating a new FAQ."""
-    pass
+    question: str = Field(None, description="The frequently asked question", min_length=5, max_length=500)
+    answer: str = Field(None, description="The answer to the question", min_length=5)
+    category_id: str = Field(None, description="Category identifier (general, technical, courses, account, faculty)")
+    priority: int = Field(None, description="Display priority (higher numbers appear first)")
 
 
 class FAQUpdate(BaseModel):
