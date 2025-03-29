@@ -119,7 +119,7 @@ async def get_course_assignments(course_id: str, include_submissions: bool = Fal
 # FAQ Functions
 @function_router.function_declaration(
     name="search_faqs",
-    description="Search through frequently asked questions",
+    description="Search through frequently asked questions using vector and keyword search",
     parameters={
         "type": "object",
         "properties": {
@@ -131,15 +131,125 @@ async def get_course_assignments(course_id: str, include_submissions: bool = Fal
                 "type": "string",
                 "description": "Optional category to filter by",
                 "default": "all"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of results to return",
+                "default": 10
             }
         },
         "required": ["query"]
     },
     roles=["student", "faculty", "admin", "anonymous"]  # Available to all users
 )
-async def search_faqs(query: str, category: str = "all"):
-    """Search FAQs"""
-    pass
+async def search_faqs(query: str, category: str = "all", limit: int = 10):
+    """Search FAQs using vector search and keyword search"""
+    from app.database import get_db
+    from fastapi import Depends
+    from sqlalchemy.ext.asyncio import AsyncSession
+    import logging
+    from app.services import faq_service
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Get a database session
+        db = next(get_db())
+        
+        # First try vector search
+        logger.info(f"Searching FAQs with vector search for query: {query}")
+        results = await faq_service.search_faqs(db, query, limit)
+        
+        # Format the results
+        formatted_results = [
+            {
+                "id": str(faq.id),
+                "question": faq.question,
+                "answer": faq.answer,
+                "category": faq.category_id,
+                "priority": faq.priority
+            }
+            for faq in results
+        ]
+        
+        return {
+            "results": formatted_results,
+            "count": len(formatted_results),
+            "query": query
+        }
+    except Exception as e:
+        logger.error(f"Error in search_faqs function: {str(e)}")
+        return {
+            "results": [],
+            "count": 0,
+            "query": query,
+            "error": str(e)
+        }
+
+@function_router.function_declaration(
+    name="vector_search_faqs",
+    description="Search FAQs using semantic vector search for more intelligent results",
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Search query string"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of results to return",
+                "default": 5
+            }
+        },
+        "required": ["query"]
+    },
+    roles=["student", "faculty", "admin", "anonymous"]  # Available to all users
+)
+async def vector_search_faqs(query: str, limit: int = 5):
+    """Search FAQs using semantic vector search only"""
+    from app.database import get_db
+    from fastapi import Depends
+    from sqlalchemy.ext.asyncio import AsyncSession
+    import logging
+    from app.services import faq_service
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Get a database session
+        db = next(get_db())
+        
+        # Perform vector-only search
+        logger.info(f"Performing vector-only search for FAQs with query: {query}")
+        results = await faq_service.vector_search_faqs(query, limit)
+        
+        # Format the results
+        formatted_results = [
+            {
+                "id": str(faq.id),
+                "question": faq.question,
+                "answer": faq.answer,
+                "category": faq.category_id,
+                "priority": faq.priority,
+                "search_type": "vector"
+            }
+            for faq in results
+        ]
+        
+        return {
+            "results": formatted_results,
+            "count": len(formatted_results),
+            "query": query
+        }
+    except Exception as e:
+        logger.error(f"Error in vector_search_faqs function: {str(e)}")
+        return {
+            "results": [],
+            "count": 0,
+            "query": query,
+            "error": str(e)
+        }
 
 @function_router.function_declaration(
     name="get_faq_categories",

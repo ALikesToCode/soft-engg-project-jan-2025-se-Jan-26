@@ -200,10 +200,36 @@ async def get_current_faculty(token: str = Depends(oauth2_scheme)) -> dict:
         HTTPException: If the token is invalid or the user is not a faculty member
     """
     user = await get_current_user(token)
-    if user.get("role") != "faculty":
+    if user.get("role") != "faculty" and user.get("role") != "admin":
         raise HTTPException(
             status_code=403,
-            detail="Faculty privileges required",
+            detail="Faculty role required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+async def get_current_admin_user(token: str = Depends(oauth2_scheme)) -> dict:
+    """
+    Get the current user and verify they have admin role.
+    
+    This function extends get_current_user by adding a role check to ensure
+    the authenticated user has admin privileges. It's used as a dependency
+    in routes that should only be accessible to administrators.
+    
+    Args:
+        token: The JWT token from the Authorization header
+        
+    Returns:
+        Dictionary containing the user information from the token
+        
+    Raises:
+        HTTPException: If the token is invalid or the user is not an admin
+    """
+    user = await get_current_user(token)
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Admin role required",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
