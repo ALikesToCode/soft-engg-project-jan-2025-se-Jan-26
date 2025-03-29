@@ -56,7 +56,8 @@ async def create_faq(db: AsyncSession, faq: FAQCreate) -> FAQ:
     Returns:
         Created FAQ object
     """
-    db_faq = FAQ(**faq.model_dump())
+    faq_dict = faq.model_dump(exclude_unset=True)
+    db_faq = FAQ(**faq_dict)
     db.add(db_faq)
     await db.commit()
     await db.refresh(db_faq)
