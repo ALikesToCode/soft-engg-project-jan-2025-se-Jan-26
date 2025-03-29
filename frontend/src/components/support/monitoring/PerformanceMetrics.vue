@@ -1,9 +1,13 @@
 <template>
-  <SupportRoleIndicator />
-  <MockDataBanner />
   <div class="bg-white rounded-lg shadow-lg p-6">
+    <h2 class="text-2xl font-bold mb-6 text-gray-800">Performance Metrics</h2>
+    
+    <div class="mb-2">
+      <SupportRoleIndicator />
+      <MockDataBanner />
+    </div>
+    
     <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-bold text-gray-800">Performance Metrics</h2>
       <div class="flex space-x-4">
         <select v-model="timeRange" class="rounded border-gray-300">
           <option value="1h">Last Hour</option>

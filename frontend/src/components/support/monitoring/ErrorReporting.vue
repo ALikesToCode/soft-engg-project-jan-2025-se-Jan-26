@@ -1,6 +1,12 @@
 <template>
-  <MockDataBanner />
   <div class="bg-white rounded-lg shadow-lg p-6">
+    <h2 class="text-2xl font-bold mb-6 text-gray-800">Error Logs</h2>
+    
+    <div class="mb-2">
+      <SupportRoleIndicator />
+      <MockDataBanner />
+    </div>
+    
     <div class="flex justify-between items-center mb-6">
       <h2 class="text-2xl font-bold text-gray-800">Error Logs</h2>
       <div class="flex space-x-4">
@@ -129,11 +135,13 @@
 import { ref, computed, onMounted } from 'vue';
 import monitoringService from '../../../services/monitoring.service';
 import MockDataBanner from './MockDataBanner.vue';
+import SupportRoleIndicator from './SupportRoleIndicator.vue';
 
 export default {
   name: 'ErrorReporting',
   components: {
-    MockDataBanner
+    MockDataBanner,
+    SupportRoleIndicator
   },
   setup() {
     const showFilters = ref(false);

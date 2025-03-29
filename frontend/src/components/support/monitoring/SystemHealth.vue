@@ -2,6 +2,11 @@
   <div class="bg-white rounded-lg shadow-lg p-6">
     <h2 class="text-2xl font-bold mb-6 text-gray-800">System Health</h2>
     
+    <div class="mb-2">
+      <SupportRoleIndicator />
+      <MockDataBanner />
+    </div>
+    
     <!-- System Uptime -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
       <div class="bg-green-50 p-4 rounded-lg">
@@ -49,9 +54,15 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import Chart from 'chart.js/auto';
 import monitoringService from '../../../services/monitoring.service';
+import SupportRoleIndicator from './SupportRoleIndicator.vue';
+import MockDataBanner from './MockDataBanner.vue';
 
 export default {
   name: 'SystemHealth',
+  components: {
+    SupportRoleIndicator,
+    MockDataBanner
+  },
   setup() {
     const performanceChart = ref(null);
     const chartInstance = ref(null);

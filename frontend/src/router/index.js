@@ -12,6 +12,11 @@ import SupportDashboard from '../views/support/SupportDashboard.vue';
 import NotificationsView from '../views/support/NotificationsView.vue';
 import ProfilePage from '../views/support/ProfilePage.vue';
 
+// Import monitoring components
+import SystemHealth from '@/components/support/monitoring/SystemHealth.vue';
+import PerformanceMetrics from '@/components/support/monitoring/PerformanceMetrics.vue';
+import ErrorReporting from '@/components/support/monitoring/ErrorReporting.vue';
+
 const routes = [
   {
     path: '/',
@@ -109,6 +114,38 @@ const routes = [
     meta: { requiresAuth: true, role: 'support' }
   },
 
+  // Explicit monitoring routes
+  {
+    path: '/monitoring/system-health',
+    name: 'monitoring-system-health',
+    component: SystemHealth,
+    meta: { 
+      requiresAuth: true, 
+      role: 'support',
+      title: 'System Health | Monitoring'
+    }
+  },
+  {
+    path: '/monitoring/performance',
+    name: 'monitoring-performance',
+    component: PerformanceMetrics,
+    meta: { 
+      requiresAuth: true, 
+      role: 'support',
+      title: 'Performance Metrics | Monitoring'
+    }
+  },
+  {
+    path: '/monitoring/errors',
+    name: 'monitoring-errors',
+    component: ErrorReporting,
+    meta: { 
+      requiresAuth: true, 
+      role: 'support',
+      title: 'Error Reporting | Monitoring'
+    }
+  },
+
   {
     path: '/:pathMatch(.*)*',
     redirect: '/'
@@ -135,6 +172,32 @@ router.beforeEach((to, from, next) => {
 
 // Navigation guard
 router.beforeEach(async (to, from, next) => {
+  // Special handling for support paths
+  if (to.path.startsWith('/support')) {
+    const isAuthenticated = await authService.isAuthenticated()
+    const hasSupportRole = authService.hasSupportRole()
+    
+    if (!isAuthenticated) {
+      // Not authenticated, redirect to login
+      next({
+        path: '/login',
+        query: { redirect: to.fullPath }
+      })
+      return
+    }
+    
+    if (!hasSupportRole) {
+      // Authenticated but not support role
+      next({ path: '/dashboard' })
+      return
+    }
+    
+    // User is authenticated and has support role
+    next()
+    return
+  }
+  
+  // Handle other routes with requiresAuth meta
   if (to.matched.some(record => record.meta.requiresAuth)) {
     const isAuthenticated = await authService.isAuthenticated()
     if (!isAuthenticated) {
@@ -143,7 +206,13 @@ router.beforeEach(async (to, from, next) => {
         query: { redirect: to.fullPath }
       })
     } else {
-      next()
+      // Check for role requirements if specified in meta
+      if (to.meta.role && !authService.hasRole(to.meta.role)) {
+        // User is authenticated but doesn't have the required role
+        next({ path: '/dashboard' })
+      } else {
+        next()
+      }
     }
   } else {
     next()

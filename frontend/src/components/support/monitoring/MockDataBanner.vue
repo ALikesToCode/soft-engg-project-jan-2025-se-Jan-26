@@ -8,19 +8,26 @@
 <script>
 import monitoringService from '../../../services/monitoring.service';
 import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 
 export default {
   name: 'MockDataBanner',
   setup() {
     const showBanner = ref(false);
+    const router = useRouter();
     
     onMounted(() => {
       showBanner.value = monitoringService.isUsingMockData();
     });
     
     const login = () => {
+      // Save current path to redirect back after login
+      localStorage.setItem('loginRedirectPath', window.location.pathname);
       // Redirect to login page
-      window.location.href = '/login';
+      router.push({ 
+        path: '/login', 
+        query: { redirect: window.location.pathname } 
+      });
     };
     
     return {

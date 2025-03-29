@@ -11,6 +11,7 @@ const dummyAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53M
 const supportRoutes = {
     path: '/support',
     name: 'supportDashboard',
+    meta: { requiresAuth: true, role: 'support' },
     children: [
         {
             path: 'dashboard',

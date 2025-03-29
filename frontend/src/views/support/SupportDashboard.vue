@@ -100,6 +100,7 @@
 
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import SideNavBar from '../../layouts/SideNavBar.vue';
 import SystemHealth from '../../components/support/monitoring/SystemHealth.vue';
 import PerformanceMetrics from '../../components/support/monitoring/PerformanceMetrics.vue';
@@ -115,6 +116,8 @@ export default {
     ErrorReporting
   },
   setup() {
+    const router = useRouter();
+    
     // Quick stats
     const activeUsers = ref(0);
     const userChange = ref(0);
@@ -249,6 +252,20 @@ export default {
     };
 
     onMounted(() => {
+      // Check authentication and role
+      if (!monitoringService.isAuthenticated()) {
+        router.push({
+          path: '/login',
+          query: { redirect: router.currentRoute.value.fullPath }
+        });
+        return;
+      }
+      
+      if (!monitoringService.hasSupportRole()) {
+        router.push('/dashboard');
+        return;
+      }
+      
       fetchDashboardData();
       
       // Set up refresh interval

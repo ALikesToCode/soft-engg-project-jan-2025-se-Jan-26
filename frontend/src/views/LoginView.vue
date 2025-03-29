@@ -276,9 +276,9 @@ export default {
       try {
         // await new Promise((resolve) => setTimeout(resolve, 1500))
         // this.$router.push('/dashboard')
-        const response = await authService.loginWithEmail(this.form.email, this.form.password)
+        const response = await authService.loginWithEmail(this.form.email, this.form.password);
         if (response) {
-          this.$router.push('/dashboard')
+          this.$router.push('/dashboard');
         }
       } catch (error) {
         console.error('Login error:', error)
@@ -288,7 +288,7 @@ export default {
     },
     async handleGoogleSignIn() {
       try {
-        this.loading = true
+        this.loading = true;
         // Use our authService to handle Google Sign In
         await authService.loginWithGoogle()
       } catch (error) {

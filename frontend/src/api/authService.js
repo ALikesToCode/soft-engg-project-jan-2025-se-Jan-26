@@ -94,17 +94,16 @@ export const authService = {
             const response = await this.axiosInstance.post(`${API_URL}${API_PREFIX}/auth/login`, new URLSearchParams({ username: email, password }));
             logger.log('Login successful');
             logger.debug('User data:', response.data);
+            
+            // Save auth data
             localStorage.setItem('token', response.data.access_token);
+            
+            // Save user role if available
+            if (response.data.user_role) {
+                localStorage.setItem('userRole', response.data.user_role.toUpperCase());
+            }
+            
             return response.data;
-            // window.location.href = '/dashboard';
-
-            // if (response.status === 200) {
-            //     logger.log('Login successful');
-            //     localStorage.setItem('token', response.data.access_token);
-            //     return { success: true, message: 'Login successful' };
-            // }
-            // return { success: false, message: 'Login failed' };
-
         } catch (error) {
             logger.error('Error logging in with email and password:', error.message);
             if (error.response) {
@@ -315,6 +314,23 @@ export const authService = {
         localStorage.removeItem('user');
         localStorage.removeItem('token');
         return true;
+    },
+
+    // Check if user has support role
+    hasRole(role) {
+        const userRole = localStorage.getItem('userRole');
+        if (!userRole) return false;
+        
+        if (Array.isArray(role)) {
+            return role.some(r => userRole.toUpperCase() === r.toUpperCase());
+        }
+        
+        return userRole.toUpperCase() === role.toUpperCase();
+    },
+    
+    // Check specifically for support role
+    hasSupportRole() {
+        return this.hasRole('SUPPORT');
     }
 };
 
