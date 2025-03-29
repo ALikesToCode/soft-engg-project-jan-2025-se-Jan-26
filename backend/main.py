@@ -39,6 +39,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import START, MessagesState, StateGraph
 from app.routes.llm import call_llm
 import subprocess
+import json
 
 # Apply Pydantic v1 patch for Python 3.13 compatibility
 from app.utils.pydantic_patch import apply_patch
@@ -54,6 +55,111 @@ logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
 
 # Get the absolute path to the static directory
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Function to verify and create required database schemas
+async def verify_and_create_schemas(pool):
+    logger.info("Verifying database schemas...")
+    required_tables = {
+        # LangGraph tables
+        "checkpoints": """
+            CREATE TABLE IF NOT EXISTS checkpoints (
+                id SERIAL PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                state JSONB NOT NULL,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        """,
+        "checkpoint_blobs": """
+            CREATE TABLE IF NOT EXISTS checkpoint_blobs (
+                id SERIAL PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                blob_id TEXT NOT NULL,
+                blob BYTEA NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                UNIQUE(thread_id, blob_id)
+            )
+        """,
+        "checkpoint_writes": """
+            CREATE TABLE IF NOT EXISTS checkpoint_writes (
+                id SERIAL PRIMARY KEY,
+                thread_id TEXT NOT NULL,
+                write_id TEXT NOT NULL,
+                write JSONB NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                UNIQUE(thread_id, write_id)
+            )
+        """,
+        "checkpoint_migrations": """
+            CREATE TABLE IF NOT EXISTS checkpoint_migrations (
+                id SERIAL PRIMARY KEY,
+                version INTEGER NOT NULL,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        """,
+        # Vector store tables
+        "langchain_pg_collection": """
+            CREATE TABLE IF NOT EXISTS langchain_pg_collection (
+                name VARCHAR(50) PRIMARY KEY,
+                cmetadata JSONB
+            )
+        """,
+        "langchain_pg_embedding": """
+            CREATE TABLE IF NOT EXISTS langchain_pg_embedding (
+                uuid UUID PRIMARY KEY,
+                collection_name VARCHAR(50) NOT NULL,
+                embedding vector(1536),
+                document TEXT,
+                cmetadata JSONB,
+                custom_id TEXT,
+                CONSTRAINT fk_collection
+                    FOREIGN KEY (collection_name) 
+                    REFERENCES langchain_pg_collection (name) 
+                    ON DELETE CASCADE
+            )
+        """,
+        "vector_store": """
+            -- This is just to check if the vector_store collection exists
+            -- Will create if it doesn't exist
+            INSERT INTO langchain_pg_collection (name, cmetadata)
+            VALUES ('vector_store', '{}')
+            ON CONFLICT (name) DO NOTHING
+        """
+    }
+    
+    # Create schema if it doesn't exist
+    async with pool.connection() as conn:
+        await conn.execute("CREATE SCHEMA IF NOT EXISTS public")
+        
+        # Check which tables exist
+        result = await conn.execute("""
+            SELECT tablename FROM pg_catalog.pg_tables 
+            WHERE schemaname = 'public'
+        """)
+        existing_tables = [row[0] for row in await result.fetchall()]
+        logger.info(f"Existing tables: {existing_tables}")
+        
+        # Create missing tables
+        for table_name, create_sql in required_tables.items():
+            if table_name not in existing_tables:
+                logger.info(f"Creating table: {table_name}")
+                await conn.execute(create_sql)
+            else:
+                logger.info(f"Table already exists: {table_name}")
+        
+        # Check if pgvector extension is available
+        try:
+            result = await conn.execute("SELECT * FROM pg_extension WHERE extname = 'vector'")
+            if await result.fetchone() is None:
+                logger.info("pgvector extension not found, attempting to create it")
+                try:
+                    await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+                    logger.info("Successfully created pgvector extension")
+                except Exception as e:
+                    logger.warning(f"Could not create pgvector extension: {str(e)}")
+            else:
+                logger.info("pgvector extension already exists")
+        except Exception as e:
+            logger.warning(f"Error checking pgvector extension: {str(e)}")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -103,7 +209,12 @@ async def lifespan(app: FastAPI):
                 connection_string = connection_string.replace("?sslmode", "?sslmode=require")
                 logger.info(f"Fixed DATABASE_URL: {connection_string}")
             else:
-                logger.warning("Could not auto-fix DATABASE_URL, continuing with original")
+                # Add sslmode=require if not present
+                if "?" in connection_string:
+                    connection_string = connection_string + "&sslmode=require"
+                else:
+                    connection_string = connection_string + "?sslmode=require"
+                logger.info(f"Added sslmode=require to DATABASE_URL: {connection_string}")
                 
         # Convert SQLAlchemy URL format to psycopg format
         # psycopg doesn't support the postgresql+asyncpg:// prefix or dialect options
@@ -111,13 +222,27 @@ async def lifespan(app: FastAPI):
         if "postgresql+asyncpg://" in psycopg_connection_string:
             psycopg_connection_string = psycopg_connection_string.replace("postgresql+asyncpg://", "postgresql://")
             
+        # Force hostname connection method (disable socket connection attempts)
+        if "ep-weathered-breeze-a8jcdehd-pooler.eastus2.azure.neon.tech" in psycopg_connection_string:
+            # We're using a Neon DB connection - ensure host connection method
+            if "?" in psycopg_connection_string:
+                # Remove invalid host_type parameter if present
+                if "&host_type=host" in psycopg_connection_string:
+                    psycopg_connection_string = psycopg_connection_string.replace("&host_type=host", "")
+            else:
+                # No need to add invalid parameters
+                pass
+        
         logger.info(f"Using psycopg connection string format: {psycopg_connection_string}")
         
         # Configure more resilient connection parameters
         connection_kwargs = {
             "autocommit": True,
             # Add connection timeout settings
-            "connect_timeout": 10,
+            "connect_timeout": 30,  # Increased from 10 to 30 seconds
+            # Force SSL for Neon DB
+            "sslmode": "require",
+            # Remove invalid host_type parameter
             # Configure automatic retry behavior
             "application_name": "langraph_checkpointer",
             # Keep connections alive
@@ -128,15 +253,30 @@ async def lifespan(app: FastAPI):
         }
         
         try:
+            # Check psycopg version
+            import psycopg
+            logger.info(f"Using psycopg version: {psycopg.__version__}")
+            
             # Create a connection pool with more resilient settings
+            # Initialize directly with all parameters in constructor
+            # Note: The warning about constructor deprecation is acceptable
             pool = AsyncConnectionPool(
-                conninfo=psycopg_connection_string, 
-                kwargs=connection_kwargs,
-                min_size=1,  # Keep at least one connection in the pool
-                max_size=5,  # Maximum number of connections
-                timeout=5    # Connection acquisition timeout
+                conninfo=psycopg_connection_string,
+                kwargs=connection_kwargs, 
+                min_size=1,
+                max_size=5
             )
+            
+            # Verify connection works
+            async with pool.connection() as conn:
+                # Execute a simple query to verify connection
+                result = await conn.execute("SELECT 1")
+                logger.info("Database connection verified successfully")
+                
             app.state.pool = pool
+            
+            # Verify and create required database schemas
+            await verify_and_create_schemas(pool)
             
             # Initialize the checkpointer
             from app.routes.llm import checkpointer, llmapp
@@ -160,26 +300,50 @@ async def lifespan(app: FastAPI):
         if not vector_store_flag.exists():
             logger.info("Vector store not initialized. Initializing...")
             try:
-                # Run the vector store initialization script
-                result = subprocess.run(
-                    ["python", "initialize_vector_store.py"], 
-                    capture_output=True, 
-                    text=True
-                )
+                # Run the vector store initialization script with retry mechanism
+                max_retries = 3
+                retry_count = 0
+                success = False
                 
-                if result.returncode == 0:
-                    logger.info("Vector store initialized successfully.")
-                    # Create flag file to indicate initialization complete
-                    vector_store_flag.touch()
-                else:
-                    logger.error(f"Vector store initialization failed: {result.stderr}")
-                    # Check if this is a pgvector extension error
-                    if "extension \"vector\" is not available" in result.stderr or "pgvector extension could not be installed" in result.stderr:
-                        logger.warning("The PostgreSQL server may not have pgvector extension installed.")
-                        logger.warning("Some AI features requiring vector search will be limited.")
-                        # Create a flag file anyway to prevent repeated failures
-                        Path("vector_store_unavailable.flag").touch()
-                        logger.info("Created flag file to prevent repeated initialization attempts.")
+                while retry_count < max_retries and not success:
+                    logger.info(f"Attempting vector store initialization (attempt {retry_count + 1}/{max_retries})")
+                    result = subprocess.run(
+                        ["python", "initialize_vector_store.py"], 
+                        capture_output=True, 
+                        text=True
+                    )
+                    
+                    if result.returncode == 0:
+                        logger.info("Vector store initialized successfully.")
+                        # Create flag file to indicate initialization complete
+                        vector_store_flag.touch()
+                        success = True
+                    else:
+                        logger.error(f"Vector store initialization attempt {retry_count + 1} failed: {result.stderr}")
+                        # Check if this is a pgvector extension error
+                        if "extension \"vector\" is not available" in result.stderr or "pgvector extension could not be installed" in result.stderr:
+                            logger.warning("The PostgreSQL server may not have pgvector extension installed.")
+                            logger.warning("Some AI features requiring vector search will be limited.")
+                            # Create a flag file anyway to prevent repeated failures
+                            Path("vector_store_unavailable.flag").touch()
+                            logger.info("Created flag file to prevent repeated initialization attempts.")
+                            break
+                        
+                        # If it's likely a connection issue, retry
+                        if "connection" in result.stderr.lower() or "timeout" in result.stderr.lower():
+                            retry_count += 1
+                            if retry_count < max_retries:
+                                # Exponential backoff
+                                wait_time = 2 ** retry_count
+                                logger.info(f"Waiting {wait_time} seconds before retrying...")
+                                import asyncio
+                                await asyncio.sleep(wait_time)
+                        else:
+                            # Non-connection error, no need to retry
+                            break
+                
+                if not success and retry_count >= max_retries:
+                    logger.error(f"Vector store initialization failed after {max_retries} attempts.")
             except Exception as e:
                 logger.error(f"Error initializing vector store: {str(e)}")
         else:
@@ -199,9 +363,8 @@ async def lifespan(app: FastAPI):
             logger.info("Closing database connection pool...")
             try:
                 await app.state.pool.close()
-                logger.info("Database connection pool closed successfully")
             except Exception as e:
-                logger.error(f"Error closing database pool: {str(e)}")
+                logger.error(f"Error closing pool: {e}")
                 
         # Clean up other resources if needed
     except Exception as e:

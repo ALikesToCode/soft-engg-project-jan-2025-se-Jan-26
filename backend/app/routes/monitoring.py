@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Query, Depends, Path
+from fastapi import APIRouter, HTTPException, Query, Depends, Path, Request
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 from app.services.monitoring_service import monitoring_service, SystemMetrics, Alert, ServiceStatus
 from app.services.auth_service import get_current_user, require_role
 import logging
+import psycopg
 
 router = APIRouter(tags=["monitoring"])
 
@@ -799,4 +800,51 @@ async def resolve_error(
     return {
         "id": error_id,
         "message": "Error resolved successfully"
-    } 
+    }
+
+@router.get("/health/database", 
+    summary="Database health check", 
+    description="Check database connectivity and report status",
+    tags=["Monitoring"]
+)
+async def check_database_health(request: Request):
+    """
+    Checks the health of the database connection.
+    
+    Returns:
+        A JSON object with database health status
+    """
+    app = request.app
+    
+    try:
+        # Check if we have a connection pool
+        if not hasattr(app.state, "pool"):
+            return {
+                "status": "unavailable",
+                "error": "Database connection pool not initialized"
+            }
+            
+        # Test the connection
+        async with app.state.pool.connection() as conn:
+            # Execute a simple query
+            result = await conn.execute("SELECT 1 as test")
+            row = await result.fetchone()
+            
+            # Get pool stats
+            pool_stats = {
+                "pool_size": app.state.pool.get_size(),
+                "pool_min_size": app.state.pool.min_size,
+                "pool_max_size": app.state.pool.max_size,
+                "idle_connections": app.state.pool.get_idle_size()
+            }
+            
+            return {
+                "status": "healthy",
+                "test_result": row[0],
+                "pool_stats": pool_stats
+            }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e)
+        } 

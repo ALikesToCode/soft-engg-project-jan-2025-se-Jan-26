@@ -218,19 +218,73 @@ async def chat(request: LLMRequest, req: Request):
                 error_str = str(e).lower()
                 
                 # Check if this is a connection issue
-                if "connection" in error_str or "closed" in error_str or "pool" in error_str:
+                if "connection" in error_str or "closed" in error_str or "pool" in error_str or "bad" in error_str or "discarding" in error_str:
                     logger.warning(f"Database connection error (attempt {retry_count+1}/{max_retries}): {str(e)}")
                     retry_count += 1
                     
                     # If this appears to be a connection pool issue, try to reinitialize
-                    if retry_count == max_retries - 1 and hasattr(app.state, "pool"):
+                    if hasattr(app.state, "pool"):
                         try:
-                            # Attempt to recreate the connection
+                            # Attempt to refresh the connection
                             import asyncio
-                            await asyncio.sleep(1)  # Brief pause before retrying
+                            await asyncio.sleep(1 * retry_count)  # Exponential backoff
                             logger.info("Attempting to refresh connection pool")
+                            
+                            # Get a connection to test if pool is healthy
+                            async with app.state.pool.connection() as conn:
+                                await conn.execute("SELECT 1")
+                                logger.info("Connection pool test successful")
                         except Exception as pool_error:
                             logger.error(f"Failed to refresh connection pool: {str(pool_error)}")
+                            
+                            # On last retry attempt, try to recreate the pool
+                            if retry_count == max_retries - 1 and hasattr(app.state, "pool"):
+                                try:
+                                    # Close the existing pool
+                                    logger.warning("Attempting to recreate connection pool")
+                                    await app.state.pool.close()
+                                    
+                                    # Get the original connection string
+                                    connection_string = os.getenv("DATABASE_URL")
+                                    if "postgresql+asyncpg://" in connection_string:
+                                        connection_string = connection_string.replace("postgresql+asyncpg://", "postgresql://")
+                                    
+                                    # Force hostname connection method (disable socket connection attempts)
+                                    if "neon.tech" in connection_string:
+                                        # We're using a Neon DB connection - ensure host connection method
+                                        if "?" in connection_string:
+                                            # Remove invalid host_type parameter if present
+                                            if "&host_type=host" in connection_string:
+                                                connection_string = connection_string.replace("&host_type=host", "")
+                                        # No need to add invalid parameters
+                                    
+                                    # Recreate pool with simplified parameters
+                                    from psycopg_pool import AsyncConnectionPool
+                                    # Create a new pool instance with all parameters
+                                    app.state.pool = AsyncConnectionPool(
+                                        conninfo=connection_string,
+                                        kwargs={
+                                            "autocommit": True,
+                                            "connect_timeout": 30,
+                                            "sslmode": "require",
+                                            "application_name": "langraph_checkpointer",
+                                            "keepalives": 1,
+                                            "keepalives_idle": 30,
+                                            "keepalives_interval": 10,
+                                            "keepalives_count": 5
+                                        },
+                                        min_size=1,
+                                        max_size=5
+                                    )
+                                    
+                                    # Recreate the checkpointer
+                                    saver = AsyncPostgresSaver(app.state.pool)
+                                    await saver.setup()
+                                    app.state.checkpointer = saver
+                                    
+                                    logger.info("Connection pool recreated successfully")
+                                except Exception as recreate_error:
+                                    logger.error(f"Failed to recreate pool: {str(recreate_error)}")
                 else:
                     # Not a connection error, no need to retry
                     raise e
