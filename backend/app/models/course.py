@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint, LargeBinary
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint, LargeBinary, Float, Boolean
 from sqlalchemy.orm import relationship
 from app.database import Base, engine, UUID
 from app.models.assignment import Assignment
@@ -92,6 +92,7 @@ class CourseEnrollment(Base):
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
     course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     student_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status = Column(String, nullable=False, default=EnrollmentStatus.ENROLLED.value)
     enrollment_date = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC))
     completion_date = Column(DateTime(timezone=True))
@@ -99,10 +100,14 @@ class CourseEnrollment(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC))
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC), onupdate=datetime.now(UTC))
     certificate_url = Column(String, nullable=True)
+    progress = Column(Float, default=0.0)  # Percentage of course completed (0-100)
+    last_activity = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_favorited = Column(Boolean, default=False)
 
     # Relationships
     course = relationship("Course", back_populates="enrollments")
-    student = relationship("User", back_populates="course_enrollments")
+    student = relationship("User", foreign_keys=[student_id], back_populates="course_enrollments")
+    user = relationship("User", foreign_keys=[user_id], back_populates="enrollments")
 
 # Module Model (Course → Modules)
 class Module(Base):
@@ -201,6 +206,9 @@ class UserRecommendedCourses(Base):
     thumbnail_path = Column(String, nullable=False, default="https://placehold.co/100x100")  # Default thumbnail
     reason = Column(Text, nullable=True)  # Recommendation reason
     tutorial_url = Column(String, nullable=False)  # for Tutorial type else Null
+    
+    # Relationships
+    user = relationship("User", back_populates="recommended_courses")
 
     def to_dict(self):
         """Converts the UserRecommendedCourses object to a dictionary"""
@@ -225,6 +233,10 @@ class BookmarkedMaterials(Base):
     author = Column(String, nullable=True)  # Author name (optional)
     date_bookmarked = Column(DateTime, default=datetime.utcnow)  # Timestamp of bookmarking
     course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=True)  # Links to the course (optional)
+    
+    # Relationships
+    user = relationship("User", back_populates="bookmarks")
+    
     def to_dict(self):
         """Converts the BookmarkedMaterials object to a dictionary"""
         return {

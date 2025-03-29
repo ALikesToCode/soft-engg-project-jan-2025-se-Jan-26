@@ -56,7 +56,12 @@ class User(Base):
     courses = relationship("Course", secondary=user_courses, back_populates="users")  # Many-to-Many with Course
     roles = relationship("Role", secondary=user_roles, back_populates="users")  # Many-to-Many with Role
     courses_taught = relationship("Course", foreign_keys="[Course.faculty_id]", back_populates="faculty")
-    course_enrollments = relationship("CourseEnrollment", back_populates="student")
+    
+    # Updated relationships
+    enrollments = relationship("CourseEnrollment", foreign_keys="[CourseEnrollment.user_id]", back_populates="user")  # One-to-Many with CourseEnrollment
+    course_enrollments = relationship("CourseEnrollment", foreign_keys="[CourseEnrollment.student_id]", back_populates="student")  # One-to-Many with CourseEnrollment
+    bookmarks = relationship("BookmarkedMaterials", back_populates="user")  # One-to-Many with BookmarkedMaterials
+    recommended_courses = relationship("UserRecommendedCourses", back_populates="user")  # One-to-Many with UserRecommendedCourses
 
 # Create the table in the database
 async def init_db():

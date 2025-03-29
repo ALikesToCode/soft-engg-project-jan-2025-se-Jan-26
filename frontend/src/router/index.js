@@ -6,6 +6,8 @@ import supportRoutes from './supportRoutes';
 import { authService } from '@/api/authService'
 import useAuthStore from '@/stores/useAuthStore'
 import { ROLE } from '@/AppConstants/globalConstants'
+import LoginView from '../views/LoginView.vue'
+import AuthCallback from '../views/AuthCallback.vue'
 
 // Import support routes
 import SupportDashboard from '../views/support/SupportDashboard.vue';
@@ -48,7 +50,7 @@ const routes = [
   {
     path: '/login',
     name: 'login',
-    component: () => import('../views/LoginView.vue'),
+    component: LoginView,
     meta: {
       title: 'Login | Cognitum',
       hideUserNavbar: true
@@ -57,10 +59,19 @@ const routes = [
   {
     path: '/auth/callback',
     name: 'auth-callback',
-    component: () => import('../views/AuthCallback.vue'),
+    component: AuthCallback,
     meta: {
       title: 'Authentication | Cognitum',
       hideUserNavbar: true
+    }
+  },
+  {
+    path: '/set-password',
+    name: 'set-password',
+    component: () => import('../views/SetPasswordView.vue'),
+    meta: { 
+      title: 'Set Password | Cognitum', 
+      requiresAuth: true 
     }
   },
   {

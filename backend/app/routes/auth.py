@@ -335,9 +335,9 @@ async def auth_callback(request: Request, db=Depends(get_db)):
         has_password = bool(user.hashed_password)
         password_notification = "" if has_password else "&password_needed=true"
         
-        # Redirect to frontend with token
-        frontend_callback_url = f"{settings.FRONTEND_URL}/auth/callback?access_token={access_token}{password_notification}"
-        logger.info(f"Redirecting to frontend callback")
+        # Redirect to frontend with token and user role
+        frontend_callback_url = f"{settings.FRONTEND_URL}/auth/callback?access_token={access_token}&user_role={user.role}{password_notification}"
+        logger.info(f"Redirecting to frontend callback with role: {user.role}")
         return RedirectResponse(url=frontend_callback_url)
     except Exception as e:
         logger.error(f"Error in auth callback: {str(e)}")

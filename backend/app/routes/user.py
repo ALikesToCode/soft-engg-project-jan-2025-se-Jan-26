@@ -9,6 +9,17 @@ from app.models.user import User
 from sqlalchemy.future import select
 from typing import List, Optional
 import uuid
+from sqlalchemy.orm import selectinload
+from app.models.course import Course, CourseEnrollment, BookmarkedMaterials, UserRecommendedCourses
+from sqlalchemy import select, update, delete
+from app.schemas.user import (
+    UserResponse, UpdateUserRequest, CourseResponse, BookmarkedMaterialResponse,
+    UserRecommendedCourseResponse
+)
+from app.services.cache_service import async_cache
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["User"])
 
@@ -377,3 +388,88 @@ async def get_user_course_content(
     except Exception as e:
         print("Error=> ", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/courses", response_model=List[CourseResponse])
+@async_cache(ttl=30, key_prefix="dashboard")  # Cache for 30 seconds
+async def get_user_courses(
+    current_user: User = Depends(get_current_user), 
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all courses for the current user with optimized query"""
+    try:
+        # Use a more efficient query with joins
+        query = select(
+            Course, 
+            CourseEnrollment.progress,
+            CourseEnrollment.last_activity,
+            CourseEnrollment.is_favorited
+        ).join(
+            CourseEnrollment, 
+            CourseEnrollment.course_id == Course.id
+        ).where(
+            CourseEnrollment.user_id == current_user.id
+        ).options(
+            selectinload(Course.modules)  # Eager load modules
+        ).order_by(
+            CourseEnrollment.last_activity.desc()
+        )
+        
+        result = await db.execute(query)
+        courses_data = result.all()
+        
+        courses = []
+        for course, progress, last_activity, is_favorited in courses_data:
+            course_dict = course.__dict__
+            course_dict["progress"] = progress
+            course_dict["last_activity"] = last_activity
+            course_dict["is_favorited"] = is_favorited
+            courses.append(course_dict)
+        
+        return courses
+    except Exception as e:
+        logger.error(f"Error getting user courses: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting user courses: {str(e)}")
+
+@router.get("/bookmarked-materials", response_model=List[BookmarkedMaterialResponse])
+@async_cache(ttl=60, key_prefix="dashboard")  # Cache for 60 seconds
+async def get_bookmarked_materials(
+    current_user: User = Depends(get_current_user), 
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(50, description="Maximum number of bookmarks to return")
+):
+    """Get bookmarked materials for the current user with optimized query"""
+    try:
+        query = select(BookmarkedMaterials).where(
+            BookmarkedMaterials.user_id == current_user.id
+        ).order_by(
+            BookmarkedMaterials.date_bookmarked.desc()
+        ).limit(limit)
+        
+        result = await db.execute(query)
+        bookmarked_materials = result.scalars().all()
+        
+        return bookmarked_materials
+    except Exception as e:
+        logger.error(f"Error getting bookmarked materials: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting bookmarked materials: {str(e)}")
+
+@router.get("/recommended-courses", response_model=List[UserRecommendedCourseResponse])
+@async_cache(ttl=300, key_prefix="dashboard")  # Cache for 5 minutes
+async def get_recommended_courses(
+    current_user: User = Depends(get_current_user), 
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(10, description="Maximum number of recommendations to return")
+):
+    """Get recommended courses for the current user with optimized query"""
+    try:
+        query = select(UserRecommendedCourses).where(
+            UserRecommendedCourses.user_id == current_user.id
+        ).limit(limit)
+        
+        result = await db.execute(query)
+        recommended_courses = result.scalars().all()
+        
+        return recommended_courses
+    except Exception as e:
+        logger.error(f"Error getting recommended courses: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error getting recommended courses: {str(e)}")

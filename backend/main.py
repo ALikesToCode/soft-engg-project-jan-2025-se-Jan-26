@@ -28,6 +28,7 @@ from app.routes.academic_integrity import router as academic_integrity_router
 from app.services.api_functions import *  # Import all API function declarations
 from app.routes import monitoring
 from app.services.monitoring_service import monitoring_service
+from app.services.cache_service import start_cleanup_task
 import logging
 from app.utils.logging_config import configure_logging
 from app.middleware import LoggingMiddleware
@@ -40,6 +41,7 @@ from langgraph.graph import START, MessagesState, StateGraph
 from app.routes.llm import call_llm
 import subprocess
 import json
+import asyncio
 
 # Apply Pydantic v1 patch for Python 3.13 compatibility
 from app.utils.pydantic_patch import apply_patch
@@ -336,7 +338,6 @@ async def lifespan(app: FastAPI):
                                 # Exponential backoff
                                 wait_time = 2 ** retry_count
                                 logger.info(f"Waiting {wait_time} seconds before retrying...")
-                                import asyncio
                                 await asyncio.sleep(wait_time)
                         else:
                             # Non-connection error, no need to retry
@@ -348,6 +349,12 @@ async def lifespan(app: FastAPI):
                 logger.error(f"Error initializing vector store: {str(e)}")
         else:
             logger.info("Vector store already initialized, skipping initialization.")
+            
+        # Start cache cleanup background task
+        logger.info("Starting cache service...")
+        cleanup_task = asyncio.create_task(start_cleanup_task())
+        app.state.cleanup_task = cleanup_task
+        
     except Exception as e:
         logger.error(f"Error during application startup: {e}")
         
@@ -366,7 +373,15 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.error(f"Error closing pool: {e}")
                 
-        # Clean up other resources if needed
+        # Cancel cache cleanup task
+        if hasattr(app.state, "cleanup_task"):
+            logger.info("Stopping cache service...")
+            app.state.cleanup_task.cancel()
+            try:
+                await app.state.cleanup_task
+            except asyncio.CancelledError:
+                pass
+                
     except Exception as e:
         logger.error(f"Error during application shutdown: {e}")
 

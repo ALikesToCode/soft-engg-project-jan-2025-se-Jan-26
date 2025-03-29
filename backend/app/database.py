@@ -53,17 +53,28 @@ if query_params:
 
 logger.info(f"Using database connection with SSL mode: {ssl_mode}")
 
-# Create async engine with proper SSL configuration
+# Create async engine with proper SSL configuration and optimized connection settings
 engine = create_async_engine(
     cleaned_url.replace("postgres://", "postgresql+asyncpg://"),
     future=True,
     echo=True,
-    poolclass=NullPool,
+    # Use a proper connection pool instead of NullPool
+    # NullPool creates and destroys connections for each request which adds overhead
+    # poolclass=NullPool,
+    pool_size=20,  # Increase pool size from default 5
+    max_overflow=40,  # Allow up to 40 more connections in high-load situations
+    pool_timeout=30,  # Increase timeout for connection acquisition
+    pool_recycle=1800,  # Recycle connections after 30 minutes
+    pool_pre_ping=True,  # Verify connections before using them
     connect_args={
         "ssl": ssl_mode == "require",
         "server_settings": {
             "search_path": schema_name,
-            "application_name": "SE Team 26 API"
+            "application_name": "SE Team 26 API",
+            # Statement timeout in milliseconds (5 seconds)
+            "statement_timeout": "5000",
+            # Idle transaction timeout (2 minutes)
+            "idle_in_transaction_session_timeout": "120000"
         }
     }
 )
@@ -81,6 +92,8 @@ Base = declarative_base()
 async def get_db():
     async with async_session() as session:
         try:
+            # Set timezone for this session
+            await session.execute(text("SET timezone = 'UTC'"))
             yield session
             await session.commit()
         except Exception:
