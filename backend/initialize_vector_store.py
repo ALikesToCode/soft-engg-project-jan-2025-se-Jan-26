@@ -140,9 +140,9 @@ try:
     logger.info("Using direct PGVector initialization")
     # According to the error, the class might have 'get_connection_string' but not 'from_connection_string'
     vector_store = PGVector(
-        embedding=embeddings,  # Try with this parameter name first
+        embeddings=embeddings,  # Try with this parameter name first
         collection_name="vector_store",
-        connection_string=pgvector_connection_string
+        connection=pgvector_connection_string
     )
         
     logger.info("Vector store initialized successfully")
