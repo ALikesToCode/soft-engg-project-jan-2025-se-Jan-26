@@ -19,6 +19,7 @@ from app.routes.auth import router as auth_router
 from app.routes.user import router as user_router
 from app.routes.user_routes import router as user_routers
 from app.routes.llm import router as chat, checkpointer
+from app.routes.chat import router as chat_history_router
 from app.routes.assignment import router as assignment_router
 from app.routes.faq import router as faq_router
 from app.routes.system_settings import router as system_settings_router
@@ -1020,6 +1021,7 @@ app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(user_router, prefix="/api/v1", tags=["User"])
 app.include_router(user_routers, prefix="/api/v1", tags=["User Management"])
 app.include_router(chat, prefix="/api/v1", tags=["Chat"])
+app.include_router(chat_history_router, prefix="/api/v1/chat", tags=["Chat History"])
 app.include_router(assignment_router, prefix="/api/v1", tags=["Assignments"])
 app.include_router(faq_router, tags=["FAQs"])
 app.include_router(system_settings_router, prefix="/api/v1", tags=["System Settings"])

@@ -62,6 +62,9 @@ class User(Base):
     course_enrollments = relationship("CourseEnrollment", foreign_keys="[CourseEnrollment.student_id]", back_populates="student")  # One-to-Many with CourseEnrollment
     bookmarks = relationship("BookmarkedMaterials", back_populates="user")  # One-to-Many with BookmarkedMaterials
     recommended_courses = relationship("UserRecommendedCourses", back_populates="user")  # One-to-Many with UserRecommendedCourses
+    
+    # Chat relationships
+    chat_sessions = relationship("ChatSession", back_populates="user")  # One-to-Many with ChatSession
 
 # Create the table in the database
 async def init_db():

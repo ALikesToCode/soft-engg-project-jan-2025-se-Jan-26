@@ -85,7 +85,8 @@ async def get_user_course_history(include_grades: bool = True):
             }
         },
         "required": ["course_id"]
-    }
+    },
+    roles=["faculty", "admin"]  # Faculty-only function
 )
 async def get_course_enrollment(course_id: str):
     """Get course enrollment details"""
@@ -108,7 +109,8 @@ async def get_course_enrollment(course_id: str):
             }
         },
         "required": ["course_id"]
-    }
+    },
+    roles=["student", "faculty", "admin"]  # Available to all authenticated users
 )
 async def get_course_assignments(course_id: str, include_submissions: bool = False):
     """Get course assignments"""
@@ -132,7 +134,8 @@ async def get_course_assignments(course_id: str, include_submissions: bool = Fal
             }
         },
         "required": ["query"]
-    }
+    },
+    roles=["student", "faculty", "admin", "anonymous"]  # Available to all users
 )
 async def search_faqs(query: str, category: str = "all"):
     """Search FAQs"""
@@ -232,7 +235,8 @@ async def get_user_profile(user_id: str = "current"):
     parameters={
         "type": "object",
         "properties": {}
-    }
+    },
+    roles=["admin"]  # Admin-only function
 )
 async def get_system_health():
     """Get system health status"""
@@ -350,13 +354,81 @@ async def get_system_alerts(alert_type: str = None, severity: str = None, resolv
             },
             "num_results": {
                 "type": "integer",
-                "description": "Maximum number of results to return",
+                "description": "Number of results to return",
                 "default": 5
             }
         },
         "required": ["query"]
-    }
+    },
+    roles=["student", "faculty", "admin", "anonymous"]  # Available to all users including unauthenticated
 )
 async def web_search(query: str, num_results: int = 5):
     """Search the web for current information"""
-    return await function_router.web_search(query, num_results) 
+    return await function_router.web_search(query, num_results)
+
+# Add new function declarations for frontend compatibility
+@function_router.function_declaration(
+    name="getCourses",
+    description="Get all available courses for the current user",
+    parameters={
+        "type": "object",
+        "properties": {},
+        "required": []
+    },
+    roles=["student", "faculty", "admin"]
+)
+async def getCourses():
+    """Get all courses available to the current user"""
+    pass
+
+@function_router.function_declaration(
+    name="getCourseById",
+    description="Get details of a specific course by ID",
+    parameters={
+        "type": "object",
+        "properties": {
+            "courseId": {
+                "type": "string",
+                "description": "The ID of the course to retrieve"
+            }
+        },
+        "required": ["courseId"]
+    },
+    roles=["student", "faculty", "admin"]
+)
+async def getCourseById(courseId: str):
+    """Get a specific course by ID"""
+    pass
+
+@function_router.function_declaration(
+    name="getAssignments",
+    description="Get all assignments for the current user",
+    parameters={
+        "type": "object",
+        "properties": {
+            "courseId": {
+                "type": "string",
+                "description": "Optional: Filter assignments by course ID"
+            }
+        },
+        "required": []
+    },
+    roles=["student", "faculty", "admin"]
+)
+async def getAssignments(courseId: str = None):
+    """Get assignments, optionally filtered by course"""
+    pass
+
+@function_router.function_declaration(
+    name="getUserProfile",
+    description="Get the current user's profile information",
+    parameters={
+        "type": "object",
+        "properties": {},
+        "required": []
+    },
+    roles=["student", "faculty", "admin"]
+)
+async def getUserProfile():
+    """Get current user profile information"""
+    pass 

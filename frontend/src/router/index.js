@@ -183,50 +183,94 @@ router.beforeEach((to, from, next) => {
 
 // Navigation guard
 router.beforeEach(async (to, from, next) => {
+  // Skip auth check for public routes or the auth callback route
+  if (to.path === '/auth/callback' || to.path === '/login' || to.path === '/' || 
+      to.path === '/about' || to.path === '/contact' || to.path === '/faq' || 
+      to.path === '/privacy-policy' || to.path === '/terms-of-service') {
+    next();
+    return;
+  }
+
+  console.log(`Navigation guard: checking auth for route ${to.fullPath}`);
+  
+  // Store the intended path if user needs to authenticate
+  if (to.meta.requiresAuth || to.path.startsWith('/support') || 
+      to.path.startsWith('/user') || to.path.startsWith('/faculty')) {
+    localStorage.setItem('loginRedirectPath', to.fullPath);
+  }
+
   // Special handling for support paths
   if (to.path.startsWith('/support')) {
-    const isAuthenticated = await authService.isAuthenticated()
-    const hasSupportRole = authService.hasSupportRole()
-    
-    if (!isAuthenticated) {
-      // Not authenticated, redirect to login
-      next({
-        path: '/login',
-        query: { redirect: to.fullPath }
-      })
-      return
+    try {
+      const isAuthenticated = await authService.isAuthenticated();
+      console.log(`Auth check for support route: authenticated = ${isAuthenticated}`);
+      
+      if (!isAuthenticated) {
+        // Not authenticated, redirect to login
+        console.log('Not authenticated, redirecting to login');
+        next({
+          path: '/login',
+          query: { redirect: to.fullPath }
+        });
+        return;
+      }
+      
+      const hasSupportRole = authService.hasSupportRole();
+      console.log(`Support role check: ${hasSupportRole}`);
+      
+      if (!hasSupportRole) {
+        // Authenticated but not support role
+        console.log('Not support role, redirecting to dashboard');
+        next({ path: '/dashboard' });
+        return;
+      }
+      
+      // User is authenticated and has support role
+      console.log('User is authenticated and has support role');
+      next();
+      return;
+    } catch (error) {
+      console.error('Error in navigation guard for support routes:', error);
+      next('/login');
+      return;
     }
-    
-    if (!hasSupportRole) {
-      // Authenticated but not support role
-      next({ path: '/dashboard' })
-      return
-    }
-    
-    // User is authenticated and has support role
-    next()
-    return
   }
   
   // Handle other routes with requiresAuth meta
   if (to.matched.some(record => record.meta.requiresAuth)) {
-    const isAuthenticated = await authService.isAuthenticated()
-    if (!isAuthenticated) {
-      next({
-        path: '/login',
-        query: { redirect: to.fullPath }
-      })
-    } else {
-      // Check for role requirements if specified in meta
-      if (to.meta.role && !authService.hasRole(to.meta.role)) {
-        // User is authenticated but doesn't have the required role
-        next({ path: '/dashboard' })
-      } else {
-        next()
+    try {
+      const isAuthenticated = await authService.isAuthenticated();
+      console.log(`Auth check for protected route: authenticated = ${isAuthenticated}`);
+      
+      if (!isAuthenticated) {
+        console.log('Not authenticated, redirecting to login');
+        next({
+          path: '/login',
+          query: { redirect: to.fullPath }
+        });
+        return;
       }
+      
+      // Check for role requirements if specified in meta
+      if (to.meta.role) {
+        const hasRequiredRole = authService.hasRole(to.meta.role);
+        console.log(`Role check for ${to.meta.role}: ${hasRequiredRole}`);
+        
+        if (!hasRequiredRole) {
+          // User is authenticated but doesn't have the required role
+          console.log('User does not have required role, redirecting to dashboard');
+          next({ path: '/dashboard' });
+          return;
+        }
+      }
+      
+      next();
+    } catch (error) {
+      console.error('Error in navigation guard for protected route:', error);
+      next('/login');
     }
   } else {
-    next()
+    next();
   }
 })
 

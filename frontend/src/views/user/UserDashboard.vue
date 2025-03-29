@@ -5,6 +5,9 @@ import api from '@/utils/api'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { useToast } from 'vue-toastification'
 import AlertMessage from '@/components/common/AlertMessage.vue'
+import { useChatStore } from '@/stores/useChatStore'
+import { onMounted } from 'vue'
+
 export default {
   name: 'DashboardView',
   data() {
@@ -70,6 +73,9 @@ export default {
         'md:grid-cols-3': this.showSplitScreen,
       }
     },
+    chatStore() {
+      return useChatStore()
+    }
   },
   methods: {
     showSuccessToast(msg) {
@@ -103,6 +109,26 @@ export default {
     },
     toggleSplitScreen() {
       this.showSplitScreen = !this.showSplitScreen
+      
+      // If we're closing split screen, ensure chat is also closed
+      if (!this.showSplitScreen && this.chatStore.isOpen) {
+        this.chatStore.closeChat()
+      }
+    },
+    activateChat() {
+      // Directly open the chat without setTimeout
+      const chatStore = useChatStore();
+      // First make sure we have a valid selected chat
+      if (chatStore.chatHistory.length > 0 && !chatStore.currentChatId) {
+        chatStore.setCurrentChat(chatStore.chatHistory[0].id);
+      } else if (chatStore.chatHistory.length === 0) {
+        // Create a new chat if there are none
+        chatStore.startNewChat("New Conversation");
+      }
+      
+      // Open the chat - use direct property access instead of the method
+      chatStore.isOpen = true;
+      console.log("Chat activated from dashboard, open state:", chatStore.isOpen);
     },
     //API calls
     async getRecommendedCourses() {
@@ -184,7 +210,14 @@ export default {
   },
 
   mounted() {
-    this.getRecommendedCourses(), this.getBookMarkedMaterials()
+    this.getRecommendedCourses();
+    this.getBookMarkedMaterials();
+
+    // Make sure the GlobalChat component from App.vue is initialized
+    const chatStore = useChatStore();
+    if (!chatStore.initialized) {
+      chatStore.initialize();
+    }
   },
 }
 </script>
@@ -197,6 +230,12 @@ export default {
       </div>
       <div class="flex-1 p-6 overflow-y-auto bg-gray-50">
         <div class="max-w-7xl mx-auto">
+          <!-- Alert Message -->
+          <AlertMessage v-if="showAlertMessage" message="This material doesn't have a learning path or tutorial yet." />
+          
+          <!-- Loading Spinner -->
+          <LoadingSpinner v-if="isDataLoading" />
+
           <!-- Recommended Section -->
           <div class="mb-8">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Recommended for You</h2>
@@ -305,16 +344,19 @@ export default {
           </div>
         </div>
       </div>
-
-      <!-- Floating Chat Bot (when not in split screen) -->
-      <ChatBotWrapper v-if="!showSplitScreen" />
     </div>
-  </div>
-  <div v-if="isDataLoading" class="loading-overlay">
-    <LoadingSpinner />
-  </div>
-  <div v-if="showAlertMessage">
-    <AlertMessage :message="'Please send mail to support to add this course.'" type="info" />
+    
+    <!-- Floating Chat Toggle Button -->
+    <button
+      v-if="!chatStore.isOpen && !showSplitScreen"
+      @click="activateChat"
+      class="fixed bottom-6 right-6 bg-maroon-600 text-white rounded-full p-4 shadow-lg hover:bg-maroon-700 transition-all z-[100] group"
+    >
+      <span class="material-icons">chat</span>
+      <span class="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-3 py-1 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+        Ask Learning Assistant
+      </span>
+    </button>
   </div>
 </template>
 
@@ -349,5 +391,20 @@ export default {
 }
 .loading-overlay {
   @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+}
+
+/* Make sure the chat components are properly positioned */
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+.h-screen {
+  height: calc(100vh - 4rem); /* Adjust for header height */
+  position: relative;
+  z-index: 0; /* Ensure proper stacking with global chat */
 }
 </style>

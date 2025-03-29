@@ -3,12 +3,14 @@
     <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
       <span class="material-icons text-5xl text-maroon-600 animate-spin mb-4">refresh</span>
       <h1 class="text-2xl font-bold text-gray-800 mb-2">Authentication in progress...</h1>
-      <p class="text-gray-600">Please wait while we complete your login.</p>
+      <p class="text-gray-600">{{ status }}</p>
     </div>
   </div>
 </template>
 
 <script>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { authService } from '@/api/authService'
 import useAuthStore from '@/stores/useAuthStore'
 import { ROLE } from '@/AppConstants/globalConstants'
@@ -16,26 +18,37 @@ import rolePaths from '@/AppConstants/rolePaths'
 
 export default {
   name: 'AuthCallback',
-  async mounted() {
-    try {
-      // Get auth store
-      const authStore = useAuthStore();
-      
-      // Process auth callback
-      const urlParams = new URLSearchParams(window.location.search);
-      const access_token = urlParams.get('access_token');
-      const user_role = urlParams.get('user_role');
-      const password_needed = urlParams.get('password_needed') === 'true';
-      
-      console.log("Received callback params:", { 
-        token: access_token ? "provided" : "missing", 
-        role: user_role || "not provided",
-        password_needed
-      });
-      
-      if (access_token) {
+  setup() {
+    const status = ref('Please wait while we complete your login.')
+    const router = useRouter()
+
+    onMounted(async () => {
+      try {
+        // Get auth store
+        const authStore = useAuthStore();
+        
+        // Process auth callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const access_token = urlParams.get('access_token');
+        const user_role = urlParams.get('user_role');
+        const password_needed = urlParams.get('password_needed') === 'true';
+        
+        console.log("Received callback params:", { 
+          token: access_token ? "provided" : "missing", 
+          role: user_role || "not provided",
+          password_needed
+        });
+        
+        if (!access_token) {
+          console.error("No access token provided in callback URL");
+          status.value = "Authentication failed. Redirecting to login...";
+          setTimeout(() => router.push('/login?error=no_token'), 2000);
+          return;
+        }
+        
         // Save auth data
         localStorage.setItem('token', access_token);
+        status.value = "Token received. Setting up your account...";
         
         // Save user role if available
         if (user_role) {
@@ -93,19 +106,32 @@ export default {
         // Clear stored redirect path
         localStorage.removeItem('loginRedirectPath');
         
-        // Get user info to complete auth process
-        await authService.getCurrentUser();
+        status.value = "Getting user information...";
         
-        // Redirect user
-        this.$router.push(targetPath);
-      } else {
-        // No token found, go to login
-        console.error("No access token provided in callback URL");
-        this.$router.push('/login?error=no_token');
+        // Validate token by getting user info
+        try {
+          const userData = await authService.getCurrentUser();
+          if (!userData) {
+            throw new Error("Failed to get user data");
+          }
+          status.value = "Authentication successful! Redirecting...";
+          
+          // Give a small delay to show success message
+          setTimeout(() => router.push(targetPath), 1000);
+        } catch (userError) {
+          console.error("Error getting user data:", userError);
+          status.value = "Error loading user data. Redirecting to login...";
+          setTimeout(() => router.push('/login?error=user_data_error'), 2000);
+        }
+      } catch (error) {
+        console.error('Auth callback error:', error);
+        status.value = "Authentication error. Redirecting to login...";
+        setTimeout(() => router.push('/login?error=callback_error'), 2000);
       }
-    } catch (error) {
-      console.error('Auth callback error:', error);
-      this.$router.push('/login?error=callback_error');
+    })
+
+    return {
+      status
     }
   }
 }

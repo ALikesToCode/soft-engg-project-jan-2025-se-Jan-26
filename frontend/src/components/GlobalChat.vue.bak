@@ -1,0 +1,471 @@
+<template>
+  <Teleport to="body">
+    <!-- Chat Panel -->
+    <Transition name="slide">
+      <div 
+        v-if="chatStore.isOpen && isAuthenticatedRoute"
+        class="chat-panel"
+      >
+        <!-- Chat Header -->
+        <div class="chat-header">
+          <div class="flex items-center space-x-3">
+            <button
+              @click="toggleHistory"
+              class="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+              :class="{ 'bg-gray-100': showHistory }"
+              title="Toggle Chat History"
+            >
+              <span class="material-icons">history</span>
+            </button>
+            <h2 class="text-lg font-semibold text-gray-900">{{ chatTitle }}</h2>
+            <span 
+              v-if="chatStore.currentContext"
+              class="px-2 py-0.5 bg-maroon-100 text-maroon-800 text-xs font-medium rounded-full"
+            >
+              {{ chatStore.currentContext.type }}
+            </span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button 
+              @click="chatStore.toggleSplitScreen"
+              class="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+              title="Toggle Split Screen"
+            >
+              <span class="material-icons">{{ chatStore.isSplitScreen ? 'close_fullscreen' : 'open_in_full' }}</span>
+            </button>
+            <button 
+              @click="closeChatSafely"
+              class="p-2 text-gray-500 hover:text-gray-700 rounded-lg hover:bg-gray-100"
+            >
+              <span class="material-icons">close</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat History Sidebar -->
+        <Transition name="slide-left">
+          <div
+            v-if="showHistory"
+            class="chat-history-sidebar"
+          >
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 class="font-medium text-gray-900">Chat History</h3>
+              <button @click="toggleHistory" class="text-gray-500 hover:text-gray-700">
+                <span class="material-icons">close</span>
+              </button>
+            </div>
+            <div class="p-4">
+              <button
+                @click="startNewChat"
+                class="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-maroon-600 hover:bg-maroon-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-maroon-500"
+              >
+                <span class="material-icons mr-1 text-sm">add</span>
+                New Chat
+              </button>
+            </div>
+            <div class="flex-1 overflow-y-auto">
+              <ul class="divide-y divide-gray-200">
+                <li 
+                  v-for="chat in chatStore.chatHistory" 
+                  :key="chat.id" 
+                  class="hover:bg-gray-50"
+                >
+                  <div class="px-4 py-3 flex justify-between">
+                    <button
+                      @click="selectChat(chat.id)"
+                      class="text-left flex-1"
+                      :class="{ 'font-medium text-maroon-600': chatStore.currentChatId === chat.id }"
+                    >
+                      <h4 class="text-sm font-medium text-gray-900 truncate">{{ chat.title }}</h4>
+                      <p class="text-xs text-gray-500">{{ formatDate(chat.lastUpdated) }}</p>
+                    </button>
+                    <button
+                      @click.stop="deleteChat(chat.id)"
+                      class="text-gray-400 hover:text-gray-600 ml-2"
+                    >
+                      <span class="material-icons text-sm">delete</span>
+                    </button>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </Transition>
+
+        <!-- Chat Content -->
+        <ChatBotBox 
+          class="flex-1 bg-white" 
+          :context="chatStore.currentContext"
+          :chat-id="chatStore.currentChatId"
+          @clear-context="chatStore.clearContext"
+          @update:title="chatStore.updateChatTitle"
+        />
+      </div>
+    </Transition>
+
+    <!-- Toggle Chat Button -->
+    <Transition name="fade">
+      <button
+        v-if="!chatStore.isOpen && shouldShowButton && isAuthenticatedRoute"
+        @click="openChatSafely"
+        class="chat-toggle-button"
+      >
+        <span class="material-icons">chat</span>
+        <span class="chat-tooltip">
+          Ask Learning Assistant
+        </span>
+      </button>
+    </Transition>
+  </Teleport>
+</template>
+
+<script>
+import { useChatStore } from '@/stores/useChatStore'
+import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, nextTick } from 'vue'
+import { Teleport, Transition } from 'vue'
+import ChatBotBox from './ChatBotBox.vue'
+import useAuthStore from '@/stores/useAuthStore'
+
+export default {
+  name: 'GlobalChat',
+  components: {
+    ChatBotBox
+  },
+  setup() {
+    const chatStore = useChatStore()
+    const authStore = useAuthStore()
+    const route = useRoute()
+    const showHistory = ref(false)
+    // Track whether the chat button should be shown
+    const shouldShowButton = ref(true)
+
+    // Check if we're on the user dashboard
+    const isUserDashboard = computed(() => {
+      try {
+        return route.path === '/user/dashboard'
+      } catch (e) {
+        return false
+      }
+    })
+    
+    // Check if we're on an authenticated route
+    const isAuthenticatedRoute = computed(() => {
+      try {
+        // Public routes
+        const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/reset-password', 
+                              '/auth-callback', '/about', '/contact', '/help', '/faq'];
+        
+        // Don't show the chat button on public routes
+        return !publicRoutes.includes(route.path) && authStore.token;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    // Chat title handling
+    const chatTitle = computed(() => {
+      try {
+        if (chatStore.currentChat) {
+          return chatStore.currentChat.title
+        }
+        return chatStore.contextTitle || 'AI Learning Assistant'
+      } catch (e) {
+        return 'AI Learning Assistant'
+      }
+    })
+
+    // Open chat securely by using direct property access
+    const openChatSafely = () => {
+      try {
+        // Ensure we have a chat to display
+        ensureValidChat()
+        
+        // Open the chat
+        chatStore.isOpen = true
+        console.log("Chat opened with direct property access:", chatStore.isOpen)
+      } catch (e) {
+        console.error("Error opening chat:", e)
+      }
+    }
+
+    // Close chat using direct property access
+    const closeChatSafely = () => {
+      try {
+        chatStore.isOpen = false
+        console.log("Chat closed with direct property access:", chatStore.isOpen)
+      } catch (e) {
+        console.error("Error closing chat:", e)
+      }
+    }
+
+    // Helper function to ensure we have a valid chat
+    const ensureValidChat = () => {
+      try {
+        if (chatStore.chatHistory.length === 0) {
+          startNewChat()
+          return
+        }
+        
+        if (!chatStore.currentChatId && chatStore.chatHistory.length > 0) {
+          chatStore.setCurrentChat(chatStore.chatHistory[0].id)
+        }
+      } catch (e) {
+        console.error("Error ensuring valid chat:", e)
+        // Create a fallback chat
+        startNewChat()
+      }
+    }
+
+    // Start a new chat with error handling
+    const startNewChat = () => {
+      try {
+        chatStore.startNewChat('New Conversation')
+        showHistory.value = false
+      } catch (e) {
+        console.error("Error starting new chat:", e)
+      }
+    }
+
+    // Safe wrapper for deleting a chat
+    const deleteChat = (chatId) => {
+      try {
+        chatStore.deleteChat(chatId)
+      } catch (e) {
+        console.error("Error deleting chat:", e)
+      }
+    }
+
+    // Safe wrapper for selecting a chat
+    const selectChat = (chatId) => {
+      try {
+        chatStore.setCurrentChat(chatId)
+        showHistory.value = false
+      } catch (e) {
+        console.error("Error selecting chat:", e)
+      }
+    }
+
+    // Toggle history safely
+    const toggleHistory = () => {
+      showHistory.value = !showHistory.value
+    }
+
+    // Format date for display
+    const formatDate = (date) => {
+      try {
+        if (!date) return "Just now"
+        
+        const now = new Date()
+        const diff = now - date
+        
+        // Less than a day
+        if (diff < 86400000) {
+          const hours = Math.floor(diff / 3600000)
+          if (hours < 1) {
+            return 'Just now'
+          } else if (hours === 1) {
+            return '1 hour ago'
+          } else {
+            return `${hours} hours ago`
+          }
+        }
+        
+        // Less than a week
+        if (diff < 604800000) {
+          const days = Math.floor(diff / 86400000)
+          if (days === 1) {
+            return 'Yesterday'
+          } else {
+            return `${days} days ago`
+          }
+        }
+        
+        // Format as date
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        })
+      } catch (e) {
+        return "Unknown date"
+      }
+    }
+
+    // Initialize component
+    onMounted(() => {
+      try {
+        console.log("GlobalChat mounted, current route:", route.path)
+        
+        // Handle dashboard case differently
+        if (isUserDashboard.value) {
+          shouldShowButton.value = false
+          console.log("On user dashboard - hiding global chat button")
+        } else {
+          shouldShowButton.value = true
+        }
+        
+        // Make sure chat store is initialized
+        if (!chatStore.initialized) {
+          console.log("Chat store not initialized, initializing now")
+          chatStore.initialize()
+        }
+        
+        // Ensure we have a valid chat
+        ensureValidChat()
+      } catch (e) {
+        console.error("Error in GlobalChat onMounted:", e)
+      }
+    })
+
+    return {
+      chatStore,
+      shouldShowButton,
+      isUserDashboard,
+      isAuthenticatedRoute,
+      chatTitle,
+      showHistory,
+      toggleHistory,
+      selectChat,
+      formatDate,
+      openChatSafely,
+      closeChatSafely,
+      startNewChat,
+      deleteChat,
+      ensureValidChat
+    }
+  }
+}
+</script>
+
+<style scoped>
+/* Chat Panel */
+.chat-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 24rem; /* w-96 */
+  background-color: white;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  z-index: 99999;
+  transition: transform 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+/* Chat Header */
+.chat-header {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: white;
+  z-index: 99999;
+}
+
+/* Chat History Sidebar */
+.chat-history-sidebar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 16rem; /* w-64 */
+  background-color: white;
+  border-right: 1px solid #e5e7eb;
+  transform: none;
+  transition: transform 0.3s ease;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Chat Toggle Button */
+.chat-toggle-button {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  background-color: rgb(157, 23, 77);
+  color: white;
+  border-radius: 9999px;
+  padding: 1rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s;
+  z-index: 99999;
+}
+
+.chat-toggle-button:hover {
+  background-color: rgb(131, 24, 67);
+}
+
+.chat-tooltip {
+  position: absolute;
+  right: calc(100% + 0.75rem);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0.25rem 0.75rem;
+  background-color: #1f2937;
+  color: white;
+  font-size: 0.875rem;
+  border-radius: 0.5rem;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 99999;
+}
+
+.chat-toggle-button:hover .chat-tooltip {
+  opacity: 1;
+}
+
+/* Transitions */
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  transform: translateX(100%);
+}
+
+.slide-left-enter-active,
+.slide-left-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-left-enter-from,
+.slide-left-leave-to {
+  transform: translateX(-100%);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Custom scrollbar for chat history */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 2px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+</style> 

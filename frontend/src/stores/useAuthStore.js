@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import FetchFunction from '../utils/FetchFunction';
 import router from '../router/index';
 import { User } from '@/models/User';
@@ -29,6 +29,44 @@ export default defineStore('auth', () => {
     const isAdmin = ref(false);
     const isDevelopment = ref(DEV_MODE);
     const hasPassword = ref(false);
+    const isInitialized = ref(false);
+
+    // Initialize auth state when store is created
+    async function initialize() {
+        console.log("Initializing auth store");
+        
+        if (isInitialized.value) {
+            console.log("Auth store already initialized");
+            return;
+        }
+        
+        // Check if we have a token
+        if (!token.value) {
+            console.log("No token found, skipping initialization");
+            isInitialized.value = true;
+            return;
+        }
+        
+        try {
+            // Get user data
+            const userData = await authService.getCurrentUser();
+            if (userData) {
+                setUser(userData);
+                console.log(`Auth store initialized for user: ${userData.email}, role: ${userData.role}`);
+            } else {
+                console.warn("Failed to get user data during initialization");
+                // Keep the token in case it's valid but the API call failed
+            }
+        } catch (error) {
+            console.error("Error initializing auth store:", error);
+            // Clear auth data on critical errors
+            if (error.response && error.response.status === 401) {
+                logout();
+            }
+        } finally {
+            isInitialized.value = true;
+        }
+    }
 
     // Development only - helper to switch roles
     function switchRole(role) {
@@ -97,8 +135,10 @@ export default defineStore('auth', () => {
         user.value = null;
         token.value = null;
         userRole.value = ROLE.STUDENT;
+        hasPassword.value = false;
         localStorage.removeItem('token');
         localStorage.removeItem('userRole');
+        router.push('/login');
     }
 
     function setUser(userData) {
@@ -111,11 +151,22 @@ export default defineStore('auth', () => {
     }
 
     function setUserRole(role) {
-        if (Object.values(ROLE).includes(role)) {
-            userRole.value = role;
-            localStorage.setItem('userRole', role);
+        if (role && typeof role === 'string') {
+            // Normalize role to uppercase
+            const normalizedRole = role.toUpperCase();
+            
+            // Validate against known roles
+            if (Object.values(ROLE).includes(normalizedRole)) {
+                userRole.value = normalizedRole;
+                localStorage.setItem('userRole', normalizedRole);
+                console.log(`User role set to: ${normalizedRole}`);
+            } else {
+                console.warn(`Invalid role: ${role}, defaulting to STUDENT`);
+                userRole.value = ROLE.STUDENT;
+                localStorage.setItem('userRole', ROLE.STUDENT);
+            }
         } else {
-            console.warn('Invalid role:', role);
+            console.warn(`Invalid role value: ${role}, defaulting to STUDENT`);
             userRole.value = ROLE.STUDENT;
             localStorage.setItem('userRole', ROLE.STUDENT);
         }
@@ -157,6 +208,10 @@ export default defineStore('auth', () => {
         }
     }
 
+    // Initialize the store on creation
+    // Note: This is called when the store is first accessed
+    setTimeout(initialize, 0);
+
     return {
         token,
         returnUrl,
@@ -165,6 +220,8 @@ export default defineStore('auth', () => {
         isAdmin,
         isDevelopment,
         hasPassword,
+        isInitialized,
+        initialize,
         switchRole,
         login,
         logout,

@@ -1,12 +1,14 @@
 export const API_ROUTES = {
-  BASE: '/api/v1',
-  COURSES: '/api/v1/courses',
-  QUIZZES: '/api/v1/courses/quizzes',
-  ASSIGNMENTS: '/api/v1/assignments',
-  SUBMISSIONS: '/api/v1/assignments',
-  ACADEMIC_INTEGRITY: '/api/v1/academic-integrity',
-  LLM: '',//'/api/v1/llm',
-  NOTIFICATIONS: '/notification'
+  BASE: '',
+  COURSES: '/courses',
+  QUIZZES: '/quizzes',
+  ASSIGNMENTS: '/assignments',
+  SUBMISSIONS: '/submissions',
+  ACADEMIC_INTEGRITY: '/academic-integrity',
+  LLM: '/llm',
+  CHAT: '/chat',
+  NOTIFICATIONS: '/notifications',
 }
 
-export const API_VERSION = 'v1' 
+// Export a default config for ease of use
+export default API_ROUTES 

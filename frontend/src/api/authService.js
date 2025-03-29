@@ -143,9 +143,25 @@ export const authService = {
                 this.debugTokenStatus();
             }
 
+            // Clear any cached user data to ensure fresh fetch
+            if (this._cachedUserData) {
+                logger.debug('Clearing cached user data');
+                this._cachedUserData = null;
+            }
+
             const response = await this.axiosInstance.get('/auth/me');
             logger.log('Current user data retrieved successfully');
             logger.debug('User data:', response.data);
+            
+            // Cache the user data for subsequent calls within the same session
+            this._cachedUserData = response.data;
+            
+            // Update local storage with user role if it exists
+            if (response.data && response.data.role) {
+                localStorage.setItem('userRole', response.data.role.toUpperCase());
+                logger.debug(`Updated userRole in localStorage: ${response.data.role.toUpperCase()}`);
+            }
+            
             return response.data;
         } catch (error) {
             logger.error('Error getting current user:', error.message);
@@ -156,6 +172,8 @@ export const authService = {
                 if (error.response.status === 401) {
                     logger.warn('Unauthorized - clearing invalid token');
                     localStorage.removeItem('token');
+                    localStorage.removeItem('userRole');
+                    this._cachedUserData = null;
                 }
             }
             return null;
@@ -166,6 +184,21 @@ export const authService = {
     async isAuthenticated() {
         try {
             logger.debug('Checking authentication status...');
+            
+            // First check if token exists
+            const token = localStorage.getItem('token');
+            if (!token) {
+                logger.debug('No token found, user is not authenticated');
+                return false;
+            }
+            
+            // Check for cached user data to avoid repeated API calls
+            if (this._cachedUserData) {
+                logger.debug('Using cached user data for authentication check');
+                return true;
+            }
+            
+            // If no cached data, make the API call
             const user = await this.getCurrentUser();
             const isAuth = !!user;
             logger.debug(`Authentication check result: ${isAuth ? 'Authenticated' : 'Not authenticated'}`);
@@ -316,19 +349,36 @@ export const authService = {
         return true;
     },
 
-    // Check if user has support role
+    // Check if user has a specific role
     hasRole(role) {
-        const userRole = localStorage.getItem('userRole');
-        if (!userRole) return false;
-        
-        if (Array.isArray(role)) {
-            return role.some(r => userRole.toUpperCase() === r.toUpperCase());
+        try {
+            logger.debug(`Checking if user has role: ${role}`);
+            
+            // Try to get role from localStorage first for faster response
+            const storedRole = localStorage.getItem('userRole');
+            if (storedRole) {
+                const hasRole = storedRole.toUpperCase() === role.toUpperCase();
+                logger.debug(`Role check from localStorage: ${storedRole.toUpperCase()} === ${role.toUpperCase()} = ${hasRole}`);
+                return hasRole;
+            }
+            
+            // If no stored role but we have cached user data, use that
+            if (this._cachedUserData && this._cachedUserData.role) {
+                const hasRole = this._cachedUserData.role.toUpperCase() === role.toUpperCase();
+                logger.debug(`Role check from cached data: ${this._cachedUserData.role.toUpperCase()} === ${role.toUpperCase()} = ${hasRole}`);
+                return hasRole;
+            }
+            
+            // Default to false if no role information is available
+            logger.debug('No role information available, defaulting to false');
+            return false;
+        } catch (error) {
+            logger.error('Error in hasRole:', error);
+            return false;
         }
-        
-        return userRole.toUpperCase() === role.toUpperCase();
     },
-    
-    // Check specifically for support role
+
+    // Check if user has support role
     hasSupportRole() {
         return this.hasRole('SUPPORT');
     }

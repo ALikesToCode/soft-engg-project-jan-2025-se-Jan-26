@@ -15,6 +15,7 @@ from sqlalchemy.future import select
 from sqlalchemy import and_, or_
 from app.models.assignment import Submission
 from app.models.user import User
+from app.services.gemini_integrity_service import gemini_integrity_service
 
 router = APIRouter(
     prefix="/academic-integrity",
@@ -674,4 +675,124 @@ async def get_all_flags(
         
         return flags
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Schema for checking LLM responses for academic integrity
+class LLMResponseCheckRequest(BaseModel):
+    """
+    Model for checking LLM responses for academic integrity issues.
+    """
+    response: str = Field(..., description="The LLM response to check")
+    query: Optional[str] = Field(None, description="The original query that generated the response")
+    course_context: Optional[str] = Field(None, description="Course context information")
+
+class LLMResponseCheckResponse(BaseModel):
+    """
+    Response model for LLM response integrity check.
+    """
+    flagged: bool = Field(..., description="Whether the response was flagged for integrity issues")
+    integrity_score: int = Field(..., description="Integrity score (0-100)")
+    analysis: Dict[str, Any] = Field(..., description="Detailed analysis of the response")
+
+# Endpoint for checking LLM responses
+@router.post("/check-llm-response", 
+    response_model=LLMResponseCheckResponse,
+    summary="Check LLM response for academic integrity issues",
+    description="Analyzes an LLM response for potential academic integrity violations",
+    response_description="Academic integrity analysis results",
+    responses={
+        200: {
+            "description": "Analysis completed successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "flagged": True,
+                        "integrity_score": 65,
+                        "analysis": {
+                            "summary": "Response contains potential academic integrity issues",
+                            "flags": [
+                                {
+                                    "type": "solution_provision",
+                                    "severity": "medium",
+                                    "explanation": "Provides a complete solution without requiring student work",
+                                    "location": {
+                                        "start_index": 120,
+                                        "end_index": 340
+                                    },
+                                    "text": "Here's the complete solution to your assignment...",
+                                    "recommendation": "Provide guidance on approach rather than complete solution"
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Bad request - Invalid input",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Response text is too short for analysis"}
+                }
+            }
+        },
+        500: {
+            "description": "Server error during analysis",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Failed to analyze response"}
+                }
+            }
+        }
+    }
+)
+async def check_llm_response(
+    request: LLMResponseCheckRequest,
+    current_user: dict = Depends(get_current_faculty)
+):
+    """
+    Check an LLM response for academic integrity issues.
+    
+    This endpoint uses Google's Gemini model to analyze an LLM response for potential
+    academic integrity violations such as plagiarism, solution provision, or code completion.
+    
+    Args:
+        request: The LLM response check request
+        current_user: The authenticated faculty user
+        
+    Returns:
+        Analysis results including flagged status, integrity score, and detailed explanation
+        
+    Raises:
+        HTTPException: If the analysis fails or the input is invalid
+    """
+    try:
+        logger.info(f"Faculty {current_user.get('email')} requested LLM response integrity check")
+        
+        # Validate input
+        if len(request.response) < 10:
+            raise HTTPException(status_code=400, detail="Response text is too short for analysis")
+            
+        # Get analysis from Gemini service
+        analysis_result = await gemini_integrity_service.check_integrity(
+            llm_response=request.response,
+            original_query=request.query,
+            course_context=request.course_context
+        )
+        
+        # Log the result
+        is_flagged = analysis_result.get("flagged", False)
+        integrity_score = analysis_result.get("integrity_score", 0)
+        logger.info(f"LLM response analyzed with score {integrity_score}, flagged: {is_flagged}")
+        
+        # Return the analysis results
+        return analysis_result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing LLM response: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to analyze response: {str(e)}"
+        ) 

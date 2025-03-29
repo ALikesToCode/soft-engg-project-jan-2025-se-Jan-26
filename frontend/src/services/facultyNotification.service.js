@@ -2,17 +2,20 @@ import axios from 'axios'
 import { API_ROUTES } from '@/config/api.routes'
 import api from '@/utils/api'
 
+// Fixing API paths by removing duplicate /api/v1/
+const API_PATH_NOTIFICATIONS = '/notifications';
+
 export const FacultyNotificationService = {
   // Get faculty notifications
   async getNotifications(filters = {}) {
-    return axios.get(`${API_ROUTES.NOTIFICATIONS}/faculty`, { params: filters })
+    return api.get(`${API_PATH_NOTIFICATIONS}/faculty`, { params: filters })
   },
 
   async getRecentNotifications(headers) {
-    console.log(`Inside notificationService.getRecentNotifications to send request at ${API_ROUTES.NOTIFICATIONS}/recent-notifications`)
+    console.log(`Inside notificationService.getRecentNotifications to send request at ${API_PATH_NOTIFICATIONS}/recent-notifications`)
     try {
       const response = await api.get(
-        `${API_ROUTES.NOTIFICATIONS}/recent-notifications`,
+        `${API_PATH_NOTIFICATIONS}/recent-notifications`,
         headers
       );
       return response;
@@ -23,11 +26,11 @@ export const FacultyNotificationService = {
 
   // Create a new notification
   async createNotification(notificationData, headers) {
-    console.log(`Inside notificationService.createNotification to send request at ${API_ROUTES.NOTIFICATIONS}/course/send`)
+    console.log(`Inside notificationService.createNotification to send request at ${API_PATH_NOTIFICATIONS}/course/send`)
     try {
       console.log(notificationData)
       const response = await api.post(
-        `${API_ROUTES.NOTIFICATIONS}/course/send`,
+        `${API_PATH_NOTIFICATIONS}/course/send`,
         notificationData,
         headers
       );
@@ -44,7 +47,7 @@ export const FacultyNotificationService = {
     try {
       console.log(notificationData)
       const response = await api.post(
-        `${API_ROUTES.NOTIFICATIONS}/system/send`,
+        `${API_PATH_NOTIFICATIONS}/system/send`,
         notificationData,
         headers
       );
@@ -58,31 +61,31 @@ export const FacultyNotificationService = {
 
   // Update notification status
   async updateNotificationStatus(notificationId, status) {
-    return axios.put(`${API_ROUTES.NOTIFICATIONS}/faculty/${notificationId}/status`, { status })
+    return api.put(`${API_PATH_NOTIFICATIONS}/faculty/${notificationId}/status`, { status })
   },
 
   // Get notification preferences
   async getPreferences() {
-    return axios.get(`${API_ROUTES.NOTIFICATIONS}/faculty/preferences`)
+    return api.get(`${API_PATH_NOTIFICATIONS}/faculty/preferences`)
   },
 
   // Update notification preferences
   async updatePreferences(preferences) {
-    return axios.put(`${API_ROUTES.NOTIFICATIONS}/faculty/preferences`, preferences)
+    return api.put(`${API_PATH_NOTIFICATIONS}/faculty/preferences`, preferences)
   },
 
   // Get notification statistics
   async getStatistics(courseId) {
-    return axios.get(`${API_ROUTES.NOTIFICATIONS}/faculty/statistics/${courseId}`)
+    return api.get(`${API_PATH_NOTIFICATIONS}/faculty/statistics/${courseId}`)
   },
 
   // Mark notification as read
   async markAsRead(notificationId) {
-    return axios.put(`${API_ROUTES.NOTIFICATIONS}/faculty/${notificationId}/read`)
+    return api.put(`${API_PATH_NOTIFICATIONS}/faculty/${notificationId}/read`)
   },
 
   // Delete notification
   async deleteNotification(notificationId) {
-    return axios.delete(`${API_ROUTES.NOTIFICATIONS}/faculty/${notificationId}`)
+    return api.delete(`${API_PATH_NOTIFICATIONS}/faculty/${notificationId}`)
   }
 } 

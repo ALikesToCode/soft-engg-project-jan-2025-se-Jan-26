@@ -22,6 +22,9 @@ class UserResponse(UserBase):
             obj.id = str(obj.id)
         return super().from_orm(obj)
 
+# Add an alias for User that points to UserResponse to fix import issues
+User = UserResponse
+
 class UpdateUserRequest(BaseModel):
     """Schema for updating user data"""
     name: Optional[str] = None

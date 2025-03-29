@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-if="shouldShowPageChat" class="h-full flex flex-col">
     <!-- Floating Action Button (visible when in minimized mode) -->
     <button
       v-if="!isExpanded && !isSplitScreen"
@@ -86,7 +86,9 @@
         <div class="flex-1 flex flex-col min-w-0">
           <ChatBotBox 
             :chat-id="currentChat?.id"
+            :context="chatStore.currentContext"
             @update:title="updateChatTitle"
+            @clear-context="clearContext"
           />
         </div>
       </div>
@@ -157,7 +159,9 @@
         <div class="flex-1 min-w-0">
           <ChatBotBox 
             :chat-id="currentChat?.id"
+            :context="chatStore.currentContext"
             @update:title="updateChatTitle"
+            @clear-context="clearContext"
           />
         </div>
       </div>
@@ -167,112 +171,258 @@
 
 <script>
 import ChatBotBox from './ChatBotBox.vue'
+import { useChatStore } from '@/stores/useChatStore'
+import { ref, computed, onMounted, watch } from 'vue'
 
 export default {
   name: 'ChatBotWrapper',
   components: {
     ChatBotBox
   },
-  data() {
-    return {
-      isExpanded: false,
-      isSplitScreen: false,
-      showHistory: false,
-      currentChat: null,
-      chatHistory: [
-        {
-          id: 1,
-          title: 'Python Programming Help',
-          lastUpdated: new Date('2024-01-25T10:30:00'),
-          messages: []
-        },
-        {
-          id: 2,
-          title: 'Data Structures Concepts',
-          lastUpdated: new Date('2024-01-24T15:45:00'),
-          messages: []
-        },
-        {
-          id: 3,
-          title: 'Web Development Questions',
-          lastUpdated: new Date('2024-01-23T09:15:00'),
-          messages: []
-        }
-      ]
+  props: {
+    pageChat: {
+      type: Boolean,
+      default: false
+    },
+    context: {
+      type: Object,
+      default: null
     }
   },
-  methods: {
-    toggleExpanded() {
-      this.isExpanded = !this.isExpanded
-      if (!this.isExpanded) {
-        this.isSplitScreen = false
-        this.showHistory = false
+  emits: ['minimize'],
+  setup(props, { emit }) {
+    const chatStore = useChatStore()
+    const loading = ref(false)
+    
+    // Check if page-specific chat should be shown
+    const shouldShowPageChat = computed(() => {
+      // Use a simple true value to always show chat
+      // This avoids complicated logic that might cause issues
+      return true
+    })
+    
+    const isExpanded = ref(false)
+    const isSplitScreen = ref(false)
+    const showHistory = ref(false)
+    
+    // Handle missing currentChat safely
+    const currentChat = computed(() => {
+      return chatStore.currentChat || null
+    })
+    
+    // Make sure we have a safe chatHistory to avoid errors
+    const chatHistory = computed(() => {
+      return chatStore.chatHistory || []
+    })
+
+    const toggleExpanded = () => {
+      // Before expanding, make sure we have a valid chat
+      ensureChatExists()
+      isExpanded.value = !isExpanded.value
+      if (!isExpanded.value) {
+        isSplitScreen.value = false
+        showHistory.value = false
       }
-    },
-    toggleSplitScreen() {
-      this.isSplitScreen = !this.isSplitScreen
-      this.isExpanded = !this.isSplitScreen
-    },
-    toggleHistory() {
-      this.showHistory = !this.showHistory
-    },
-    startNewChat() {
-      const newChat = {
-        id: Date.now(),
-        title: 'New Conversation',
-        lastUpdated: new Date(),
-        messages: []
+    }
+
+    const toggleSplitScreen = () => {
+      isSplitScreen.value = !isSplitScreen.value
+      isExpanded.value = !isSplitScreen.value
+    }
+
+    const toggleHistory = () => {
+      showHistory.value = !showHistory.value
+    }
+
+    // Helper function to ensure we have at least one chat
+    const ensureChatExists = async () => {
+      try {
+        loading.value = true
+        
+        // Create a default chat if none exists
+        if (chatStore.chatHistory.length === 0) {
+          await startNewChat()
+        }
+        
+        // Make sure we have a selected chat
+        if (!chatStore.currentChatId && chatStore.chatHistory.length > 0) {
+          await selectChat(chatStore.chatHistory[0].id)
+        }
+        
+        return true
+      } catch (e) {
+        console.error("Error ensuring chat exists:", e)
+        
+        // Create a local fallback if needed
+        if (chatStore.chatHistory.length === 0) {
+          chatStore.chatHistory = [{
+            id: "local-" + Date.now(),
+            title: "New Chat",
+            createdAt: new Date(),
+            lastUpdated: new Date(),
+            messages: []
+          }]
+          
+          if (chatStore.chatHistory.length > 0) {
+            chatStore.currentChatId = chatStore.chatHistory[0].id
+          }
+        }
+        
+        return false
+      } finally {
+        loading.value = false
       }
-      this.chatHistory.unshift(newChat)
-      this.selectChat(newChat)
-    },
-    selectChat(chat) {
-      this.currentChat = chat
-    },
-    deleteChat(chatToDelete) {
-      this.chatHistory = this.chatHistory.filter(chat => chat.id !== chatToDelete.id)
-      if (this.currentChat?.id === chatToDelete.id) {
-        this.currentChat = this.chatHistory[0] || null
+    }
+
+    // Start a new chat with error handling
+    const startNewChat = async () => {
+      try {
+        loading.value = true
+        await chatStore.startNewChat('New Conversation')
+        
+        // Set context if provided
+        if (props.context) {
+          chatStore.setContext(props.context)
+        }
+        
+        return true
+      } catch (e) {
+        console.error("Error starting new chat:", e)
+        
+        // Create a local fallback
+        const newChatId = "local-" + Date.now()
+        const newChat = {
+          id: newChatId,
+          title: "New Conversation",
+          createdAt: new Date(),
+          lastUpdated: new Date(),
+          messages: []
+        }
+        
+        chatStore.chatHistory.push(newChat)
+        chatStore.currentChatId = newChatId
+        
+        // Set context if provided
+        if (props.context) {
+          chatStore.setContext(props.context)
+        }
+        
+        return false
+      } finally {
+        loading.value = false
       }
-    },
-    updateChatTitle(chatId, newTitle) {
-      const chat = this.chatHistory.find(c => c.id === chatId)
-      if (chat) {
-        chat.title = newTitle
-        chat.lastUpdated = new Date()
+    }
+
+    // Select a chat with error handling
+    const selectChat = async (chatId) => {
+      try {
+        loading.value = true
+        await chatStore.setCurrentChat(chatId)
+        return true
+      } catch (e) {
+        console.error("Error selecting chat:", e)
+        
+        // Try to set it directly
+        chatStore.currentChatId = chatId
+        return false
+      } finally {
+        loading.value = false
       }
-    },
-    formatDate(date) {
-      const now = new Date()
-      const diff = now - date
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-      
-      if (days === 0) {
-        return 'Today'
-      } else if (days === 1) {
-        return 'Yesterday'
-      } else if (days < 7) {
-        return `${days} days ago`
-      } else {
-        return date.toLocaleDateString()
+    }
+
+    // Delete a chat with error handling
+    const deleteChat = async (chatId) => {
+      try {
+        loading.value = true
+        await chatStore.deleteChat(chatId)
+        return true
+      } catch (e) {
+        console.error("Error deleting chat:", e)
+        
+        // Try to delete it locally
+        chatStore.chatHistory = chatStore.chatHistory.filter(chat => chat.id !== chatId)
+        
+        // If the deleted chat was selected, select another one
+        if (chatStore.currentChatId === chatId) {
+          if (chatStore.chatHistory.length > 0) {
+            chatStore.currentChatId = chatStore.chatHistory[0].id
+          } else {
+            // Create a new one if all chats were deleted
+            startNewChat()
+          }
+        }
+        
+        return false
+      } finally {
+        loading.value = false
       }
+    }
+
+    const updateChatTitle = (chatId, newTitle) => {
+      try {
+        chatStore.updateChatTitle(chatId, newTitle)
+      } catch (error) {
+        console.error('Error updating chat title:', error)
+      }
+    }
+
+    // Clear context
+    const clearContext = () => {
+      chatStore.clearContext()
+    }
+
+    // Watch for changes in the current chat
+    watch(() => chatStore.currentChat, (newChat) => {
+      console.log('Current chat changed:', newChat)
+    })
+
+    // Initialize on mount
+    onMounted(async () => {
+      try {
+        console.log("ChatBotWrapper mounted, pageChat:", props.pageChat)
+        
+        // Make sure chat store is initialized
+        if (!chatStore.initialized) {
+          console.log("Chat store not initialized, initializing now")
+          await chatStore.initialize()
+        }
+        
+        // Ensure chat exists
+        await ensureChatExists()
+        
+        // Set context if provided
+        if (props.context) {
+          chatStore.setContext(props.context)
+        }
+      } catch (e) {
+        console.error("Error in ChatBotWrapper onMounted:", e)
+      }
+    })
+
+    return {
+      chatStore,
+      shouldShowPageChat,
+      isExpanded,
+      isSplitScreen,
+      showHistory,
+      currentChat,
+      chatHistory,
+      toggleExpanded,
+      toggleSplitScreen,
+      toggleHistory,
+      startNewChat,
+      selectChat,
+      deleteChat,
+      updateChatTitle,
+      clearContext,
+      formatDate,
+      ensureChatExists
     }
   }
 }
 </script>
 
 <style scoped>
-.scale-enter-active,
-.scale-leave-active {
-  transition: all 0.2s ease-in-out;
-}
-
-.scale-enter-from,
-.scale-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
 /* Custom scrollbar for chat history */
 .overflow-y-auto::-webkit-scrollbar {
   width: 4px;
@@ -289,5 +439,16 @@ export default {
 
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
+}
+
+.function-capabilities-badge {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  background-color: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 9999px;
+  color: #0369a1;
+  font-size: 0.75rem;
 }
 </style> 

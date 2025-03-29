@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, status
 from pydantic import BaseModel, Field
 import json
 from typing import List, Dict, Any, Optional
@@ -10,7 +10,13 @@ load_dotenv()
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from app.validators.llm_validator import LLMInputValidator
+from app.models.user import User
 from app.services.function_router import function_router
+from app.utils.openapi import get_openapi
+from app.routes.auth import get_current_user
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Initialize chat model
 llm = ChatGoogleGenerativeAI(
@@ -153,8 +159,8 @@ from starlette.requests import Request as StarletteRequest
                         "content": "Here are the available courses in the program:",
                         "function_calls": [
                             {
-                                "name": "get_courses",
-                                "arguments": {"category": "all"}
+                                "name": "getCourses",
+                                "arguments": {}
                             }
                         ]
                     }
@@ -181,18 +187,32 @@ async def chat(request: LLMRequest, req: Request):
     Raises:
         HTTPException: If input validation fails or if there's an error generating the response
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
     try:
         # Use the app state to get the LLMApp
         app = req.app
         
-        if not hasattr(app.state, "llmapp"):
-            raise HTTPException(
-                status_code=500, 
-                detail="LLMApp not initialized. Server configuration issue."
-            )
+        if not hasattr(app.state, "llmapp") or not app.state.llmapp:
+            # Handle initial startup - retry with exponential backoff
+            max_init_retries = 3
+            for retry in range(max_init_retries):
+                logger.warning(f"LLMApp not initialized. Attempting to initialize (attempt {retry+1}/{max_init_retries})")
+                try:
+                    # Try to initialize LLMApp if possible
+                    if hasattr(app.state, "pool") and app.state.pool:
+                        await create_llm_app(app)
+                        logger.info("LLMApp initialization successful")
+                        break
+                except Exception as init_error:
+                    logger.error(f"LLMApp initialization error: {str(init_error)}")
+                    import asyncio
+                    await asyncio.sleep(1 * (2 ** retry))  # Exponential backoff
+            
+            # If still not initialized, return fallback response
+            if not hasattr(app.state, "llmapp") or not app.state.llmapp:
+                logger.error("LLMApp initialization failed, returning fallback response")
+                return LLMResponse(
+                    content="I'm sorry, I'm still starting up. Please try again in a moment."
+                )
             
         config = {"configurable": {"thread_id": request.id}}
         input_message = [HumanMessage(content=request.query)]
@@ -249,151 +269,104 @@ async def chat(request: LLMRequest, req: Request):
                                     if "postgresql+asyncpg://" in connection_string:
                                         connection_string = connection_string.replace("postgresql+asyncpg://", "postgresql://")
                                     
-                                    # Force hostname connection method (disable socket connection attempts)
-                                    if "neon.tech" in connection_string:
-                                        # We're using a Neon DB connection - ensure host connection method
-                                        if "?" in connection_string:
-                                            # Remove invalid host_type parameter if present
-                                            if "&host_type=host" in connection_string:
-                                                connection_string = connection_string.replace("&host_type=host", "")
-                                        # No need to add invalid parameters
-                                    
-                                    # Recreate pool with simplified parameters
-                                    from psycopg_pool import AsyncConnectionPool
-                                    # Create a new pool instance with all parameters
-                                    app.state.pool = AsyncConnectionPool(
-                                        conninfo=connection_string,
-                                        kwargs={
-                                            "autocommit": True,
-                                            "connect_timeout": 30,
-                                            "sslmode": "require",
-                                            "application_name": "langraph_checkpointer",
-                                            "keepalives": 1,
-                                            "keepalives_idle": 30,
-                                            "keepalives_interval": 10,
-                                            "keepalives_count": 5
-                                        },
-                                        min_size=1,
-                                        max_size=5
-                                    )
+                                    # Create a new pool
+                                    app.state.pool = AsyncConnectionPool(connection_string)
                                     
                                     # Recreate the checkpointer
-                                    saver = AsyncPostgresSaver(app.state.pool)
-                                    await saver.setup()
-                                    app.state.checkpointer = saver
+                                    app.state.checkpointer = AsyncPostgresSaver(pool=app.state.pool)
                                     
-                                    logger.info("Connection pool recreated successfully")
+                                    # Recreate the LLMApp
+                                    await create_llm_app(app)
+                                    logger.info("Successfully recreated connection pool and LLMApp")
                                 except Exception as recreate_error:
-                                    logger.error(f"Failed to recreate pool: {str(recreate_error)}")
+                                    logger.error(f"Failed to recreate connection pool: {str(recreate_error)}")
                 else:
-                    # Not a connection error, no need to retry
-                    raise e
+                    # Not a connection error, break the loop
+                    logger.error(f"Non-connection error in LLMApp: {str(e)}")
+                    break
         
-        # If we've exhausted all retries
-        if retry_count >= max_retries:
-            logger.error(f"Failed after {max_retries} attempts: {str(last_error)}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Database connection error after multiple attempts: {str(last_error)}"
-            )
-        
-        # Extract the last message (AI response)
-        ai_message = response["messages"][-1]
-        
-        # Process function calls if present and execute them
-        function_calls = []
-        function_results = []
-        
-        if hasattr(ai_message, "additional_kwargs"):
-            # Process tool_calls format (newer LangChain format)
-            if "tool_calls" in ai_message.additional_kwargs:
-                for tool_call in ai_message.additional_kwargs["tool_calls"]:
-                    function_name = tool_call["function"]["name"]
-                    try:
-                        arguments = json.loads(tool_call["function"]["arguments"])
-                    except:
-                        arguments = {"query_text": tool_call["function"]["arguments"]}
-                        
-                    # Add to function calls list
-                    function_calls.append(FunctionCall(
-                        name=function_name,
-                        arguments=arguments
-                    ))
-                    
-                    # Execute function and capture result
-                    try:
-                        result = await function_router.execute_function(function_name, arguments)
-                        function_results.append({
-                            "name": function_name,
-                            "result": result
-                        })
-                    except Exception as e:
-                        function_results.append({
-                            "name": function_name,
-                            "error": str(e)
-                        })
-                        
-            # Process function_call format (older format)
-            elif "function_call" in ai_message.additional_kwargs:
-                fc = ai_message.additional_kwargs["function_call"]
-                function_name = fc["name"]
-                try:
-                    arguments = json.loads(fc["arguments"])
-                except:
-                    arguments = {"query_text": fc["arguments"]}
-                    
-                # Add to function calls list
-                function_calls.append(FunctionCall(
-                    name=function_name,
-                    arguments=arguments
-                ))
-                
-                # Execute function and capture result
-                try:
-                    result = await function_router.execute_function(function_name, arguments)
-                    function_results.append({
-                        "name": function_name,
-                        "result": result
-                    })
-                except Exception as e:
-                    function_results.append({
-                        "name": function_name,
-                        "error": str(e)
-                    })
-        
-        # If we have function results, send them back to the LLM for a better response
-        if function_results:
-            # Add function results to the conversation
-            for fr in function_results:
-                if "error" in fr:
-                    result_msg = f"Error executing function {fr['name']}: {fr['error']}"
-                else:
-                    result_msg = f"Function {fr['name']} returned: {json.dumps(fr['result'])}"
-                response["messages"].append(AIMessage(content=result_msg))
-            
-            # Get a new response from the LLM with the function results
-            followup_response = await app.state.llmapp.ainvoke(
-                response,
-                config=config
-            )
-            
-            # Use the updated response
-            updated_ai_message = followup_response["messages"][-1]
-            
-            # Return the updated response
+        # If we exhausted all retries, raise the last error
+        if retry_count == max_retries and last_error:
+            logger.error(f"Exhausted all retries: {str(last_error)}")
+            # Return a "friendly" error response instead of crashing
             return LLMResponse(
-                content=updated_ai_message.content,
+                content="I'm sorry, I encountered an issue while processing your request. Please try again later."
+            )
+        
+        # Format and return the response
+        if "messages" in response and len(response["messages"]) > 0:
+            output_message = response["messages"][-1]
+            
+            if output_message is None or not hasattr(output_message, "content"):
+                return LLMResponse(
+                    content="I'm sorry, I couldn't generate a response. Please try again."
+                )
+            
+            # Check if we need to convert legacy function calls format
+            function_calls = []
+            if hasattr(output_message, "additional_kwargs") and "function_calls" in output_message.additional_kwargs:
+                raw_function_calls = output_message.additional_kwargs["function_calls"]
+                
+                # Convert to our function call format
+                for fc in raw_function_calls:
+                    # Parse arguments from string to dict if needed
+                    args = fc.get("arguments", {})
+                    if isinstance(args, str):
+                        try:
+                            args = json.loads(args)
+                        except:
+                            # If we can't parse it, use it as is
+                            logger.warning(f"Could not parse function arguments: {args}")
+                            
+                    function_calls.append({
+                        "name": fc.get("name", "unknown_function"),
+                        "arguments": args
+                    })
+            
+            # Handle tool calls format for newer Google Gemini models
+            if hasattr(output_message, "tool_calls") and output_message.tool_calls:
+                for tool_call in output_message.tool_calls:
+                    # Extract function details
+                    name = tool_call.get("name", "unknown_function")
+                    args = tool_call.get("args", {})
+                    
+                    # Convert args from string to dict if needed
+                    if isinstance(args, str):
+                        try:
+                            args = json.loads(args)
+                        except:
+                            logger.warning(f"Could not parse tool call arguments: {args}")
+                    
+                    function_calls.append({
+                        "name": name,
+                        "arguments": args
+                    })
+                    
+            # If function name format needs conversion (e.g., get_courses -> getCourses)
+            for fc in function_calls:
+                # Convert snake_case to camelCase if needed
+                if "_" in fc["name"]:
+                    parts = fc["name"].split("_")
+                    camel_case = parts[0] + ''.join(x.title() for x in parts[1:])
+                    
+                    # Check if camelCase version exists in our function declarations
+                    function_names = [f["name"] for f in function_router.get_function_declarations()]
+                    if camel_case in function_names:
+                        fc["name"] = camel_case
+            
+            return LLMResponse(
+                content=output_message.content,
                 function_calls=function_calls if function_calls else None
             )
-                
-        # Return the original response if no functions were called
-        return LLMResponse(
-            content=ai_message.content,
-            function_calls=function_calls if function_calls else None
-        )
+        else:
+            return LLMResponse(
+                content="I apologize, but I couldn't generate a proper response."
+            )
+            
     except Exception as e:
+        logger.error(f"Unhandled error in chat endpoint: {str(e)}")
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing chat request: {str(e)}"
         )
 
@@ -439,3 +412,107 @@ async def clear_chat(id: str, req: Request):
                 return {"message": f"Chat history for thread_id '{id}' has been cleared."}
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Error clearing chat history: {e}")
+
+@router.get("/openapi.json", 
+    summary="Get API documentation",
+    description="Returns OpenAPI documentation filtered by user role",
+    responses={
+        200: {"description": "Return filtered OpenAPI documentation"},
+        401: {"description": "Unauthorized"},
+        500: {"description": "Server error"}
+    }
+)
+async def get_openapi_docs(req: Request, current_user: Optional[Dict[str, Any]] = Depends(get_current_user)):
+    """
+    Get OpenAPI documentation filtered according to the user's role.
+    
+    This endpoint returns the OpenAPI specification with only the endpoints
+    that are accessible to the current user based on their role.
+    """
+    # Get the main app instance
+    app = req.app
+    
+    try:
+        # Get the full OpenAPI spec
+        openapi_schema = get_openapi(
+            title="API Documentation",
+            version="1.0.0",
+            description="API documentation for the application",
+            routes=app.routes
+        )
+        
+        # If no user is authenticated, only return public endpoints
+        user_role = "anonymous"
+        if current_user:
+            user_role = current_user.get("role", "anonymous").lower()
+            logger.info(f"Filtering OpenAPI docs for user role: {user_role}")
+        else:
+            logger.info("No authenticated user, returning anonymous API docs")
+        
+        # Define paths accessible by role
+        role_access = {
+            "admin": {  # Admin can access everything
+                "include_all": True,
+                "excluded_paths": []
+            },
+            "faculty": {
+                "include_all": False,
+                "allowed_tags": ["Authentication", "Chat", "Courses", "Assignments", 
+                                "LLM", "FAQs", "User", "Users"],
+                "excluded_paths": ["/api/v1/settings", "/api/v1/monitoring"]
+            },
+            "student": {
+                "include_all": False,
+                "allowed_tags": ["Authentication", "Chat", "Courses", "Assignments", 
+                                "LLM", "FAQs", "User"],
+                "excluded_paths": ["/api/v1/settings", "/api/v1/monitoring", 
+                                  "/api/v1/users", "/api/v1/auth/users"]
+            },
+            "anonymous": {
+                "include_all": False,
+                "allowed_tags": ["Authentication"],
+                "allowed_paths": ["/api/v1/auth/login", "/api/v1/auth/register", 
+                                 "/api/v1/auth/refresh", "/api/v1/faqs"]
+            }
+        }
+        
+        # Get access configuration for this role
+        access_config = role_access.get(user_role, role_access["anonymous"])
+        
+        # If not admin, filter the paths
+        if not access_config.get("include_all", False):
+            filtered_paths = {}
+            
+            for path, path_item in openapi_schema["paths"].items():
+                # Check if path is explicitly allowed (for anonymous users)
+                if "allowed_paths" in access_config and any(
+                    path.startswith(allowed_path) for allowed_path in access_config.get("allowed_paths", [])
+                ):
+                    filtered_paths[path] = path_item
+                    continue
+                    
+                # Check if path is explicitly excluded
+                if any(path.startswith(excluded) for excluded in access_config.get("excluded_paths", [])):
+                    continue
+                
+                # Check if any operation in this path has an allowed tag
+                if "allowed_tags" in access_config:
+                    for method, operation in path_item.items():
+                        if method in ["get", "post", "put", "delete", "patch"]:
+                            # Check if operation has any allowed tags
+                            if "tags" in operation and any(
+                                tag in access_config["allowed_tags"] for tag in operation["tags"]
+                            ):
+                                filtered_paths[path] = path_item
+                                break
+            
+            # Replace paths with filtered paths
+            openapi_schema["paths"] = filtered_paths
+        
+        return openapi_schema
+    except Exception as e:
+        logger.error(f"Error generating OpenAPI documentation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating API documentation: {str(e)}"
+        )
