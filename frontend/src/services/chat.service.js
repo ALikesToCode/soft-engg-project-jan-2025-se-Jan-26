@@ -358,10 +358,31 @@ export const ChatService = {
     try {
       // Get current user info from auth store
       const authStore = useAuthStore();
-      const isAuthenticated = authStore.isAuthenticated;
+      const isAuthenticated = authStore.isAuthenticated || !!authStore.token;
       const userRole = authStore.userRole?.toLowerCase() || 'anonymous';
       
       console.log(`Getting available functions for user role: ${userRole}`);
+      
+      // Skip API call for unauthenticated users and return anonymous functions directly
+      if (!isAuthenticated) {
+        console.log('User not authenticated, returning anonymous functions without API call');
+        // Return only functions available to anonymous users
+        return [
+          {
+            name: "web_search",
+            description: "Search the web for current information",
+            parameters: {
+              properties: {
+                query: {
+                  type: "string",
+                  description: "The search query"
+                }
+              },
+              required: ["query"]
+            }
+          }
+        ];
+      }
       
       // First try to get from API
       const response = await api.get(`${API_PATHS.CHAT}/available-functions`);
@@ -496,11 +517,20 @@ export const ChatService = {
    */
   async canUseFunctions() {
     try {
-      const functions = await this.getAvailableFunctions()
-      return Array.isArray(functions) && functions.length > 0
+      const authStore = useAuthStore();
+      const isAuthenticated = authStore.isAuthenticated || !!authStore.token;
+      
+      // If user is not authenticated, return limited functions without API call
+      if (!isAuthenticated) {
+        console.log('User not authenticated, returning limited functions without API call');
+        return true; // We still want to show the functions badge for anonymous users
+      }
+      
+      const functions = await this.getAvailableFunctions();
+      return Array.isArray(functions) && functions.length > 0;
     } catch (error) {
-      console.error('Error checking if AI can use functions:', error)
-      return true // Default to true for better UX
+      console.error('Error checking if AI can use functions:', error);
+      return true; // Default to true for better UX
     }
   },
 
