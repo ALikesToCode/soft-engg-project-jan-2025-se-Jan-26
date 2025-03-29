@@ -94,9 +94,14 @@ def async_cache(ttl: int = None, key_prefix: str = ""):
                     cache_key += f"{hash(arg)}:"
                     
             for k, v in sorted(kwargs.items()):
-                if hasattr(v, "__dict__"):
+                if isinstance(v, dict):  # If v is a dictionary
+                    # Convert the dictionary to a frozenset of its items
+                    cache_key += f"{k}_{hash(frozenset(v.items()))}:"
+                elif hasattr(v, "__dict__"):  # If v has a __dict__ attribute
+                    # Hash the frozenset of the object's __dict__
                     cache_key += f"{k}_{hash(frozenset(v.__dict__.items()))}:"
                 else:
+                    # Otherwise, just hash the value
                     cache_key += f"{k}_{hash(v)}:"
             
             # Check cache first

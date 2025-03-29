@@ -757,3 +757,17 @@ async def create_course(course_data: CourseCreate,
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+@course_router.get("/courses/{course_id}/students")
+async def get_students_in_course(course_id: str, 
+                            db: AsyncSession = Depends(get_db)):
+    """
+    Get all students in a course
+    """
+    try:
+        students = await get_students_by_course(course_id, db)
+        return students
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

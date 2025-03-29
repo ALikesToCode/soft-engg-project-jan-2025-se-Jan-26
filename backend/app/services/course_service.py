@@ -817,3 +817,15 @@ class CourseService:
             return [bm.to_dict() for bm in bookmarked_materials]
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+    async def get_students_by_course(course_id:int, db:AsyncSession):
+        try:            
+            # Fetch all students for the given course and return as a list
+            result = await db.execute(
+                select(User).join(CourseEnrollment).where(and_(CourseEnrollment.course_id == course_id, CourseEnrollment.student_id == User.id))
+            )
+            students = result.scalars().all()  
+            return [student.to_dict() for student in students]
+        except Exception as e:
+            logger.error(f"Error fetching students: {str(e)}")
+            raise HTTPException(status_code=500, detail="Internal Server Error")
