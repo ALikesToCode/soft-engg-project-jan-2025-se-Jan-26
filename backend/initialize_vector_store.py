@@ -132,29 +132,29 @@ from langchain_postgres import PGVector
 try:
     logger.info("Initializing vector store...")
     
-    # Determine the correct initialization method based on the available parameters
+    # Get detailed parameter information for better debugging
     pgvector_params = inspect.signature(PGVector.__init__).parameters
-    logger.info(f"Available PGVector parameters: {list(pgvector_params.keys())}")
+    param_details = {name: str(param.annotation) for name, param in pgvector_params.items()}
+    logger.info(f"Available PGVector parameters with types: {param_details}")
     
-    # The error message suggests using a direct instantiation
-    logger.info("Using direct PGVector initialization")
-    # According to the error, the class might have 'get_connection_string' but not 'from_connection_string'
+    # Now we know the correct parameter is 'connection'
+    logger.info("Using 'connection' parameter with connection string")
     vector_store = PGVector(
-        embedding=embeddings,  # Try with this parameter name first
+        embeddings=embeddings,
         collection_name="vector_store",
-        connection_string=pgvector_connection_string
+        connection=pgvector_connection_string
     )
-        
+    
     logger.info("Vector store initialized successfully")
 except Exception as e:
     logger.error(f"Error initializing vector store: {str(e)}")
-    # Try to provide more helpful error information
-    import pkg_resources
+    # Get more information about langchain-postgres
     try:
-        langchain_postgres_version = pkg_resources.get_distribution("langchain-postgres").version
+        import importlib.metadata
+        langchain_postgres_version = importlib.metadata.version("langchain-postgres")
         logger.error(f"langchain-postgres version: {langchain_postgres_version}")
-    except Exception:
-        logger.error("Could not determine langchain-postgres version")
+    except Exception as ex:
+        logger.error(f"Could not get additional info: {str(ex)}")
     raise
 
 # Add documents to the vector store

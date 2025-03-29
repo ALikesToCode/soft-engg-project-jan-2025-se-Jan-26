@@ -222,6 +222,7 @@
 
 <script>
 import { authService } from '@/api/authService'
+import { useToast } from 'vue-toastification'
 
 export default {
   name: 'LoginView',
@@ -244,7 +245,11 @@ export default {
         email: '',
         password: '',
       },
+      toast: null,
     }
+  },
+  mounted() {
+    this.toast = useToast()
   },
   methods: {
     validateForm() {
@@ -274,14 +279,18 @@ export default {
 
       this.loading = true
       try {
-        // await new Promise((resolve) => setTimeout(resolve, 1500))
-        // this.$router.push('/dashboard')
         const response = await authService.loginWithEmail(this.form.email, this.form.password);
-        if (response) {
-          this.$router.push('/dashboard');
+        if (response.success === false) {
+          // Login failed, show toast instead of redirecting
+          this.toast.error(response.message || 'Login failed. Please check your credentials.');
+          return;
         }
+        
+        // Login successful
+        this.$router.push('/dashboard');
       } catch (error) {
         console.error('Login error:', error)
+        this.toast.error('Login failed. Please try again later.');
       } finally {
         this.loading = false
       }

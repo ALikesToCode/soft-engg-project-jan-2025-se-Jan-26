@@ -50,19 +50,22 @@ export default {
         localStorage.setItem('token', access_token);
         status.value = "Token received. Setting up your account...";
         
-        // Save user role if available
+        // Save user role if available and convert it properly to match ROLE constants
         if (user_role) {
-          // Convert role to proper format for our constants
+          // Convert backend role format to frontend ROLE constant format
           let formattedRole;
           switch(user_role.toLowerCase()) {
             case 'student':
-              formattedRole = ROLE.STUDENT;
+              formattedRole = ROLE.STUDENT; // STUDENT constant
               break;
             case 'faculty':
-              formattedRole = ROLE.FACULTY;
+              formattedRole = ROLE.FACULTY; // FACULTY constant
               break;
             case 'support':
-              formattedRole = ROLE.SUPPORT;
+              formattedRole = ROLE.SUPPORT; // SUPPORT constant
+              break;
+            case 'admin':
+              formattedRole = ROLE.SUPPORT; // Admin users use SUPPORT dashboard
               break;
             default:
               formattedRole = ROLE.STUDENT; // Default if unknown
@@ -70,7 +73,7 @@ export default {
           
           // Save role to localStorage and update store
           authStore.setUserRole(formattedRole);
-          console.log(`User role set to: ${formattedRole}`);
+          console.log(`User role set to: ${formattedRole} from backend role: ${user_role}`);
         }
         
         // Check for redirect path from localStorage
@@ -84,14 +87,15 @@ export default {
           // Redirect to set password page
           console.log("User needs to set a password, redirecting to password setup");
           targetPath = '/set-password';
-        } else if (redirectPath && redirectPath.includes('/monitoring') && user_role === 'support') {
-          // If there's a redirect path to monitoring and user has support role, go there
+        } else if (redirectPath && redirectPath.includes('/monitoring') && (user_role === 'support' || user_role === 'admin')) {
+          // If there's a redirect path to monitoring and user has support/admin role, go there
           targetPath = redirectPath;
         } else {
-          // Get default dashboard based on role
+          // Get current role from store to ensure we're using the latest value
           const role = authStore.userRole;
+          console.log(`Current role in auth store for redirection: ${role}`);
           
-          // Use rolePaths for consistent redirects
+          // Use rolePaths for consistent redirects based on role constants
           if (role === ROLE.SUPPORT) {
             targetPath = rolePaths.SUPPORT.dashboard;
           } else if (role === ROLE.FACULTY) {
@@ -114,6 +118,37 @@ export default {
           if (!userData) {
             throw new Error("Failed to get user data");
           }
+          
+          // Update role from user data if available (most accurate source)
+          if (userData.role) {
+            // Convert backend role to frontend format
+            let updatedRole;
+            switch(userData.role.toLowerCase()) {
+              case 'faculty':
+                updatedRole = ROLE.FACULTY;
+                break;
+              case 'support':
+              case 'admin':
+                updatedRole = ROLE.SUPPORT;
+                break;
+              default: 
+                updatedRole = ROLE.STUDENT;
+            }
+            
+            // Update store with the latest role
+            authStore.setUserRole(updatedRole);
+            
+            // Re-determine target path based on updated role
+            if (updatedRole === ROLE.SUPPORT) {
+              targetPath = rolePaths.SUPPORT.dashboard;
+            } else if (updatedRole === ROLE.FACULTY) {
+              targetPath = rolePaths.FACULTY.dashboard;
+            } else {
+              targetPath = rolePaths.STUDENT.dashboard;
+            }
+            console.log(`Updated redirection to ${targetPath} based on user data role: ${updatedRole}`);
+          }
+          
           status.value = "Authentication successful! Redirecting...";
           
           // Give a small delay to show success message
