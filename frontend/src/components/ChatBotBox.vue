@@ -110,7 +110,8 @@ export default {
       messages: [],
       newMessage: '',
       isTyping: false,
-      messageHistory: new Map() // Store messages for each chat
+      messageHistory: new Map(), // Store messages for each chat
+      threadId: null // Add thread ID
     }
   },
   watch: {
@@ -119,9 +120,11 @@ export default {
       handler(newId) {
         if (newId) {
           // Load messages for this chat
-          this.messages = this.messageHistory.get(newId) || []
+          this.messages = this.messageHistory.get(newId)?.messages || []
+          this.threadId = this.messageHistory.get(newId)?.threadId || crypto.randomUUID()
         } else {
           this.messages = []
+          this.threadId = crypto.randomUUID()
         }
       }
     }
@@ -141,7 +144,10 @@ export default {
 
       // Save to history
       if (this.chatId) {
-        this.messageHistory.set(this.chatId, [...this.messages])
+        this.messageHistory.set(this.chatId, {
+          messages: [...this.messages],
+          threadId: this.threadId
+        })
       }
 
       // Simulate AI response
@@ -162,7 +168,10 @@ export default {
 
       // Save to history again
       if (this.chatId) {
-        this.messageHistory.set(this.chatId, [...this.messages])
+        this.messageHistory.set(this.chatId, {
+          messages: [...this.messages],
+          threadId: this.threadId
+        })
       }
 
       this.isTyping = false
@@ -174,7 +183,10 @@ export default {
     },
     async getAIResponse(message) {
       try {
-        const data = await ChatService.sendMessage(message);
+        const data = await ChatService.sendMessage({
+          id: this.threadId,
+          message: message
+        });
         
         // Handle function calls if present
         if (data.function_calls && data.function_calls.length > 0) {

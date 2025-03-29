@@ -105,3 +105,33 @@ pytest
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Vector Store Retrieval
+
+This application includes a vector store for retrieving relevant information from course materials. The vector store is implemented using:
+
+- PostgreSQL with pgvector extension for storing embeddings
+- Google's text-embedding-004 model for generating embeddings
+- LangChain's PGVector implementation for integrating with the database
+
+### Setup
+
+The vector store is automatically initialized when the application starts for the first time. The initialization process:
+
+1. Loads PDF files from the `pdfs` directory
+2. Splits them into smaller chunks
+3. Generates embeddings for each chunk
+4. Stores the embeddings and document content in the PostgreSQL database
+
+### Usage
+
+The vector store is used by the chat functionality to retrieve relevant information from course materials when users ask questions. The LLM will call the `query_course_materials` function when appropriate to get information from the stored documents.
+
+### Manual Initialization
+
+If you need to manually reinitialize the vector store, you can:
+
+1. Delete the `vector_store_initialized.flag` file in the backend directory
+2. Restart the server, or run `python initialize_vector_store.py` directly
+
+For more detailed information, see the [VECTOR_STORE_SETUP.md](VECTOR_STORE_SETUP.md) file.

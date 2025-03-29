@@ -6,12 +6,19 @@ import api from '@/utils/api'
 export const ChatService = {
   /**
    * Send a message to the AI and get a response
-   * @param {string} message - The user's message
+   * @param {Object} params - Object containing id and message
+   * @param {string} params.id - Thread ID for conversation
+   * @param {string} params.message - The user's message
    * @returns {Promise<Object>} - The AI's response
    */
-  async sendMessage(message) {
+  async sendMessage(params) {
     try {
+      const { id, message } = typeof params === 'string' 
+        ? { id: crypto.randomUUID(), message: params } 
+        : params;
+      
       const response = await api.post(`${API_ROUTES.LLM}/chat`, {
+        id: id,
         query: message
       })
       return response.data
@@ -51,12 +58,17 @@ export const ChatService = {
 
   /**
    * Send a message to the AI with academic integrity validation
-   * @param {string} message - The user's message
+   * @param {Object|string} params - Either a string message or object with id and message
    * @returns {Promise<Object>} - The AI's response
    */
-  sendValidatedMessage: withLLMValidation(async (message) => {
+  sendValidatedMessage: withLLMValidation(async (params) => {
     try {
+      const { id, message } = typeof params === 'string' 
+        ? { id: crypto.randomUUID(), message: params } 
+        : params;
+      
       const response = await axios.post(`${API_ROUTES.LLM}/chat`, {
+        id: id,
         query: message
       })
       return response.data

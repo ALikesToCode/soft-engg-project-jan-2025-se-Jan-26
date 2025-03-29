@@ -18,7 +18,7 @@ from pathlib import Path
 from app.routes.auth import router as auth_router
 from app.routes.user import router as user_router
 from app.routes.user_routes import router as user_routers
-from app.routes.llm import router as chat
+from app.routes.llm import router as chat, checkpointer
 from app.routes.assignment import router as assignment_router
 from app.routes.faq import router as faq_router
 from app.routes.system_settings import router as system_settings_router
@@ -33,6 +33,12 @@ from app.utils.logging_config import configure_logging
 from app.middleware import LoggingMiddleware
 from contextlib import asynccontextmanager
 from app.routes.notification import router as notification
+import os
+from psycopg_pool import AsyncConnectionPool
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.graph import START, MessagesState, StateGraph
+from app.routes.llm import call_llm
+import subprocess
 
 # Apply Pydantic v1 patch for Python 3.13 compatibility
 from app.utils.pydantic_patch import apply_patch
@@ -55,19 +61,129 @@ async def lifespan(app: FastAPI):
     try:
         # Initialize database on startup
         logger.info("Initializing database...")
-        await init_db()
+        # Check if we've already run a full initialization before
+        db_initialized_flag = Path("db_initialized.flag")
+        if not db_initialized_flag.exists():
+            logger.info("First time initialization - creating all database objects")
+            await init_db()
+            # Create the flag file to indicate we've completed a full initialization
+            db_initialized_flag.touch()
+            logger.info("Database initialization completed and flag file created")
+        else:
+            logger.info("Database previously initialized, skipping full initialization")
         
         # Create default users
         logger.info("Creating default users...")
-        async with async_session() as session:
-            try:
-                await create_default_users(session)
-            except Exception as e:
-                logger.error(f"Error creating default users: {e}")
+        # Only create default users if we're doing the first initialization 
+        # or if users_initialized.flag doesn't exist
+        users_initialized_flag = Path("users_initialized.flag")
+        if not db_initialized_flag.exists() or not users_initialized_flag.exists():
+            async with async_session() as session:
+                try:
+                    await create_default_users(session)
+                    # Create flag to indicate users have been set up
+                    users_initialized_flag.touch()
+                except Exception as e:
+                    logger.error(f"Error creating default users: {e}")
+        else:
+            logger.info("Default users already initialized, skipping")
         
         # Start monitoring service background tasks
         logger.info("Starting monitoring service...")
         await monitoring_service.start_background_tasks()
+
+        # Set up LangGraph with Postgres
+        logger.info("Setting up LangGraph with Postgres...")
+        connection_string = os.getenv("DATABASE_URL")
+        # Verify the connection string is properly formatted
+        if not connection_string or not connection_string.endswith("require"):
+            logger.error(f"Invalid DATABASE_URL format: {connection_string}")
+            if connection_string and "?sslmode" in connection_string:
+                # Fix common issue with sslmode parameter
+                connection_string = connection_string.replace("?sslmode", "?sslmode=require")
+                logger.info(f"Fixed DATABASE_URL: {connection_string}")
+            else:
+                logger.warning("Could not auto-fix DATABASE_URL, continuing with original")
+                
+        # Convert SQLAlchemy URL format to psycopg format
+        # psycopg doesn't support the postgresql+asyncpg:// prefix or dialect options
+        psycopg_connection_string = connection_string
+        if "postgresql+asyncpg://" in psycopg_connection_string:
+            psycopg_connection_string = psycopg_connection_string.replace("postgresql+asyncpg://", "postgresql://")
+            
+        logger.info(f"Using psycopg connection string format: {psycopg_connection_string}")
+        
+        # Configure more resilient connection parameters
+        connection_kwargs = {
+            "autocommit": True,
+            # Add connection timeout settings
+            "connect_timeout": 10,
+            # Configure automatic retry behavior
+            "application_name": "langraph_checkpointer",
+            # Keep connections alive
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5
+        }
+        
+        try:
+            # Create a connection pool with more resilient settings
+            pool = AsyncConnectionPool(
+                conninfo=psycopg_connection_string, 
+                kwargs=connection_kwargs,
+                min_size=1,  # Keep at least one connection in the pool
+                max_size=5,  # Maximum number of connections
+                timeout=5    # Connection acquisition timeout
+            )
+            app.state.pool = pool
+            
+            # Initialize the checkpointer
+            from app.routes.llm import checkpointer, llmapp
+            saver = AsyncPostgresSaver(pool)
+            await saver.setup()
+            
+            # Create the workflow
+            workflow = StateGraph(state_schema=MessagesState)
+            workflow.add_edge(START, "llm")
+            workflow.add_node("llm", call_llm)
+            
+            # Set the global app and checkpointer objects
+            app.state.checkpointer = saver
+            app.state.llmapp = workflow.compile(checkpointer=saver)
+        except Exception as e:
+            logger.error(f"Failed to initialize database pool: {str(e)}")
+            logger.warning("LangGraph features will not be available")
+        
+        # Initialize vector store if needed (only once)
+        vector_store_flag = Path("vector_store_initialized.flag")
+        if not vector_store_flag.exists():
+            logger.info("Vector store not initialized. Initializing...")
+            try:
+                # Run the vector store initialization script
+                result = subprocess.run(
+                    ["python", "initialize_vector_store.py"], 
+                    capture_output=True, 
+                    text=True
+                )
+                
+                if result.returncode == 0:
+                    logger.info("Vector store initialized successfully.")
+                    # Create flag file to indicate initialization complete
+                    vector_store_flag.touch()
+                else:
+                    logger.error(f"Vector store initialization failed: {result.stderr}")
+                    # Check if this is a pgvector extension error
+                    if "extension \"vector\" is not available" in result.stderr or "pgvector extension could not be installed" in result.stderr:
+                        logger.warning("The PostgreSQL server may not have pgvector extension installed.")
+                        logger.warning("Some AI features requiring vector search will be limited.")
+                        # Create a flag file anyway to prevent repeated failures
+                        Path("vector_store_unavailable.flag").touch()
+                        logger.info("Created flag file to prevent repeated initialization attempts.")
+            except Exception as e:
+                logger.error(f"Error initializing vector store: {str(e)}")
+        else:
+            logger.info("Vector store already initialized, skipping initialization.")
     except Exception as e:
         logger.error(f"Error during application startup: {e}")
         
@@ -77,6 +193,17 @@ async def lifespan(app: FastAPI):
         # Stop monitoring service background tasks on shutdown
         logger.info("Stopping monitoring service...")
         await monitoring_service.stop_background_tasks()
+        
+        # Close pool connection
+        if hasattr(app.state, "pool"):
+            logger.info("Closing database connection pool...")
+            try:
+                await app.state.pool.close()
+                logger.info("Database connection pool closed successfully")
+            except Exception as e:
+                logger.error(f"Error closing database pool: {str(e)}")
+                
+        # Clean up other resources if needed
     except Exception as e:
         logger.error(f"Error during application shutdown: {e}")
 

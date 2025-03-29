@@ -346,7 +346,6 @@ async def create_default_users(db: AsyncSession) -> None:
                 
                 from datetime import datetime, UTC
                 now = datetime.now(UTC)
-                now_str = now.strftime('%Y-%m-%d %H:%M:%S')
                 
                 # Use direct SQL to avoid ORM issues
                 support_id = str(uuid.uuid4())
@@ -377,12 +376,12 @@ async def create_default_users(db: AsyncSession) -> None:
                 from sqlalchemy import text
                 from datetime import datetime, UTC
                 
-                now_str = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
+                now = datetime.now(UTC)
                 await db.execute(
                     text("UPDATE users SET hashed_password = :password, updated_at = :updated_at WHERE email = :email"),
                     {
                         "password": hashed_password, 
-                        "updated_at": now_str, 
+                        "updated_at": now, 
                         "email": support_email
                     }
                 )
@@ -407,7 +406,6 @@ async def create_default_users(db: AsyncSession) -> None:
                 
                 from datetime import datetime, UTC
                 now = datetime.now(UTC)
-                now_str = now.strftime('%Y-%m-%d %H:%M:%S')
                 
                 # Use direct SQL to avoid ORM issues
                 faculty_id = str(uuid.uuid4())

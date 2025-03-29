@@ -12,6 +12,11 @@ from typing import AsyncGenerator
 from fastapi import Depends
 from datetime import datetime, UTC
 import re
+from sqlalchemy import inspect, text
+import logging
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 # Parse the database URL to handle SSL properly
 url = urlparse(settings.DATABASE_URL)
@@ -22,11 +27,31 @@ path_parts = url.path.split('/')
 db_name = path_parts[-1]
 schema_name = 'public'  # Default schema
 
-# Remove sslmode from the URL and handle it in connect_args
-ssl_mode = query_params.pop('sslmode', ['prefer'])[0]
+# Handle SSL mode properly
+ssl_mode = None
+if 'sslmode' in query_params:
+    ssl_mode = query_params.pop('sslmode', ['prefer'])[0]
+    
+# If sslmode is not in query params but in the URL string (malformed URL)
+elif "?sslmode" in settings.DATABASE_URL:
+    # Fix common issue with malformed sslmode parameter
+    if "?sslmode=require" not in settings.DATABASE_URL:
+        fixed_url = settings.DATABASE_URL.replace("?sslmode", "?sslmode=require")
+        logger.warning(f"Fixed malformed URL: {fixed_url}")
+        url = urlparse(fixed_url)
+        query_params = parse_qs(url.query)
+        ssl_mode = 'require'
+    else:
+        ssl_mode = 'require'
+else:
+    ssl_mode = 'prefer'  # Default if not specified
+
+# Create a clean URL without sslmode for SQLAlchemy
 cleaned_url = f"{url.scheme}://{url.netloc}{url.path}"
 if query_params:
     cleaned_url += '?' + '&'.join(f"{k}={v[0]}" for k, v in query_params.items())
+
+logger.info(f"Using database connection with SSL mode: {ssl_mode}")
 
 # Create async engine with proper SSL configuration
 engine = create_async_engine(
@@ -64,67 +89,34 @@ async def get_db():
         finally:
             await session.close()
 
-# Initialize the database tables
+# Function to initialize the database (create tables, etc.)
 async def init_db():
-    """
-    Initialize the database tables.
+    """Initialize the database by creating tables if they don't exist."""
+    async with engine.begin() as conn:
+        # Create schema if it doesn't exist
+        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public"))
+        await conn.execute(text("SET search_path TO public"))
     
-    This function creates all tables defined in the models if they don't already exist.
-    It should be called during application startup to ensure the database schema is properly set up.
-    
-    Returns:
-        None
-    """
-    # Import models here to ensure they are registered with Base
-    # but avoid circular imports
-    from app.models.user import User
-    from app.models.course import Course, CourseEnrollment, UserRecommendedCourses, BookmarkedMaterials
-    from app.models.assignment import Assignment, Submission
-    from app.models.role import Role
-    from app.models.faq import FAQ
-    from app.models.system_settings import SystemSettings, Integration
-    from app.models.notification import CourseNotification, SystemNotification, UserNotificationStatus
-    from datetime import datetime
-    from sqlalchemy import inspect, text
-    
-    try:
-        # First, ensure the schema exists - this needs to be in its own transaction
-        async with engine.begin() as conn:
-            try:
-                await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
-                await conn.execute(text(f"SET search_path TO {schema_name}"))
-            except Exception as e:
-                print(f"Warning: Schema creation issue: {e}")
+    # Check if tables exist before recreating
+    tables_exist = False
+    async with async_session() as session:
+        # Get a list of existing tables
+        result = await session.execute(text(
+            "SELECT pg_catalog.pg_class.relname FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace WHERE pg_catalog.pg_class.relkind = ANY (ARRAY['r'::VARCHAR, 'p'::VARCHAR]) AND pg_catalog.pg_class.relpersistence != 't'::CHAR AND pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid) AND pg_catalog.pg_namespace.nspname != 'pg_catalog'::VARCHAR"
+        ))
+        existing_tables = [row[0] for row in result.fetchall()]
+        print(f"Existing tables: {existing_tables}")
         
-        # Check if tables already exist - in a new transaction
-        tables = []
+        # Check if core tables exist (using 'users' as a marker)
+        if 'users' in existing_tables:
+            tables_exist = True
+    
+    # Only create tables if they don't exist
+    if not tables_exist:
+        print("Creating database tables...")
         async with engine.begin() as conn:
-            try:
-                # Use run_sync to properly handle inspection on async connection
-                tables = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
-                print(f"Existing tables: {tables}")
-            except Exception as e:
-                print(f"Warning: Could not inspect tables: {e}")
-        
-        #Add the new table names in the below list to get it created
-        required_tables = ['courses', 'system_settings', 'faqs', 'integrations', 'users', 'user_roles', 'roles',
-                            'assignments', 'user_courses', 'module', 'submissions', 'lecture', 'lecture_content',
-                            'course_enrollments', 'lecture_content_doc','course_notifications','system_notifications',
-                            'user_notification_status','user_recommended_courses','bookmarked_materials']
-
-        # Only create tables if they don't exist
-        if any(table not in tables for table in required_tables):
-            print("Creating database tables...")
-            
-            # Create enum types first - in a separate transaction
-            try:
-                async with engine.begin() as conn:
-                    try:
-                        # Set search path explicitly for this connection
-                        await conn.execute(text(f"SET search_path TO {schema_name}"))
-                        
-                        # Try to create the enum type
-                        await conn.execute(text("""
+            # Create the course status enum type if it doesn't exist
+            await conn.execute(text("""
                             DO $$ 
                             BEGIN
                                 IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'coursestatus') THEN
@@ -132,104 +124,12 @@ async def init_db():
                                 END IF;
                             END $$;
                         """))
-                    except Exception as e:
-                        print(f"Warning: Could not create enum type: {e}")
-            except Exception as e:
-                print(f"Error in enum creation transaction: {e}")
-            
-            # Then create all tables - in a separate transaction
-            try:
-                async with engine.begin() as conn:
-                    # Set search path explicitly for this connection
-                    await conn.execute(text(f"SET search_path TO {schema_name}"))
-                    
-                    # Create all tables
-                    await conn.run_sync(Base.metadata.create_all)
-                    print("Tables created successfully")
-            except Exception as e:
-                print(f"Error creating tables: {e}")
-                return
-            
-            # Create default users only if tables were just created - in a separate transaction
-            try:
-                async with async_session() as session:
-                    try:
-                        # Check if support user exists
-                        support_email = "support@study.iitm.ac.in"
-                        try:
-                            result = await session.execute(
-                                text("SELECT * FROM users WHERE email = :email"),
-                                {"email": support_email}
-                            )
-                            support_user = result.fetchone()
-                            
-                            if support_user:
-                                print(f"Support user already exists: {support_email}")
-                                # Update support user password if needed
-                                from app.utils.password import get_password_hash
-                                hashed_password = get_password_hash("support123")
-                                print(f"Updating support user password: {hashed_password[:10]}...")
-                                
-                                # Use a parameterized query with proper timestamp handling
-                                now_str = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
-                                await session.execute(
-                                    text("UPDATE users SET hashed_password = :password, updated_at = :updated_at WHERE email = :email"),
-                                    {"password": hashed_password, "updated_at": now_str, "email": support_email}
-                                )
-                                await session.commit()
-                            else:
-                                # Create default users
-                                now = datetime.now(UTC)
-                                now_str = now.strftime('%Y-%m-%d %H:%M:%S')
-                                
-                                # Use direct SQL to avoid ORM timezone issues
-                                faculty_id = str(uuid.uuid4())
-                                await session.execute(
-                                    text("""
-                                        INSERT INTO users (id, email, name, role, created_at, updated_at) 
-                                        VALUES (:id, :email, :name, :role, :created_at, :updated_at)
-                                    """),
-                                    {
-                                        "id": faculty_id,
-                                        "email": "faculty@study.iitm.ac.in",
-                                        "name": "Default Faculty",
-                                        "role": "faculty",
-                                        "created_at": now_str,
-                                        "updated_at": now_str
-                                    }
-                                )
-                                
-                                # Create default support user
-                                support_id = str(uuid.uuid4())
-                                await session.execute(
-                                    text("""
-                                        INSERT INTO users (id, email, name, role, created_at, updated_at) 
-                                        VALUES (:id, :email, :name, :role, :created_at, :updated_at)
-                                    """),
-                                    {
-                                        "id": support_id,
-                                        "email": "support@study.iitm.ac.in",
-                                        "name": "Support Team",
-                                        "role": "support",
-                                        "created_at": now_str,
-                                        "updated_at": now_str
-                                    }
-                                )
-                                
-                                await session.commit()
-                                print("Default users created successfully.")
-                        except Exception as e:
-                            await session.rollback()
-                            print(f"Error checking or creating users: {e}")
-                    except Exception as e:
-                        await session.rollback()
-                        print(f"Error in user creation session: {e}")
-            except Exception as e:
-                print(f"Error creating default users: {e}")
-        else:
-            print("Database tables already exist, skipping initialization.")
-    except Exception as e:
-        print(f"Database initialization error: {e}")
+                        
+            # Create all tables defined in the models
+            await conn.run_sync(Base.metadata.create_all)
+        print("Tables created successfully")
+    else:
+        print("Database tables already exist, skipping creation")
 
 # Custom UUID type for SQLite compatibility
 class UUID(TypeDecorator):
