@@ -4,16 +4,26 @@ from app.database import get_db
 from app.services.auth_service import get_current_user, require_auth
 from app.routes.auth import require_role
 from app.services.course_service import CourseService
-from typing import List, Optional
+from typing import List, Optional, Dict
 from uuid import UUID
 from app.services.function_router import function_router
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID4
 
 class CourseBookmarkData(BaseModel):
     course_id: UUID
     type: str
     title: str
     author: str
+
+class EnrollmentCreate(BaseModel):
+    student_id: UUID4
+    status: Optional[str] = None
+
+class EnrollmentStatusUpdate(BaseModel):
+    status: str
+
+class BulkEnrollment(BaseModel):
+    student_ids: List[UUID4]
 
 router = APIRouter(tags=["User Courses"])
 @router.get("/user/courses/history",
@@ -365,4 +375,428 @@ async def get_course_details(course_id: str):
                 "enrolled_students": 150
             }
     
-    raise HTTPException(status_code=404, detail=f"Course {course_id} not found") 
+    raise HTTPException(status_code=404, detail=f"Course {course_id} not found")
+
+@router.post("/faculty/courses/{course_id}/enrollment",
+    summary="Enroll a student in a course",
+    description="Creates a new enrollment for a student in a specific course. Only accessible by faculty.",
+    response_model=Dict,
+    responses={
+        200: {
+            "description": "Student enrolled successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "course_id": "234f5678-f90a-23e4-b567-537725285111",
+                        "student_id": "345g6789-g01b-34e5-c678-648836396222",
+                        "status": "enrolled",
+                        "enrollment_date": "2024-03-30T12:00:00Z"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Bad request - Invalid request or student already enrolled",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Student is already enrolled in this course"}
+                }
+            }
+        },
+        403: {
+            "description": "Forbidden - User is not a faculty member",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Insufficient permissions"}
+                }
+            }
+        }
+    }
+)
+async def enroll_student_by_faculty(
+    course_id: UUID,
+    enrollment: EnrollmentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role("faculty"))
+):
+    """
+    Enroll a student in a course (faculty access).
+    
+    This endpoint allows faculty members to enroll a student in their course.
+    
+    Args:
+        course_id: UUID of the course
+        enrollment: Request body containing student ID and optional status
+        
+    Returns:
+        Enrollment details
+    """
+    try:
+        # Optional: Check if faculty is teaching this course
+        # This can be added for extra security
+        
+        result = await CourseService.enroll_student(
+            db=db,
+            course_id=course_id,
+            student_id=enrollment.student_id,
+            user_id=UUID(current_user["sub"]),
+            status=enrollment.status if enrollment.status else None
+        )
+        return result
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.patch("/faculty/courses/enrollment/{enrollment_id}",
+    summary="Update enrollment status",
+    description="Updates the status of a student's enrollment in a course. Only accessible by faculty.",
+    response_model=Dict,
+    responses={
+        200: {
+            "description": "Enrollment status updated successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": "123e4567-e89b-12d3-a456-426614174000",
+                        "course_id": "234f5678-f90a-23e4-b567-537725285111",
+                        "student_id": "345g6789-g01b-34e5-c678-648836396222",
+                        "status": "completed",
+                        "enrollment_date": "2024-03-15T00:00:00Z",
+                        "completion_date": "2024-03-30T12:00:00Z"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Not found - Enrollment does not exist",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Enrollment not found"}
+                }
+            }
+        }
+    }
+)
+async def update_enrollment_status_by_faculty(
+    enrollment_id: UUID,
+    status_update: EnrollmentStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role("faculty"))
+):
+    """
+    Update enrollment status (faculty access).
+    
+    This endpoint allows faculty members to update a student's enrollment status
+    (e.g., from enrolled to completed).
+    
+    Args:
+        enrollment_id: UUID of the enrollment to update
+        status_update: Request body containing the new status
+        
+    Returns:
+        Updated enrollment details
+    """
+    try:
+        result = await CourseService.update_enrollment_status(
+            db=db,
+            enrollment_id=enrollment_id,
+            status=status_update.status
+        )
+        return result
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/faculty/courses/enrollment/{enrollment_id}",
+    summary="Delete course enrollment",
+    description="Removes a student from a course by deleting their enrollment. Only accessible by faculty.",
+    response_model=Dict,
+    responses={
+        200: {
+            "description": "Enrollment deleted successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "Enrollment deleted successfully",
+                        "course_id": "234f5678-f90a-23e4-b567-537725285111",
+                        "student_id": "345g6789-g01b-34e5-c678-648836396222"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Not found - Enrollment does not exist",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Enrollment not found"}
+                }
+            }
+        }
+    }
+)
+async def delete_enrollment_by_faculty(
+    enrollment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role("faculty"))
+):
+    """
+    Delete course enrollment (faculty access).
+    
+    This endpoint allows faculty members to remove a student from a course.
+    
+    Args:
+        enrollment_id: UUID of the enrollment to delete
+        
+    Returns:
+        Confirmation message
+    """
+    try:
+        result = await CourseService.delete_enrollment(
+            db=db,
+            enrollment_id=enrollment_id
+        )
+        return result
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/faculty/courses/{course_id}/bulk-enrollment",
+    summary="Bulk enroll students",
+    description="Enrolls multiple students in a course at once. Only accessible by faculty.",
+    response_model=Dict,
+    responses={
+        200: {
+            "description": "Bulk enrollment completed",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "course_id": "234f5678-f90a-23e4-b567-537725285111",
+                        "successful": [
+                            {
+                                "student_id": "345g6789-g01b-34e5-c678-648836396222",
+                                "status": "enrolled"
+                            }
+                        ],
+                        "failed": [
+                            {
+                                "student_id": "456h7890-h12c-45f6-d789-759947407333",
+                                "reason": "Already enrolled"
+                            }
+                        ],
+                        "total_enrolled": 1,
+                        "total_waitlisted": 0,
+                        "total_failed": 1
+                    }
+                }
+            }
+        }
+    }
+)
+async def bulk_enroll_students_by_faculty(
+    course_id: UUID,
+    enrollment: BulkEnrollment,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role("faculty"))
+):
+    """
+    Bulk enroll students (faculty access).
+    
+    This endpoint allows faculty members to enroll multiple students in their course at once.
+    
+    Args:
+        course_id: UUID of the course
+        enrollment: Request body containing list of student IDs
+        
+    Returns:
+        Summary of enrollment results
+    """
+    try:
+        result = await CourseService.bulk_enroll_students(
+            db=db,
+            course_id=course_id,
+            student_ids=enrollment.student_ids,
+            user_id=UUID(current_user["sub"])
+        )
+        return result
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Support staff endpoints - similar to faculty endpoints but with support role requirement
+
+@router.post("/support/courses/{course_id}/enrollment",
+    summary="Enroll a student in a course (Support)",
+    description="Creates a new enrollment for a student in a specific course. Only accessible by support staff.",
+    response_model=Dict,
+    responses={
+        200: {
+            "description": "Student enrolled successfully"
+        },
+        400: {
+            "description": "Bad request - Invalid request or student already enrolled"
+        },
+        403: {
+            "description": "Forbidden - User is not a support staff member"
+        }
+    }
+)
+async def enroll_student_by_support(
+    course_id: UUID,
+    enrollment: EnrollmentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role("support"))
+):
+    """
+    Enroll a student in a course (support access).
+    
+    This endpoint allows support staff to enroll a student in any course.
+    
+    Args:
+        course_id: UUID of the course
+        enrollment: Request body containing student ID and optional status
+        
+    Returns:
+        Enrollment details
+    """
+    try:
+        result = await CourseService.enroll_student(
+            db=db,
+            course_id=course_id,
+            student_id=enrollment.student_id,
+            user_id=UUID(current_user["sub"]),
+            status=enrollment.status if enrollment.status else None
+        )
+        return result
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.patch("/support/courses/enrollment/{enrollment_id}",
+    summary="Update enrollment status (Support)",
+    description="Updates the status of a student's enrollment in a course. Only accessible by support staff.",
+    response_model=Dict,
+    responses={
+        200: {
+            "description": "Enrollment status updated successfully"
+        },
+        404: {
+            "description": "Not found - Enrollment does not exist"
+        }
+    }
+)
+async def update_enrollment_status_by_support(
+    enrollment_id: UUID,
+    status_update: EnrollmentStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role("support"))
+):
+    """
+    Update enrollment status (support access).
+    
+    This endpoint allows support staff to update any student's enrollment status.
+    
+    Args:
+        enrollment_id: UUID of the enrollment to update
+        status_update: Request body containing the new status
+        
+    Returns:
+        Updated enrollment details
+    """
+    try:
+        result = await CourseService.update_enrollment_status(
+            db=db,
+            enrollment_id=enrollment_id,
+            status=status_update.status
+        )
+        return result
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/support/courses/enrollment/{enrollment_id}",
+    summary="Delete course enrollment (Support)",
+    description="Removes a student from a course by deleting their enrollment. Only accessible by support staff.",
+    response_model=Dict,
+    responses={
+        200: {
+            "description": "Enrollment deleted successfully"
+        },
+        404: {
+            "description": "Not found - Enrollment does not exist"
+        }
+    }
+)
+async def delete_enrollment_by_support(
+    enrollment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role("support"))
+):
+    """
+    Delete course enrollment (support access).
+    
+    This endpoint allows support staff to remove any student from any course.
+    
+    Args:
+        enrollment_id: UUID of the enrollment to delete
+        
+    Returns:
+        Confirmation message
+    """
+    try:
+        result = await CourseService.delete_enrollment(
+            db=db,
+            enrollment_id=enrollment_id
+        )
+        return result
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/support/courses/{course_id}/bulk-enrollment",
+    summary="Bulk enroll students (Support)",
+    description="Enrolls multiple students in a course at once. Only accessible by support staff.",
+    response_model=Dict,
+    responses={
+        200: {
+            "description": "Bulk enrollment completed"
+        }
+    }
+)
+async def bulk_enroll_students_by_support(
+    course_id: UUID,
+    enrollment: BulkEnrollment,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_role("support"))
+):
+    """
+    Bulk enroll students (support access).
+    
+    This endpoint allows support staff to enroll multiple students in any course at once.
+    
+    Args:
+        course_id: UUID of the course
+        enrollment: Request body containing list of student IDs
+        
+    Returns:
+        Summary of enrollment results
+    """
+    try:
+        result = await CourseService.bulk_enroll_students(
+            db=db,
+            course_id=course_id,
+            student_ids=enrollment.student_ids,
+            user_id=UUID(current_user["sub"])
+        )
+        return result
+    except HTTPException as http_ex:
+        raise http_ex
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) 

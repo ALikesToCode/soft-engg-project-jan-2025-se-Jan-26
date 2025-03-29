@@ -20,6 +20,10 @@ import shutil
 import uuid
 import enum
 import logging
+from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy import cast
+from sqlalchemy.sql.functions import func
+from datetime import UTC
 
 logger = logging.getLogger(__name__)
 
@@ -829,3 +833,321 @@ class CourseService:
         except Exception as e:
             logger.error(f"Error fetching students: {str(e)}")
             raise HTTPException(status_code=500, detail="Internal Server Error")
+
+    @staticmethod
+    async def enroll_student(db: AsyncSession, course_id: UUID, student_id: UUID, user_id: UUID, status: str = EnrollmentStatus.ENROLLED.value) -> Dict[str, Any]:
+        """
+        Enroll a student in a course.
+        
+        Args:
+            db: Database session
+            course_id: UUID of the course
+            student_id: UUID of the student to enroll
+            user_id: UUID of the user making the enrollment (faculty or support)
+            status: Enrollment status (default: enrolled)
+            
+        Returns:
+            Details of the created enrollment
+        """
+        try:
+            # Check if the course exists
+            course_result = await db.execute(select(Course).where(Course.id == course_id))
+            course = course_result.scalars().first()
+            if not course:
+                raise HTTPException(status_code=404, detail="Course not found")
+                
+            # Check if the student exists
+            student_result = await db.execute(select(User).where(User.id == student_id))
+            student = student_result.scalars().first()
+            if not student:
+                raise HTTPException(status_code=404, detail="Student not found")
+                
+            # Check if student is already enrolled
+            existing_enrollment = await db.execute(
+                select(CourseEnrollment).where(
+                    and_(
+                        CourseEnrollment.course_id == course_id,
+                        CourseEnrollment.student_id == student_id
+                    )
+                )
+            )
+            if existing_enrollment.scalars().first():
+                raise HTTPException(status_code=400, detail="Student is already enrolled in this course")
+                
+            # Check enrollment limit
+            if course.enrollment_limit is not None:
+                current_enrollment_count = await db.execute(
+                    select(func.count()).select_from(CourseEnrollment).where(CourseEnrollment.course_id == course_id)
+                )
+                count = current_enrollment_count.scalar()
+                if count >= course.enrollment_limit:
+                    # If at limit, set status to waitlisted
+                    status = EnrollmentStatus.WAITLISTED.value
+            
+            # Create enrollment
+            new_enrollment = CourseEnrollment(
+                course_id=course_id,
+                student_id=student_id,
+                user_id=user_id,  # User who created the enrollment
+                status=status,
+                enrollment_date=datetime.now(UTC)
+            )
+            
+            db.add(new_enrollment)
+            await db.commit()
+            await db.refresh(new_enrollment)
+            
+            # Return enrollment data
+            return {
+                "id": str(new_enrollment.id),
+                "course_id": str(new_enrollment.course_id),
+                "student_id": str(new_enrollment.student_id),
+                "status": new_enrollment.status,
+                "enrollment_date": new_enrollment.enrollment_date.isoformat()
+            }
+            
+        except HTTPException as e:
+            await db.rollback()
+            raise e
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error enrolling student: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to enroll student: {str(e)}")
+    
+    @staticmethod
+    async def update_enrollment_status(db: AsyncSession, enrollment_id: UUID, status: str) -> Dict[str, Any]:
+        """
+        Update the status of a course enrollment.
+        
+        Args:
+            db: Database session
+            enrollment_id: UUID of the enrollment to update
+            status: New enrollment status
+            
+        Returns:
+            Updated enrollment details
+        """
+        try:
+            # Validate enrollment status
+            if status not in [e.value for e in EnrollmentStatus]:
+                raise HTTPException(status_code=400, detail=f"Invalid enrollment status. Must be one of: {', '.join([e.value for e in EnrollmentStatus])}")
+                
+            # Get the enrollment
+            enrollment_result = await db.execute(select(CourseEnrollment).where(CourseEnrollment.id == enrollment_id))
+            enrollment = enrollment_result.scalars().first()
+            if not enrollment:
+                raise HTTPException(status_code=404, detail="Enrollment not found")
+                
+            # Update the status
+            enrollment.status = status
+            
+            # If completed, set completion date
+            if status == EnrollmentStatus.COMPLETED.value:
+                enrollment.completion_date = datetime.now(UTC)
+                
+            await db.commit()
+            await db.refresh(enrollment)
+            
+            return {
+                "id": str(enrollment.id),
+                "course_id": str(enrollment.course_id),
+                "student_id": str(enrollment.student_id),
+                "status": enrollment.status,
+                "enrollment_date": enrollment.enrollment_date.isoformat(),
+                "completion_date": enrollment.completion_date.isoformat() if enrollment.completion_date else None
+            }
+            
+        except HTTPException as e:
+            await db.rollback()
+            raise e
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error updating enrollment status: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to update enrollment status: {str(e)}")
+    
+    @staticmethod
+    async def delete_enrollment(db: AsyncSession, enrollment_id: UUID) -> Dict[str, Any]:
+        """
+        Remove a student from a course by deleting the enrollment.
+        
+        Args:
+            db: Database session
+            enrollment_id: UUID of the enrollment to delete
+            
+        Returns:
+            Confirmation message
+        """
+        try:
+            # Get the enrollment
+            enrollment_result = await db.execute(select(CourseEnrollment).where(CourseEnrollment.id == enrollment_id))
+            enrollment = enrollment_result.scalars().first()
+            if not enrollment:
+                raise HTTPException(status_code=404, detail="Enrollment not found")
+                
+            # Store course_id and student_id for return value
+            course_id = enrollment.course_id
+            student_id = enrollment.student_id
+                
+            # Delete the enrollment
+            await db.delete(enrollment)
+            await db.commit()
+            
+            # Check for waitlisted students who can now be enrolled
+            if enrollment.status == EnrollmentStatus.ENROLLED.value:
+                # Get the course
+                course_result = await db.execute(select(Course).where(Course.id == course_id))
+                course = course_result.scalars().first()
+                
+                # If there's an enrollment limit, promote a waitlisted student
+                if course and course.enrollment_limit:
+                    # Find the earliest waitlisted student
+                    waitlisted_result = await db.execute(
+                        select(CourseEnrollment)
+                        .where(
+                            and_(
+                                CourseEnrollment.course_id == course_id,
+                                CourseEnrollment.status == EnrollmentStatus.WAITLISTED.value
+                            )
+                        )
+                        .order_by(CourseEnrollment.enrollment_date)
+                        .limit(1)
+                    )
+                    waitlisted = waitlisted_result.scalars().first()
+                    
+                    # If there's a waitlisted student, promote them
+                    if waitlisted:
+                        waitlisted.status = EnrollmentStatus.ENROLLED.value
+                        await db.commit()
+            
+            return {
+                "message": "Enrollment deleted successfully",
+                "course_id": str(course_id),
+                "student_id": str(student_id)
+            }
+            
+        except HTTPException as e:
+            await db.rollback()
+            raise e
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error deleting enrollment: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to delete enrollment: {str(e)}")
+    
+    @staticmethod
+    async def bulk_enroll_students(db: AsyncSession, course_id: UUID, student_ids: List[UUID], user_id: UUID) -> Dict[str, Any]:
+        """
+        Enroll multiple students in a course at once.
+        
+        Args:
+            db: Database session
+            course_id: UUID of the course
+            student_ids: List of UUIDs of students to enroll
+            user_id: UUID of the user making the enrollment (faculty or support)
+            
+        Returns:
+            Summary of enrollment results
+        """
+        results = {
+            "course_id": str(course_id),
+            "successful": [],
+            "failed": [],
+            "total_enrolled": 0,
+            "total_waitlisted": 0,
+            "total_failed": 0
+        }
+        
+        try:
+            # Check if the course exists
+            course_result = await db.execute(select(Course).where(Course.id == course_id))
+            course = course_result.scalars().first()
+            if not course:
+                raise HTTPException(status_code=404, detail="Course not found")
+            
+            # Get current enrollment count
+            current_enrollment_count = await db.execute(
+                select(func.count())
+                .select_from(CourseEnrollment)
+                .where(
+                    and_(
+                        CourseEnrollment.course_id == course_id,
+                        CourseEnrollment.status == EnrollmentStatus.ENROLLED.value
+                    )
+                )
+            )
+            enrolled_count = current_enrollment_count.scalar()
+            
+            # Process each student
+            for student_id in student_ids:
+                try:
+                    # Check if student exists
+                    student_result = await db.execute(select(User).where(User.id == student_id))
+                    student = student_result.scalars().first()
+                    if not student:
+                        results["failed"].append({
+                            "student_id": str(student_id),
+                            "reason": "Student not found"
+                        })
+                        results["total_failed"] += 1
+                        continue
+                    
+                    # Check if already enrolled
+                    existing_enrollment = await db.execute(
+                        select(CourseEnrollment).where(
+                            and_(
+                                CourseEnrollment.course_id == course_id,
+                                CourseEnrollment.student_id == student_id
+                            )
+                        )
+                    )
+                    if existing_enrollment.scalars().first():
+                        results["failed"].append({
+                            "student_id": str(student_id),
+                            "reason": "Already enrolled"
+                        })
+                        results["total_failed"] += 1
+                        continue
+                    
+                    # Determine if enrolled or waitlisted
+                    status = EnrollmentStatus.ENROLLED.value
+                    if course.enrollment_limit is not None and enrolled_count >= course.enrollment_limit:
+                        status = EnrollmentStatus.WAITLISTED.value
+                        results["total_waitlisted"] += 1
+                    else:
+                        enrolled_count += 1
+                        results["total_enrolled"] += 1
+                    
+                    # Create enrollment
+                    new_enrollment = CourseEnrollment(
+                        course_id=course_id,
+                        student_id=student_id,
+                        user_id=user_id,
+                        status=status,
+                        enrollment_date=datetime.now(UTC)
+                    )
+                    
+                    db.add(new_enrollment)
+                    
+                    # Add to successful list
+                    results["successful"].append({
+                        "student_id": str(student_id),
+                        "status": status
+                    })
+                    
+                except Exception as e:
+                    results["failed"].append({
+                        "student_id": str(student_id),
+                        "reason": str(e)
+                    })
+                    results["total_failed"] += 1
+            
+            # Commit all changes
+            await db.commit()
+            return results
+            
+        except HTTPException as e:
+            await db.rollback()
+            raise e
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error in bulk enrollment: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to complete bulk enrollment: {str(e)}")
