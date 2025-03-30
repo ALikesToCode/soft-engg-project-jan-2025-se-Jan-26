@@ -79,27 +79,28 @@ async def verify_and_create_schemas(pool):
         # Skip langchain-related schema verification since we're not using it anymore
         logger.info("Skipping LangChain schema verification")
         
-        # Make sure we have the default tables
-        async with pool.connection() as conn:
-            async with conn.cursor() as cursor:
-                # Check if core tables exist
-                await cursor.execute("""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_schema = 'public' 
-                        AND table_name = 'users'
-                    );
-                """)
-                users_table_exists = await cursor.fetchone()
-                
-                # If users table doesn't exist, we need to run init_db
-                if not users_table_exists or not users_table_exists[0]:
-                    logger.info("Core tables not found. Running database initialization...")
-                    # Run async initialization
-                    await init_db()
-                    logger.info("Database initialization completed.")
-                else:
-                    logger.info("Core tables already exist, skipping initialization.")
+        # Make sure we have the default tables with timeout
+        async with asyncio.timeout(5.0):  # Add timeout to prevent hanging
+            async with pool.connection() as conn:
+                async with conn.cursor() as cursor:
+                    # Check if core tables exist
+                    await cursor.execute("""
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.tables 
+                            WHERE table_schema = 'public' 
+                            AND table_name = 'users'
+                        );
+                    """)
+                    users_table_exists = await cursor.fetchone()
+                    
+                    # If users table doesn't exist, we need to run init_db
+                    if not users_table_exists or not users_table_exists[0]:
+                        logger.info("Core tables not found. Running database initialization...")
+                        # Run async initialization
+                        await init_db()
+                        logger.info("Database initialization completed.")
+                    else:
+                        logger.info("Core tables already exist, skipping initialization.")
         
         # Verify DB initialization flag exists
         if not Path("db_initialized.flag").exists():
@@ -110,172 +111,175 @@ async def verify_and_create_schemas(pool):
         # Create default users
         if not Path("users_initialized.flag").exists():
             logger.info("Creating default users...")
-            async with async_session() as session:
-                await create_default_users(session)
+            async with asyncio.timeout(5.0):  # Add timeout
+                async with async_session() as session:
+                    await create_default_users(session)
             with open("users_initialized.flag", 'w') as f:
                 f.write('')
             logger.info("Default users created and flag file updated.")
         else:
             logger.info("Default users already created, skipping.")
             
+    except asyncio.TimeoutError:
+        logger.error("Timeout verifying database schemas, but continuing startup")
     except Exception as e:
         logger.error(f"Error verifying database schemas: {str(e)}")
-        raise
+        # Don't raise - allow startup to continue with limited functionality
+        logger.warning("Continuing with application startup despite schema verification issues")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for application startup and shutdown"""
-    try:
-        # Initialize database on startup
-        logger.info("Initializing database...")
-        # Check if we've already run a full initialization before
-        db_initialized_flag = Path("db_initialized.flag")
-        if not db_initialized_flag.exists():
-            logger.info("First time initialization - creating all database objects")
-            await init_db()
+    # Initialize database on startup
+    logger.info("Initializing database...")
+    # Check if we've already run a full initialization before
+    db_initialized_flag = Path("db_initialized.flag")
+    if not db_initialized_flag.exists():
+        logger.info("First time initialization - creating all database objects")
+        try:
+            # Add timeout for database initialization
+            async with asyncio.timeout(10.0):
+                await init_db()
             # Create the flag file to indicate we've completed a full initialization
             db_initialized_flag.touch()
             logger.info("Database initialization completed and flag file created")
-        else:
-            logger.info("Database previously initialized, skipping full initialization")
-        
-        # Create default users
-        logger.info("Creating default users...")
-        # Only create default users if we're doing the first initialization 
-        # or if users_initialized.flag doesn't exist
-        users_initialized_flag = Path("users_initialized.flag")
-        if not db_initialized_flag.exists() or not users_initialized_flag.exists():
-            async with async_session() as session:
-                try:
-                    await create_default_users(session)
-                    # Create flag to indicate users have been set up
-                    users_initialized_flag.touch()
-                except Exception as e:
-                    logger.error(f"Error creating default users: {e}")
-        else:
-            logger.info("Default users already initialized, skipping")
-        
-        # Start monitoring service background tasks with timeout
-        logger.info("Starting monitoring service...")
-        try:
-            # Add a timeout to prevent hanging on monitoring startup
-            monitoring_task = asyncio.create_task(monitoring_service.start_background_tasks())
-            await asyncio.wait_for(monitoring_task, timeout=5.0)
-            logger.info("Monitoring service started successfully")
         except asyncio.TimeoutError:
-            logger.warning("Monitoring service startup timed out - continuing anyway")
+            logger.warning("Database initialization timed out, continuing with limited functionality")
         except Exception as e:
-            logger.error(f"Error starting monitoring service: {str(e)} - continuing anyway")
+            logger.error(f"Error initializing database: {str(e)} - continuing with limited functionality")
+    else:
+        logger.info("Database previously initialized, skipping full initialization")
+    
+    # Create default users
+    logger.info("Creating default users...")
+    # Only create default users if we're doing the first initialization 
+    # or if users_initialized.flag doesn't exist
+    users_initialized_flag = Path("users_initialized.flag")
+    if not db_initialized_flag.exists() or not users_initialized_flag.exists():
+        try:
+            async with asyncio.timeout(5.0):  # Add timeout
+                async with async_session() as session:
+                    await create_default_users(session)
+                # Create flag to indicate users have been set up
+                users_initialized_flag.touch()
+        except asyncio.TimeoutError:
+            logger.warning("Default user creation timed out, continuing startup")
+        except Exception as e:
+            logger.error(f"Error creating default users: {e}")
+    else:
+        logger.info("Default users already initialized, skipping")
+    
+    # Start monitoring service background tasks with timeout
+    logger.info("Starting monitoring service...")
+    monitoring_started = False
+    try:
+        # Add a timeout to prevent hanging on monitoring startup
+        monitoring_task = asyncio.create_task(monitoring_service.start_background_tasks())
+        await asyncio.wait_for(monitoring_task, timeout=3.0)
+        monitoring_started = True
+        logger.info("Monitoring service started successfully")
+    except asyncio.TimeoutError:
+        logger.warning("Monitoring service startup timed out - continuing anyway")
+    except Exception as e:
+        logger.error(f"Error starting monitoring service: {str(e)} - continuing anyway")
 
-        # Set up database connection
-        logger.info("Setting up database connection...")
-        connection_string = os.getenv("DATABASE_URL")
-        # Verify the connection string is properly formatted
-        if not connection_string or not connection_string.endswith("require"):
-            logger.error(f"Invalid DATABASE_URL format: {connection_string}")
-            if connection_string and "?sslmode" in connection_string:
-                # Fix common issue with sslmode parameter
-                connection_string = connection_string.replace("?sslmode", "?sslmode=require")
-                logger.info(f"Fixed DATABASE_URL: {connection_string}")
+    # Set up database connection
+    logger.info("Setting up database connection...")
+    connection_string = os.getenv("DATABASE_URL")
+    
+    # Simplified connection string check and preparation
+    if connection_string:
+        if "sslmode=require" not in connection_string:
+            if "?" in connection_string:
+                connection_string = connection_string + "&sslmode=require"
             else:
-                # Add sslmode=require if not present
-                if "?" in connection_string:
-                    connection_string = connection_string + "&sslmode=require"
-                else:
-                    connection_string = connection_string + "?sslmode=require"
-                logger.info(f"Added sslmode=require to DATABASE_URL: {connection_string}")
+                connection_string = connection_string + "?sslmode=require"
                 
         # Convert SQLAlchemy URL format to psycopg format
-        # psycopg doesn't support the postgresql+asyncpg:// prefix or dialect options
-        psycopg_connection_string = connection_string
-        if "postgresql+asyncpg://" in psycopg_connection_string:
-            psycopg_connection_string = psycopg_connection_string.replace("postgresql+asyncpg://", "postgresql://")
-            
-        # Force hostname connection method (disable socket connection attempts)
-        if "ep-weathered-breeze-a8jcdehd-pooler.eastus2.azure.neon.tech" in psycopg_connection_string:
-            # We're using a Neon DB connection - ensure host connection method
-            if "?" in psycopg_connection_string:
-                # Remove invalid host_type parameter if present
-                if "&host_type=host" in psycopg_connection_string:
-                    psycopg_connection_string = psycopg_connection_string.replace("&host_type=host", "")
-            else:
-                # No need to add invalid parameters
-                pass
+        psycopg_connection_string = connection_string.replace("postgresql+asyncpg://", "postgresql://")
         
         logger.info(f"Using psycopg connection string format: {psycopg_connection_string}")
         
-        # Create connection pool
+        # Create connection pool with reduced values for faster startup
         connection_kwargs = {
-            "min_size": 2,
-            "max_size": 10,
-            "max_idle": 300.0,
-            "timeout": 30.0
+            "min_size": 1,      # Reduced from 2
+            "max_size": 5,      # Reduced from 10
+            "max_idle": 60.0,   # Reduced from 300
+            "timeout": 10.0     # Reduced from 30
         }
-
+        
         try:
             # Create the connection pool with psycopg
             logger.info("Creating psycopg connection pool...")
             pool = AsyncConnectionPool(psycopg_connection_string, **connection_kwargs)
             
-            # Open the pool with proper async handling
-            await pool.open(wait=True)
-            
-            # Define setup function for new connections
-            async def setup_connection(conn):
-                await conn.set_autocommit(True)
-            
-            # Set the setup callback
-            pool.configure_connection = setup_connection
-            
-            logger.info("Successfully connected to database pool")
-            
-            # Store the pool in the app state
-            app.state.pool = pool
-            
-            # Verify and create schemas
-            await verify_and_create_schemas(pool)
-            
-            # Start cleanup task for redis cache with timeout
+            # Open the pool with proper async handling and timeout
             try:
-                # Add a timeout to prevent hanging on cache startup
-                cleanup_task = asyncio.create_task(start_cleanup_task())
-                # Wait for the task to complete with a timeout
-                await asyncio.wait_for(cleanup_task, timeout=5.0)
-                logger.info("Redis cache cleanup task started")
+                await asyncio.wait_for(pool.open(wait=True), timeout=10.0)
+                logger.info("Successfully connected to database pool")
+                
+                # Store the pool in the app state
+                app.state.pool = pool
+                
+                # Set autocommit on connections
+                async def setup_connection(conn):
+                    await conn.set_autocommit(True)
+                pool.configure_connection = setup_connection
+                
+                # Verify and create schemas with a timeout
+                await verify_and_create_schemas(pool)
             except asyncio.TimeoutError:
-                logger.warning("Redis cache cleanup task startup timed out - continuing anyway")
-            except Exception as e:
-                logger.warning(f"Failed to start Redis cache cleanup task: {str(e)} - continuing anyway")
-            
-            logger.info("Application startup completed successfully")
+                logger.error("Timeout opening database pool - continuing with limited functionality")
             
         except Exception as e:
             logger.error(f"Database connection error: {str(e)}")
             logger.error("Failed to create connection pool or initialize schemas")
-            raise
-        
-        # Application is now ready - yield control back to FastAPI
-        yield
-        
-        # Shutdown tasks
-        logger.info("Shutting down application...")
-        
-        # Close the connection pool
-        if hasattr(app.state, "pool"):
-            logger.info("Closing database connection pool...")
-            await app.state.pool.close()
-            logger.info("Database connection pool closed")
-            
-        # Stop monitoring service
-        logger.info("Stopping monitoring service...")
-        await monitoring_service.stop_background_tasks()
-        
-        logger.info("Application shutdown complete")
-        
+            # Don't raise the exception, allow the application to start with limited functionality
+    else:
+        logger.error("DATABASE_URL not set, starting with limited functionality")
+    
+    # Start cleanup task for redis cache with timeout
+    try:
+        # Add a timeout to prevent hanging on cache startup
+        cleanup_task = asyncio.create_task(start_cleanup_task())
+        # Wait for the task to complete with a reduced timeout
+        await asyncio.wait_for(cleanup_task, timeout=3.0)
+        logger.info("Redis cache cleanup task started")
+    except asyncio.TimeoutError:
+        logger.warning("Redis cache cleanup task startup timed out - continuing anyway")
     except Exception as e:
-        logger.error(f"Error in lifespan handler: {str(e)}")
-        # Re-raise to let FastAPI know startup failed
-        raise
+        logger.warning(f"Failed to start Redis cache cleanup task: {str(e)} - continuing anyway")
+    
+    logger.info("Application startup completed - ready to serve requests")
+    
+    # Application is now ready - yield control back to FastAPI
+    yield
+    
+    # Shutdown tasks
+    logger.info("Shutting down application...")
+    
+    # Close the connection pool
+    if hasattr(app.state, "pool"):
+        logger.info("Closing database connection pool...")
+        try:
+            await asyncio.wait_for(app.state.pool.close(), timeout=5.0)
+            logger.info("Database connection pool closed")
+        except asyncio.TimeoutError:
+            logger.warning("Timeout closing database pool - forcing shutdown")
+        except Exception as e:
+            logger.error(f"Error closing database pool: {str(e)}")
+        
+    # Stop monitoring service only if it was started
+    if monitoring_started:
+        logger.info("Stopping monitoring service...")
+        try:
+            await asyncio.wait_for(monitoring_service.stop_background_tasks(), timeout=3.0)
+        except asyncio.TimeoutError:
+            logger.warning("Timeout stopping monitoring service - forcing shutdown")
+        except Exception as e:
+            logger.error(f"Error stopping monitoring service: {str(e)}")
+    
+    logger.info("Application shutdown complete")
 
 # Create FastAPI application
 app = FastAPI(
@@ -327,16 +331,17 @@ app.include_router(notification, prefix="/api/notifications", tags=["notificatio
 # Monitoring endpoints
 app.include_router(monitoring.router, prefix="/api/monitoring", tags=["monitoring"])
 
-# Root endpoint
+# Root endpoint - optimized for faster response
 @app.get("/", include_in_schema=False)
 async def root():
-    # This is primarily for health checks and to show the API is up
-    return {"status": "ok", "api": f"{settings.APP_NAME} API", "version": settings.APP_VERSION}
+    # Simplified response for faster performance
+    return JSONResponse(content={"status": "ok", "version": settings.APP_VERSION})
 
-# Health check for API root
+# Health check for API root - optimized
 @app.get("/health", include_in_schema=False)
 async def health_check():
-    return {"status": "ok", "api": f"{settings.APP_NAME} API", "version": settings.APP_VERSION}
+    # Simple response that avoids any database calls
+    return JSONResponse(status_code=200, content={"status": "ok"})
 
 if __name__ == "__main__":
     import uvicorn
