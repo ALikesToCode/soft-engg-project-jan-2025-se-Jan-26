@@ -19,15 +19,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# LangGraph lifecycle setup
-from psycopg_pool import AsyncConnectionPool
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from contextlib import asynccontextmanager
-
-# Global variables for LangGraph
-checkpointer = None
-llmapp = None
-
 router = APIRouter()
 
 # Schema definitions
@@ -165,10 +156,10 @@ async def chat(request: LLMRequest, req: Request):
                 logger.warning(f"LLMApp not initialized. Attempting to initialize (attempt {retry+1}/{max_init_retries})")
                 try:
                     # Try to initialize LLMApp if possible
-                    if hasattr(app.state, "pool") and app.state.pool:
-                        await create_llm_app(app)
-                        logger.info("LLMApp initialization successful")
-                        break
+                    from app.services.llm_service import create_llm_app
+                    await create_llm_app(app)
+                    logger.info("LLMApp initialization successful")
+                    break
                 except Exception as init_error:
                     logger.error(f"LLMApp initialization error: {str(init_error)}")
                     import asyncio
@@ -187,7 +178,7 @@ async def chat(request: LLMRequest, req: Request):
         # Get available functions
         tools = function_router.get_function_declarations()
         
-        # Attempt to invoke the LLMApp with retry logic for connection issues
+        # Attempt to invoke the LLMApp with retry logic
         max_retries = 3
         retry_count = 0
         last_error = None
@@ -202,60 +193,26 @@ async def chat(request: LLMRequest, req: Request):
                 break  # Success, exit the retry loop
             except Exception as e:
                 last_error = e
-                error_str = str(e).lower()
+                logger.error(f"Error invoking LLMApp: {str(e)}")
+                retry_count += 1
                 
-                # Check if this is a connection issue
-                if "connection" in error_str or "closed" in error_str or "pool" in error_str or "bad" in error_str or "discarding" in error_str:
-                    logger.warning(f"Database connection error (attempt {retry_count+1}/{max_retries}): {str(e)}")
-                    retry_count += 1
+                if retry_count < max_retries:
+                    # Wait before retrying
+                    import asyncio
+                    await asyncio.sleep(1 * retry_count)
                     
-                    # If this appears to be a connection pool issue, try to reinitialize
-                    if hasattr(app.state, "pool"):
+                    # Try to reinitialize the LLM app
+                    if retry_count == max_retries - 1:
                         try:
-                            # Attempt to refresh the connection
-                            import asyncio
-                            await asyncio.sleep(1 * retry_count)  # Exponential backoff
-                            logger.info("Attempting to refresh connection pool")
-                            
-                            # Get a connection to test if pool is healthy
-                            async with app.state.pool.connection() as conn:
-                                await conn.execute("SELECT 1")
-                                logger.info("Connection pool test successful")
-                        except Exception as pool_error:
-                            logger.error(f"Failed to refresh connection pool: {str(pool_error)}")
-                            
-                            # On last retry attempt, try to recreate the pool
-                            if retry_count == max_retries - 1 and hasattr(app.state, "pool"):
-                                try:
-                                    # Close the existing pool
-                                    logger.warning("Attempting to recreate connection pool")
-                                    await app.state.pool.close()
-                                    
-                                    # Get the original connection string
-                                    connection_string = os.getenv("DATABASE_URL")
-                                    if "postgresql+asyncpg://" in connection_string:
-                                        connection_string = connection_string.replace("postgresql+asyncpg://", "postgresql://")
-                                    
-                                    # Create a new pool
-                                    app.state.pool = AsyncConnectionPool(connection_string)
-                                    
-                                    # Recreate the checkpointer
-                                    app.state.checkpointer = AsyncPostgresSaver(pool=app.state.pool)
-                                    
-                                    # Recreate the LLMApp
-                                    await create_llm_app(app)
-                                    logger.info("Successfully recreated connection pool and LLMApp")
-                                except Exception as recreate_error:
-                                    logger.error(f"Failed to recreate connection pool: {str(recreate_error)}")
-                else:
-                    # Not a connection error, break the loop
-                    logger.error(f"Non-connection error in LLMApp: {str(e)}")
-                    break
+                            from app.services.llm_service import create_llm_app
+                            await create_llm_app(app)
+                            logger.info("Reinitialized LLM application")
+                        except Exception as reinit_error:
+                            logger.error(f"Failed to reinitialize LLM app: {str(reinit_error)}")
         
-        # If we exhausted all retries, raise the last error
+        # If we exhausted all retries, return a friendly error
         if retry_count == max_retries and last_error:
             logger.error(f"Exhausted all retries: {str(last_error)}")
-            # Return a "friendly" error response instead of crashing
             return LLMResponse(
                 content="I'm sorry, I encountered an issue while processing your request. Please try again later."
             )
@@ -364,21 +321,25 @@ async def clear_chat(id: str, req: Request):
     """Delete chat history for a specified thread ID"""
     app = req.app
     
-    if not hasattr(app.state, "pool"):
+    if not hasattr(app.state, "llmapp") or app.state.llmapp is None:
         raise HTTPException(
             status_code=500, 
-            detail="Database pool not initialized. Server configuration issue."
+            detail="LLM application not initialized. Server configuration issue."
         )
     
-    async with app.state.pool.connection() as conn:
-        async with conn.cursor() as cursor:
-            try:
-                await cursor.execute("DELETE FROM checkpoints WHERE thread_id = %s", (id,))
-                await cursor.execute("DELETE FROM checkpoint_writes WHERE thread_id = %s", (id,))
-                await cursor.execute("DELETE FROM checkpoint_blobs WHERE thread_id = %s", (id,))
+    try:
+        # Access our custom LLMApp implementation
+        if hasattr(app.state.llmapp, "conversations"):
+            # If the thread exists, delete it
+            if id in app.state.llmapp.conversations:
+                del app.state.llmapp.conversations[id]
                 return {"message": f"Chat history for thread_id '{id}' has been cleared."}
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Error clearing chat history: {e}")
+            else:
+                return {"message": f"No chat history found for thread_id '{id}'."}
+        else:
+            return {"message": "Chat history deletion is not supported with current LLM implementation."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clearing chat history: {e}")
 
 @router.get("/openapi.json", 
     summary="Get API documentation",

@@ -4,7 +4,6 @@ from typing import Dict, Any, List, Optional
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langgraph.graph import START, StateGraph, MessagesState
 from app.services.function_router import function_router
 
 logger = logging.getLogger(__name__)
@@ -38,63 +37,73 @@ When a user asks a question that requires using these functions, call the approp
 Respond directly to simple questions that don't require function calls.
 Always be helpful, concise, and professional."""
 
-async def call_llm(state: MessagesState):
-    """Function to call the LLM model with the current state"""
+async def call_llm(messages):
+    """Function to call the LLM model with the provided messages"""
     # Get the LLM and prompt template
     llm = get_llm()
     
     # Create prompt template with system message and user messages
     prompt_template = ChatPromptTemplate.from_messages([
-        ("system", get_system_prompt()),
+        SystemMessage(content=get_system_prompt()),
         MessagesPlaceholder(variable_name="messages")
     ])
     
     # Apply the prompt template to the current state
-    prompt = await prompt_template.ainvoke(state)
+    prompt = await prompt_template.ainvoke({"messages": messages})
     
     # Call the LLM with the prompt
     response = await llm.ainvoke(prompt)
     
-    # Return the updated state with the new response
-    return {"messages": state["messages"] + [response]}
+    return response
+
+class LLMApp:
+    """Simple LLM application class to replace LangGraph"""
+    
+    def __init__(self):
+        self.conversations = {}
+        
+    async def ainvoke(self, state, config=None):
+        """Process a message and return a response"""
+        messages = state.get("messages", [])
+        thread_id = config.get("configurable", {}).get("thread_id", "default") if config else "default"
+        
+        # Retrieve existing conversation or start a new one
+        conversation = self.conversations.get(thread_id, [])
+        
+        # Add new messages to the conversation
+        conversation.extend(messages)
+        
+        # Get response from LLM
+        response = await call_llm(conversation)
+        
+        # Update the conversation with the response
+        conversation.append(response)
+        
+        # Store updated conversation
+        self.conversations[thread_id] = conversation
+        
+        # Return updated state
+        return {"messages": conversation}
+    
+    async def aget_state(self, config=None):
+        """Get the current state of a conversation"""
+        thread_id = config.get("configurable", {}).get("thread_id", "default") if config else "default"
+        conversation = self.conversations.get(thread_id, [])
+        return [{"messages": conversation}]
 
 async def create_llm_app(app):
-    """Initialize the LLM application with LangGraph
+    """Initialize a simple LLM application
     
     Args:
         app: FastAPI application instance
     """
     logger.info("Initializing LLM application")
     
-    # Check if we have a checkpointer configured in the app state
-    if not hasattr(app.state, "checkpointer") or not app.state.checkpointer:
-        logger.error("Cannot initialize LLMApp: missing checkpointer in app state")
-        raise ValueError("Missing checkpointer in app state")
-    
-    # Create a new state graph for conversations
-    builder = StateGraph(MessagesState)
-    
-    # Add the LLM node to the graph
-    builder.add_node("llm", call_llm)
-    
-    # Set up the graph flow: START -> llm -> END
-    builder.set_entry_point("llm")
-    
-    # Compile the graph
-    graph = builder.compile()
-    
-    # Configure persistence with the checkpointer
-    memory = await graph.with_checkpointer(
-        app.state.checkpointer,
-        key="conversation_history"
-    ).aconfigure(
-        configurable={
-            "thread_id": "default"  # Default thread ID
-        }
-    )
+    # Create a new LLMApp instance
+    llm_app = LLMApp()
     
     # Store the initialized app in application state
-    app.state.llmapp = memory
+    app.state.llmapp = llm_app
     
     logger.info("LLM application initialized successfully")
-    return memory
+    return llm_app

@@ -216,22 +216,33 @@ export const ChatService = {
       
       console.log('Sending message to AI:', payload)
       const response = await api.post(`${API_PATHS.CHAT}`, payload)
+      
+      // Return response.data directly as it should already be formatted correctly
+      // The backend returns { content: string, function_calls: [] }
       return response.data
     } catch (error) {
       console.error('Error sending message to AI:', error)
       // Fallback to a simulated AI response
       return {
-        content: "I apologize, but I'm having trouble connecting to the server right now. The backend API endpoints may not be fully implemented yet. Please try again later."
+        content: "I apologize, but I'm having trouble connecting to the server right now. Please try again later."
       }
     }
   },
 
   /**
    * Get the current chat history
+   * @param {string} id - Thread ID to get history for 
    * @returns {Promise<Array>} - The chat history
    */
-  async getChatHistory() {
+  async getChatHistory(id) {
     try {
+      // If an ID is provided, get that specific chat history
+      if (id) {
+        const response = await api.get(`${API_PATHS.CHAT}?id=${id}`)
+        return response.data
+      }
+      
+      // Otherwise try to get all chat sessions
       const response = await api.get(`${API_PATHS.CHAT}/sessions`)
       return response.data
     } catch (error) {
@@ -852,6 +863,25 @@ export const ChatService = {
     } catch (error) {
       console.error('Error getting Swagger endpoints:', error);
       throw error;
+    }
+  },
+
+  /**
+   * Clear the chat history for a thread
+   * @param {string} id - Thread ID to clear history for
+   * @returns {Promise<Object>} - Response indicating success
+   */
+  async clearChatHistory(id) {
+    try {
+      if (!id) {
+        throw new Error('Thread ID is required to clear chat history')
+      }
+      
+      const response = await api.delete(`${API_PATHS.CHAT}?id=${id}`)
+      return response.data
+    } catch (error) {
+      console.error('Error clearing chat history:', error)
+      throw error
     }
   },
 }

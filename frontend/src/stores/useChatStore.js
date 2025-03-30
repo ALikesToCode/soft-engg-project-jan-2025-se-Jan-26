@@ -301,28 +301,61 @@ export const useChatStore = defineStore('chat', () => {
     try {
       if (!chatId) return
       
-      // Delete in backend if authenticated
+      isLoading.value = true
+      error.value = null
+      
+      // Delete from backend if authenticated
       if (authStore.isAuthenticated) {
         try {
           await ChatService.deleteChatSession(chatId)
         } catch (err) {
-          console.error("Error deleting chat in backend:", err)
+          console.error("Error deleting chat from backend:", err)
         }
       }
       
-      // Delete locally
+      // Remove from local state
       chatHistory.value = chatHistory.value.filter(chat => chat.id !== chatId)
       
       // If we deleted the current chat, select another one
       if (currentChatId.value === chatId) {
-        if (chatHistory.value.length > 0) {
-          currentChatId.value = chatHistory.value[0].id
-        } else {
-          currentChatId.value = null
-        }
+        ensureValidChatSelected()
       }
     } catch (err) {
       console.error("Error deleting chat:", err)
+      error.value = "Failed to delete chat"
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  // Clear all messages from a chat but keep the chat
+  async function clearChatHistory(chatId) {
+    try {
+      if (!chatId) return
+      
+      isLoading.value = true
+      error.value = null
+      
+      // Clear from backend if authenticated
+      if (authStore.isAuthenticated) {
+        try {
+          await ChatService.clearChatHistory(chatId)
+        } catch (err) {
+          console.error("Error clearing chat history from backend:", err)
+        }
+      }
+      
+      // Clear messages in local state
+      const chatIndex = chatHistory.value.findIndex(chat => chat.id === chatId)
+      if (chatIndex !== -1) {
+        chatHistory.value[chatIndex].messages = []
+        chatHistory.value[chatIndex].lastUpdated = new Date()
+      }
+    } catch (err) {
+      console.error("Error clearing chat history:", err)
+      error.value = "Failed to clear chat history"
+    } finally {
+      isLoading.value = false
     }
   }
 
@@ -387,6 +420,7 @@ export const useChatStore = defineStore('chat', () => {
     setCurrentChat,
     updateChatTitle,
     deleteChat,
+    clearChatHistory,
     toggleChat,
     openChat,
     closeChat,
