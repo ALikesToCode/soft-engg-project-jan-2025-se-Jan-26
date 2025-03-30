@@ -13,7 +13,7 @@ from app.schemas.faq import FAQCreate, FAQUpdate, FAQResponse, FAQRating, FAQSea
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/api/v1/faqs",
+    prefix="/faqs",
     tags=["FAQs"],
     responses={404: {"description": "Not found"}},
 )

@@ -135,6 +135,7 @@
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { ChatService } from '@/services/chat.service'
+import ApiExecutorService from '@/services/api-executor.service'
 import { useChatStore } from '@/stores/useChatStore'
 import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
@@ -320,37 +321,58 @@ export default {
           return "I'm sorry, I couldn't generate a response. Please try again."
         }
         
-        // Handle function calls if present (if backend returns them)
+        // Handle function calls if present
         if (data.function_calls && data.function_calls.length > 0) {
           // Show function calling indicator
           isFunctionCalling.value = true
           
-          // First part of the response (before function calls)
-          let response = data.content?.trim() || ""
-          
-          // Wait a moment to simulate the time for function execution 
-          // (this would actually be happening on the backend)
-          await new Promise(resolve => setTimeout(resolve, 1500))
-          
-          // Format function calls in a more readable way
-          const functionCallsFormatted = data.function_calls.map(fc => {
-            const functionName = fc.name.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-            const args = Object.entries(fc.arguments || {})
-              .map(([key, value]) => `${key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: ${typeof value === 'object' ? JSON.stringify(value) : value}`)
-              .join('\n- ');
+          try {
+            // Format the response to include function calls and results
+            let response = data.content?.trim() || ""
+            
+            // Add function calls section
+            response += "\n\n**Function Calls:**\n```js\n"
+            data.function_calls.forEach(call => {
+              response += `${call.name}(${JSON.stringify(call.arguments, null, 2)})\n`
+            })
+            response += "```\n"
+            
+            // Add function results section if available
+            if (data.function_results && data.function_results.length > 0) {
+              response += "\n**Results:**\n```json\n"
+              data.function_results.forEach(result => {
+                response += `${result.name} result: ${JSON.stringify(result.result, null, 2)}\n\n`
+              })
+              response += "```\n"
               
-            return `**${functionName}**\n- ${args}`;
-          }).join('\n\n');
-          
-          // Add function calls section
-          response += '\n\n---\n\n';
-          response += '### I used these functions to get information:\n\n';
-          response += functionCallsFormatted;
-          
-          // Hide function calling indicator
-          isFunctionCalling.value = false
-          
-          return response;
+              // Check if we need to do a follow-up call to process the results
+              // This is useful if we want the LLM to interpret the results
+              const includeFollowUp = false // Set to true if you want a follow-up call
+              
+              if (includeFollowUp) {
+                // Send the results back to the AI with a follow-up call
+                const followUpPayload = {
+                  id: threadId.value,
+                  query: "Based on these results, provide a clearer response: " + 
+                         JSON.stringify(data.function_results),
+                  function_results: data.function_results
+                }
+                
+                const followUpResponse = await ChatService.sendMessage(followUpPayload)
+                if (followUpResponse && followUpResponse.content) {
+                  response += "\n\n**Interpretation:**\n" + followUpResponse.content
+                }
+              }
+            }
+            
+            return response
+          } catch (funcError) {
+            console.error("Error processing function results:", funcError)
+            return data.content + "\n\nI tried to process function results, but encountered an error: " + funcError.message
+          } finally {
+            // Hide function calling indicator
+            isFunctionCalling.value = false
+          }
         }
         
         // Regular response (no function calls)
@@ -402,6 +424,34 @@ export default {
       }
     }
     
+    // Toggle Swagger documentation modal
+    const toggleSwaggerInfo = async () => {
+      try {
+        // Toggle the visibility
+        showSwaggerInfo.value = !showSwaggerInfo.value
+        
+        // If showing and we don't have endpoints loaded yet, fetch them
+        if (showSwaggerInfo.value && swaggerEndpoints.value.length === 0) {
+          loadingSwagger.value = true
+          swaggerError.value = null
+          
+          try {
+            // Use the ChatService to get the Swagger endpoints
+            const endpoints = await ChatService.getSwaggerEndpoints()
+            swaggerEndpoints.value = endpoints
+          } catch (error) {
+            console.error("Error loading API documentation:", error)
+            swaggerError.value = "Failed to load API documentation"
+          } finally {
+            loadingSwagger.value = false
+          }
+        }
+      } catch (err) {
+        console.error("Error toggling Swagger info:", err)
+        swaggerError.value = "An error occurred"
+      }
+    }
+    
     return {
       currentMessages,
       newMessage,
@@ -421,7 +471,8 @@ export default {
       showSwaggerInfo,
       loadingSwagger,
       swaggerError,
-      clearChat
+      clearChat,
+      toggleSwaggerInfo
     }
   }
 }

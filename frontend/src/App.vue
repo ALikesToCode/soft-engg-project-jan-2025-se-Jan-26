@@ -90,17 +90,15 @@ export default {
 </template>
 
 <style>
-/* Import base styles first */
+/* Import all CSS files first */
 @import './assets/base.css';
+@import './assets/text-colors.css';
+@import './assets/hero-styles.css';
 
 /* Then import Tailwind */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Then import our custom styles to override Tailwind */
-@import './assets/text-colors.css';
-@import './assets/hero-styles.css';
 
 /* Base styles */
 body {

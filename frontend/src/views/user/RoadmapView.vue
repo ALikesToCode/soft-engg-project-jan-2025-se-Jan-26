@@ -115,6 +115,24 @@
                             </div>
                           </div>
                         </div>
+                        
+                        <!-- Status Controls -->
+                        <div class="mt-4 flex justify-end space-x-2" v-if="!milestone.locked">
+                          <button 
+                            @click="updateMilestoneStatus(milestone, 'in_progress')"
+                            class="px-3 py-1 rounded-md text-sm bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors"
+                            :class="{ 'bg-blue-200': milestone.status === 'in_progress' }"
+                          >
+                            In Progress
+                          </button>
+                          <button 
+                            @click="updateMilestoneStatus(milestone, 'completed')"
+                            class="px-3 py-1 rounded-md text-sm bg-green-100 text-green-800 hover:bg-green-200 transition-colors"
+                            :class="{ 'bg-green-200': milestone.status === 'completed' }"
+                          >
+                            Complete
+                          </button>
+                        </div>
                       </div>
                     </div>
 
@@ -198,6 +216,8 @@
 import SideNavBar from '@/layouts/SideNavBar.vue'
 import ChatBotBox from '@/components/ChatBotBox.vue'
 import { useChatStore } from '@/stores/useChatStore'
+import { useToast } from 'vue-toastification'
+import { RoadmapService } from '@/services/roadmap.service'
 
 export default {
   name: 'RoadmapView',
@@ -211,15 +231,12 @@ export default {
       required: true
     }
   },
-  created() {
-    console.log('Loading roadmap for course:', this.id);
-    // TODO: Fetch roadmap data for the specific course
-    // this.loadRoadmapData(this.id);
-  },
   setup() {
     const chatStore = useChatStore()
+    const toast = useToast()
     return {
-      chatStore
+      chatStore,
+      toast
     }
   },
   data() {
@@ -233,7 +250,40 @@ export default {
   },
   async created() {
     try {
-      // For now using mock data based on course ID
+      console.log('Loading roadmap for course:', this.id);
+      
+      // Show loading state
+      this.loading = true;
+      
+      // Use the RoadmapService to fetch the roadmap
+      const data = await RoadmapService.getRoadmap(this.id);
+      
+      if (data && data.roadmap) {
+        this.roadmap = data.roadmap;
+        
+        // Set context for chat
+        this.currentLearningContext = {
+          type: 'roadmap',
+          title: this.roadmap.title,
+          description: this.roadmap.description,
+          courseId: this.id
+        };
+      } else {
+        throw new Error('No valid roadmap data found');
+      }
+    } catch (err) {
+      this.error = 'Failed to load roadmap: ' + (err.message || 'Unknown error');
+      console.error('Error loading roadmap:', err);
+      
+      // Fallback to mock data
+      this.loadMockRoadmap();
+    } finally {
+      this.loading = false;
+    }
+  },
+  methods: {
+    loadMockRoadmap() {
+      // Mock data as fallback
       const mockRoadmaps = {
         1: {
           id: 1,
@@ -335,22 +385,15 @@ export default {
           ]
         }
       };
-
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 500));
       
       this.roadmap = mockRoadmaps[this.id] || null;
       if (!this.roadmap) {
         this.error = 'Roadmap not found';
+        this.toast.error('Could not load roadmap, using mock data instead');
+      } else {
+        this.toast.info('Using mock roadmap data');
       }
-    } catch (err) {
-      this.error = 'Failed to load roadmap';
-      console.error('Error loading roadmap:', err);
-    } finally {
-      this.loading = false;
-    }
-  },
-  methods: {
+    },
     getMilestoneStatusClasses(status) {
       const classes = {
         completed: {
@@ -434,6 +477,52 @@ export default {
           materialId: material.id
         }
       });
+    },
+    async updateMilestoneStatus(milestone, newStatus) {
+      try {
+        // Don't allow changing locked milestones
+        if (milestone.locked) {
+          this.toast.warning('This milestone is locked. Complete previous milestones first.');
+          return;
+        }
+        
+        this.toast.info('Updating milestone status...');
+        
+        // Call the service to update progress
+        const response = await RoadmapService.updateProgress(
+          this.roadmap.id, 
+          milestone.id, 
+          newStatus
+        );
+        
+        if (response && response.success) {
+          // Update the local state
+          milestone.status = newStatus;
+          
+          // Update completion counters
+          if (newStatus === 'completed') {
+            this.roadmap.completedSteps += 1;
+          } else if (milestone.status === 'completed' && newStatus !== 'completed') {
+            this.roadmap.completedSteps -= 1;
+          }
+          
+          // Unlock next milestone if this one is completed
+          if (newStatus === 'completed') {
+            const nextIndex = this.roadmap.milestones.findIndex(m => m.id === milestone.id) + 1;
+            if (nextIndex < this.roadmap.milestones.length) {
+              this.roadmap.milestones[nextIndex].locked = false;
+              this.roadmap.milestones[nextIndex].status = 'in_progress';
+            }
+          }
+          
+          this.toast.success('Progress updated successfully');
+        } else {
+          this.toast.error('Failed to update progress');
+        }
+      } catch (error) {
+        console.error('Error updating milestone status:', error);
+        this.toast.error('Failed to update milestone status: ' + error.message);
+      }
     }
   }
 }

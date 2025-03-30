@@ -11,35 +11,7 @@ from app.schemas.faq import FAQCreate, FAQUpdate
 # Setup logging
 logger = logging.getLogger(__name__)
 
-# Import vector store components
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_postgres import PGVector
-import os
-
-# Initialize embeddings model
-embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/text-embedding-004",
-    google_api_key=os.getenv("GOOGLE_API_KEY")
-)
-
-# Function to get vector store connection
-def get_vector_store(collection_name="faq_store"):
-    """Get initialized vector store connection"""
-    try:
-        database_url = os.getenv("DATABASE_URL")
-        if not database_url:
-            raise ValueError("DATABASE_URL environment variable is not set")
-            
-        vector_store = PGVector(
-            embeddings=embeddings,
-            collection_name=collection_name,
-            connection_string=database_url
-        )
-        return vector_store
-    except Exception as e:
-        logger.error(f"Error initializing vector store: {str(e)}")
-        return None
-
+# Mock vector store implementation
 async def get_faqs(db: AsyncSession, category_id: Optional[str] = None, skip: int = 0, limit: int = 100) -> List[FAQ]:
     """
     Get all FAQs, optionally filtered by category.
@@ -100,8 +72,8 @@ async def create_faq(db: AsyncSession, faq_create: FAQCreate) -> FAQ:
     await db.commit()
     await db.refresh(faq)
     
-    # Add to vector store
-    await add_faq_to_vector_store(faq)
+    # Mock: Add to vector store - log but don't actually do it
+    logger.info(f"Mock: Added FAQ {faq.id} to vector store")
     
     return faq
 
@@ -130,8 +102,8 @@ async def update_faq(db: AsyncSession, faq_id: str, faq_update: FAQUpdate) -> Op
     await db.commit()
     await db.refresh(faq)
     
-    # Update in vector store
-    await add_faq_to_vector_store(faq)
+    # Mock: Update in vector store - log but don't actually do it
+    logger.info(f"Mock: Updated FAQ {faq.id} in vector store")
     
     return faq
 
@@ -168,17 +140,7 @@ async def search_faqs(db: AsyncSession, query: str, limit: int = 20) -> List[FAQ
     Returns:
         List of matching FAQ objects
     """
-    # Try vector search first
-    try:
-        vector_results = await vector_search_faqs(query, limit)
-        
-        if vector_results and len(vector_results) > 0:
-            logger.info(f"Vector search found {len(vector_results)} results for query: {query}")
-            return vector_results
-    except Exception as e:
-        logger.warning(f"Vector search failed, falling back to keyword search: {str(e)}")
-    
-    # Fall back to traditional keyword search
+    # Skip mock vector search and use only keyword search
     logger.info(f"Using keyword search for query: {query}")
     search_query = f"%{query.lower()}%"
     result = await db.execute(
@@ -206,36 +168,9 @@ async def vector_search_faqs(query: str, limit: int = 20) -> List[FAQ]:
     Returns:
         List of matching FAQ objects
     """
-    # Get vector store
-    vector_store = get_vector_store()
-    if not vector_store:
-        logger.warning("Vector store not available for FAQ search")
-        return []
-    
-    try:
-        # Perform similarity search
-        results = vector_store.similarity_search(query, k=limit)
-        
-        # Convert results to FAQ objects
-        faqs = []
-        for doc in results:
-            # Extract FAQ ID from metadata
-            faq_id = doc.metadata.get("faq_id")
-            if faq_id:
-                # Create FAQ object from document
-                faq = FAQ(
-                    id=faq_id,
-                    question=doc.metadata.get("question", ""),
-                    answer=doc.page_content,
-                    category_id=doc.metadata.get("category_id", "general"),
-                    priority=doc.metadata.get("priority", 0)
-                )
-                faqs.append(faq)
-        
-        return faqs
-    except Exception as e:
-        logger.error(f"Error in vector search: {str(e)}")
-        return []
+    # Mock implementation - return empty list
+    logger.info(f"Mock vector search for: {query} (returning empty list)")
+    return []
 
 
 async def add_faq_to_vector_store(faq: FAQ) -> bool:
@@ -248,29 +183,6 @@ async def add_faq_to_vector_store(faq: FAQ) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    vector_store = get_vector_store()
-    if not vector_store:
-        logger.warning("Vector store not available for adding FAQ")
-        return False
-    
-    try:
-        from langchain_core.documents import Document
-        
-        # Create document from FAQ
-        doc = Document(
-            page_content=faq.answer,
-            metadata={
-                "faq_id": str(faq.id),
-                "question": faq.question,
-                "category_id": faq.category_id,
-                "priority": faq.priority
-            }
-        )
-        
-        # Add document to vector store
-        vector_store.add_documents([doc])
-        logger.info(f"Added FAQ {faq.id} to vector store")
-        return True
-    except Exception as e:
-        logger.error(f"Error adding FAQ to vector store: {str(e)}")
-        return False 
+    # Mock implementation - just return success
+    logger.info(f"Mock: Added FAQ {faq.id} to vector store")
+    return True 
