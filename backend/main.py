@@ -55,6 +55,7 @@ from app.routes.vector_search import router as vector_search
 from app.routes.upload import router as upload
 from app.routes.llm import router as llm
 from app.routes.roadmap import router as roadmap
+from app.routes.enrollments import router as enrollments  # Import new enrollments router
 
 # Apply Pydantic v1 patch for Python 3.13 compatibility
 from app.utils.pydantic_patch import apply_patch
@@ -313,23 +314,24 @@ if STATIC_DIR.exists():
     logger.info(f"Mounted static files from {STATIC_DIR}")
 
 # Include routers
-app.include_router(auth, prefix="/api", tags=["auth"])
-app.include_router(users, prefix="/api/users", tags=["users"])
-app.include_router(healthcheck, prefix="/api", tags=["system"])
-app.include_router(courses, prefix="/api/courses", tags=["courses"])
-app.include_router(module, prefix="/api/modules", tags=["modules"])
-app.include_router(assignments, prefix="/api/assignments", tags=["assignments"])
-app.include_router(academic_integrity, prefix="/api/academic-integrity", tags=["academic-integrity"])
-app.include_router(faqs, prefix="/api/faqs", tags=["faqs"])
-app.include_router(lectures, prefix="/api/lectures", tags=["lectures"])
-app.include_router(vector_search, prefix="/api/vector", tags=["search"])
-app.include_router(upload, prefix="/api/upload", tags=["files"])
-app.include_router(llm, prefix="/api/llm", tags=["llm"])
-app.include_router(roadmap, prefix="/api/roadmap", tags=["roadmap"])
-app.include_router(notification, prefix="/api/notifications", tags=["notifications"])
+app.include_router(auth, prefix="/api/v1", tags=["auth"])
+app.include_router(users, prefix="/api/v1/users", tags=["users"])
+app.include_router(healthcheck, prefix="/api/v1", tags=["system"])
+app.include_router(courses, prefix="/api/v1/courses", tags=["courses"])
+app.include_router(module, prefix="/api/v1/modules", tags=["modules"])
+app.include_router(assignments, prefix="/api/v1/assignments", tags=["assignments"])
+app.include_router(academic_integrity, prefix="/api/v1/academic-integrity", tags=["academic-integrity"])
+app.include_router(faqs, prefix="/api/v1/faqs", tags=["faqs"])
+app.include_router(lectures, prefix="/api/v1/lectures", tags=["lectures"])
+app.include_router(vector_search, prefix="/api/v1/vector", tags=["search"])
+app.include_router(upload, prefix="/api/v1/upload", tags=["files"])
+app.include_router(llm, prefix="/api/v1/llm", tags=["llm"])
+app.include_router(roadmap, prefix="/api/v1/roadmap", tags=["roadmap"])
+app.include_router(notification, prefix="/api/v1/notifications", tags=["notifications"])
+app.include_router(enrollments, prefix="/api/v1", tags=["enrollments"])  # Update prefix structure
 
 # Monitoring endpoints
-app.include_router(monitoring.router, prefix="/api/monitoring", tags=["monitoring"])
+app.include_router(monitoring.router, prefix="/api/v1/monitoring", tags=["monitoring"])
 
 # Root endpoint - optimized for faster response
 @app.get("/", include_in_schema=False)
