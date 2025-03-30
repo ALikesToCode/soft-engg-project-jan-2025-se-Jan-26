@@ -12,70 +12,12 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from app.validators.llm_validator import LLMInputValidator
 from app.models.user import User
 from app.services.function_router import function_router
+from app.services.llm_service import create_llm_app
 from app.utils.openapi import get_openapi
 from app.routes.auth import get_current_user
 import logging
 
 logger = logging.getLogger(__name__)
-
-# Initialize chat model
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    google_api_key=os.getenv("GOOGLE_API_KEY")
-)
-
-# System message to help Gemini understand available functions
-prompt = """You are a sophisticated AI teaching assistant for  courses with access to specialized functions to enhance your capabilities.
-
-## Primary Role and Responsibilities
-- Provide clear, accurate, and thoughtful responses to academic queries related to the course
-- Help students understand complex technical concepts with clear explanations and examples
-- Assist faculty with course-related information and resource access
-- Support both theoretical knowledge and practical application questions
-
-## When Responding to Users
-1. ANALYZE: First carefully analyze the query using your core knowledge of the course
-2. STRATEGIZE: Determine which knowledge source is most appropriate:
-   - Your built-in knowledge for general concepts, theories, and fundamentals
-   - Course-specific materials for curriculum questions (via query_course_materials)
-   - FAQ database for common questions (via search_faqs or vector_search_faqs)
-   - Web search for current industry trends, tools, or external resources
-3. RETRIEVE: If needed, call appropriate functions to get specialized information:
-   - Use query_course_materials for course-specific content (PDFs, lectures, assignments)
-   - Use search_faqs or vector_search_faqs for frequently asked questions
-   - Use web_search for current tech trends, documentation, or external references
-4. SYNTHESIZE: Integrate all information sources:
-   - Provide comprehensive answers that blend your knowledge with retrieved information
-   - Present a coherent, well-structured response that directly addresses the user's needs
-   - Cite specific sources when referencing course materials, FAQs, or web content
-
-## Function Usage Guidelines
-- query_course_materials: PRIMARY function for course-specific questions about  curriculum, assignments, lectures, or textbook content
-- search_faqs: For finding answers to common questions using both keyword and semantic search
-- vector_search_faqs: For more advanced semantic search of FAQs when regular search doesn't yield good results
-- web_search: For supplementary information on current technologies, libraries, frameworks, or industry practices
-
-## Response Quality Standards
-- Be precise and technically accurate in all explanations
-- Use appropriate course terminology
-- Structure complex topics logically with clear examples
-- Provide practical context when explaining theoretical concepts
-- If uncertain, acknowledge limitations rather than providing potentially incorrect information
-
-Remember: Your goal is to facilitate deep understanding of the course concepts while providing high-quality academic assistance tailored to the user's specific needs."""
-
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-prompt_template = ChatPromptTemplate.from_messages(
-    [   ("system", prompt),
-        MessagesPlaceholder(variable_name="messages")
-    ]
-)
-
-from langgraph.graph import START, MessagesState, StateGraph
-async def call_llm(state: MessagesState):
-    prompt = await prompt_template.ainvoke(state)
-    response = await llm.ainvoke(prompt)
-    return {"messages": state["messages"] + [response]}
 
 # LangGraph lifecycle setup
 from psycopg_pool import AsyncConnectionPool
@@ -88,15 +30,15 @@ llmapp = None
 
 router = APIRouter()
 
-from pydantic import BaseModel
+# Schema definitions
+class FunctionCall(BaseModel):
+    """Schema for function call data"""
+    name: str
+    arguments: Dict[str, Any]
+
 class LLMRequest(BaseModel):
     id: str
     query: str
-
-class FunctionCall(BaseModel):
-    """Schema for function calls made by Gemini"""
-    name: str
-    arguments: Dict[str, Any]
 
 class LLMResponse(BaseModel):
     """Schema for LLM responses that may include function calls"""

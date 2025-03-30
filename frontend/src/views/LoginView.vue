@@ -223,6 +223,8 @@
 <script>
 import { authService } from '@/api/authService'
 import { useToast } from 'vue-toastification'
+import { ROLE } from '@/AppConstants/globalConstants'
+import rolePaths from '@/AppConstants/rolePaths'
 
 export default {
   name: 'LoginView',
@@ -280,16 +282,43 @@ export default {
       this.loading = true
       try {
         const response = await authService.loginWithEmail(this.form.email, this.form.password);
-        if (response.success === false) {
-          // Login failed, show toast instead of redirecting
-          this.toast.error(response.message || 'Login failed. Please check your credentials.');
+        
+        // Check if login failed
+        if (!response || response.success === false) {
+          // Login failed, show toast notification
+          this.toast.error(response?.message || 'Login failed. Please check your credentials.');
           return;
         }
         
-        // Login successful
-        this.$router.push('/dashboard');
+        // Login successful - get user data to determine correct dashboard
+        try {
+          const userData = await authService.getCurrentUser();
+          if (!userData) {
+            this.toast.error('Unable to retrieve user data');
+            return;
+          }
+          
+          // Get user role and determine correct dashboard path
+          const userRole = userData.role?.toUpperCase();
+          let dashboardPath = '/dashboard'; // Default fallback
+          
+          // Use rolePaths to properly redirect based on role
+          if (userRole === ROLE.STUDENT) {
+            dashboardPath = rolePaths.STUDENT.dashboard;
+          } else if (userRole === ROLE.FACULTY) {
+            dashboardPath = rolePaths.FACULTY.dashboard;
+          } else if (userRole === ROLE.SUPPORT || userRole === 'ADMIN') {
+            dashboardPath = rolePaths.SUPPORT.dashboard;
+          }
+          
+          console.log(`Login successful. Redirecting to ${dashboardPath} based on role: ${userRole}`);
+          this.$router.push(dashboardPath);
+        } catch (userError) {
+          console.error('Error getting user data:', userError);
+          this.toast.error('Error loading user data after login');
+        }
       } catch (error) {
-        console.error('Login error:', error)
+        console.error('Login error:', error);
         this.toast.error('Login failed. Please try again later.');
       } finally {
         this.loading = false

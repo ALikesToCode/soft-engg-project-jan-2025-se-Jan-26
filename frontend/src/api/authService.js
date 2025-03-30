@@ -24,13 +24,24 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
     (config) => {
         // Skip adding token for login requests
-        if (config.url.includes('/auth/login')) {
+        if (config.url && config.url.includes('/auth/login')) {
             return config;
         }
+        
         const token = localStorage.getItem('token');
         if (token) {
+            // Clean up token - remove quotes and any 'Bearer ' prefix
+            let cleanToken = token;
+            
             // Remove quotes if token is stored as JSON string
-            const cleanToken = token.replace(/^"|"$/g, '');
+            cleanToken = cleanToken.replace(/^"|"$/g, '');
+            
+            // Remove Bearer prefix if it was accidentally stored with the token
+            if (cleanToken.startsWith('Bearer ')) {
+                cleanToken = cleanToken.substring(7);
+            }
+            
+            // Add the proper Authorization header
             config.headers.Authorization = `Bearer ${cleanToken}`;
             logger.debug(`Request to ${config.url} - Adding Authorization header: Bearer ${cleanToken.substring(0, 15)}...`);
         } else {
@@ -91,30 +102,43 @@ export const authService = {
             formData.append('password', password);
             console.log('Login Request Data:', { username: email, password });
 
-            const response = await this.axiosInstance.post(`${API_URL}${API_PREFIX}/auth/login`, new URLSearchParams({ username: email, password }));
+            // Fix: Use proper relative URL and formData directly
+            const response = await this.axiosInstance.post('/auth/login', formData, {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+            
             logger.log('Login successful');
             logger.debug('User data:', response.data);
             
             // Save auth data
             localStorage.setItem('token', response.data.access_token);
             
-            // Save user role if available
-            if (response.data.user_role) {
-                localStorage.setItem('userRole', response.data.user_role.toUpperCase());
+            // Save user role if available from user object
+            if (response.data.user && response.data.user.role) {
+                localStorage.setItem('userRole', response.data.user.role.toUpperCase());
             }
             
-            return response.data;
+            return {
+                success: true,
+                access_token: response.data.access_token,
+                user: response.data.user
+            };
         } catch (error) {
             logger.error('Error logging in with email and password:', error.message);
             if (error.response) {
                 logger.error(`Status: ${error.response.status}, Data:`, error.response.data);
                 return {
                     success: false,
-                    message: error.response.data?.detail || 'Login failed',
+                    message: error.response.data?.detail || 'Login failed. Please check your credentials.',
                     status: error.response.status
                 };
             }
-            return { success: false, message: 'Network error while logging in' };
+            return { 
+                success: false, 
+                message: 'Network error while logging in' 
+            };
         }
     },
 
@@ -149,33 +173,42 @@ export const authService = {
                 this._cachedUserData = null;
             }
 
-            const response = await this.axiosInstance.get('/auth/me');
-            logger.log('Current user data retrieved successfully');
-            logger.debug('User data:', response.data);
-            
-            // Cache the user data for subsequent calls within the same session
-            this._cachedUserData = response.data;
-            
-            // Update local storage with user role if it exists
-            if (response.data && response.data.role) {
-                localStorage.setItem('userRole', response.data.role.toUpperCase());
-                logger.debug(`Updated userRole in localStorage: ${response.data.role.toUpperCase()}`);
-            }
-            
-            return response.data;
-        } catch (error) {
-            logger.error('Error getting current user:', error.message);
-            if (error.response) {
-                logger.error(`Status: ${error.response.status}, Data:`, error.response.data);
-
-                // If unauthorized, clear token
-                if (error.response.status === 401) {
+            // Make the request to the backend
+            try {
+                const response = await this.axiosInstance.get('/auth/me');
+                logger.log('Current user data retrieved successfully');
+                logger.debug('User data:', response.data);
+                
+                // Cache the user data for subsequent calls within the same session
+                this._cachedUserData = response.data;
+                
+                // Update local storage with user role if it exists
+                if (response.data && response.data.role) {
+                    localStorage.setItem('userRole', response.data.role.toUpperCase());
+                    logger.debug(`Updated userRole in localStorage: ${response.data.role.toUpperCase()}`);
+                }
+                
+                return response.data;
+            } catch (apiError) {
+                logger.error('Response error from /auth/me:', apiError.response?.status, apiError.response?.data);
+                
+                // If unauthorized, clear token and retry login
+                if (apiError.response?.status === 401) {
+                    logger.warn('Unauthorized access detected - token may be invalid or expired');
+                    logger.error('Error getting current user:', apiError.message);
+                    logger.error('Status:', apiError.response?.status, 'Data:', apiError.response?.data);
+                    
+                    // Clear invalid token data
                     logger.warn('Unauthorized - clearing invalid token');
                     localStorage.removeItem('token');
                     localStorage.removeItem('userRole');
                     this._cachedUserData = null;
                 }
+                
+                return null;
             }
+        } catch (error) {
+            logger.error('Error getting current user:', error.message);
             return null;
         }
     },

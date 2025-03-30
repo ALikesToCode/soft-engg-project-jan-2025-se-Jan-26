@@ -22,6 +22,22 @@ export default {
     const status = ref('Please wait while we complete your login.')
     const router = useRouter()
 
+    // Helper function to convert backend role to frontend role format
+    const mapBackendRoleToFrontend = (backendRole) => {
+      if (!backendRole) return ROLE.STUDENT;
+      
+      switch(backendRole.toLowerCase()) {
+        case 'faculty':
+          return ROLE.FACULTY;
+        case 'support':
+        case 'admin':
+          return ROLE.SUPPORT;
+        case 'student':
+        default:
+          return ROLE.STUDENT;
+      }
+    }
+
     onMounted(async () => {
       try {
         // Get auth store
@@ -50,65 +66,19 @@ export default {
         localStorage.setItem('token', access_token);
         status.value = "Token received. Setting up your account...";
         
-        // Save user role if available and convert it properly to match ROLE constants
+        // Save user role if available
         if (user_role) {
-          // Convert backend role format to frontend ROLE constant format
-          let formattedRole;
-          switch(user_role.toLowerCase()) {
-            case 'student':
-              formattedRole = ROLE.STUDENT; // STUDENT constant
-              break;
-            case 'faculty':
-              formattedRole = ROLE.FACULTY; // FACULTY constant
-              break;
-            case 'support':
-              formattedRole = ROLE.SUPPORT; // SUPPORT constant
-              break;
-            case 'admin':
-              formattedRole = ROLE.SUPPORT; // Admin users use SUPPORT dashboard
-              break;
-            default:
-              formattedRole = ROLE.STUDENT; // Default if unknown
-          }
-          
-          // Save role to localStorage and update store
-          authStore.setUserRole(formattedRole);
-          console.log(`User role set to: ${formattedRole} from backend role: ${user_role}`);
+          const frontendRole = mapBackendRoleToFrontend(user_role);
+          authStore.setUserRole(frontendRole);
+          console.log(`User role set to: ${frontendRole} from backend role: ${user_role}`);
         }
-        
-        // Check for redirect path from localStorage
-        const redirectPath = localStorage.getItem('loginRedirectPath');
-        
-        // Determine where to redirect the user based on role
-        let targetPath;
         
         // Handle password_needed first if applicable
         if (password_needed) {
-          // Redirect to set password page
           console.log("User needs to set a password, redirecting to password setup");
-          targetPath = '/set-password';
-        } else if (redirectPath && redirectPath.includes('/monitoring') && (user_role === 'support' || user_role === 'admin')) {
-          // If there's a redirect path to monitoring and user has support/admin role, go there
-          targetPath = redirectPath;
-        } else {
-          // Get current role from store to ensure we're using the latest value
-          const role = authStore.userRole;
-          console.log(`Current role in auth store for redirection: ${role}`);
-          
-          // Use rolePaths for consistent redirects based on role constants
-          if (role === ROLE.SUPPORT) {
-            targetPath = rolePaths.SUPPORT.dashboard;
-          } else if (role === ROLE.FACULTY) {
-            targetPath = rolePaths.FACULTY.dashboard;
-          } else {
-            targetPath = rolePaths.STUDENT.dashboard;
-          }
-          
-          console.log(`Redirecting to ${targetPath} based on role: ${role}`);
+          setTimeout(() => router.push('/set-password'), 1000);
+          return;
         }
-        
-        // Clear stored redirect path
-        localStorage.removeItem('loginRedirectPath');
         
         status.value = "Getting user information...";
         
@@ -119,37 +89,39 @@ export default {
             throw new Error("Failed to get user data");
           }
           
-          // Update role from user data if available (most accurate source)
+          // Update role from user data (most accurate source)
           if (userData.role) {
-            // Convert backend role to frontend format
-            let updatedRole;
-            switch(userData.role.toLowerCase()) {
-              case 'faculty':
-                updatedRole = ROLE.FACULTY;
-                break;
-              case 'support':
-              case 'admin':
-                updatedRole = ROLE.SUPPORT;
-                break;
-              default: 
-                updatedRole = ROLE.STUDENT;
-            }
-            
-            // Update store with the latest role
+            const updatedRole = mapBackendRoleToFrontend(userData.role);
             authStore.setUserRole(updatedRole);
-            
-            // Re-determine target path based on updated role
-            if (updatedRole === ROLE.SUPPORT) {
-              targetPath = rolePaths.SUPPORT.dashboard;
-            } else if (updatedRole === ROLE.FACULTY) {
-              targetPath = rolePaths.FACULTY.dashboard;
-            } else {
-              targetPath = rolePaths.STUDENT.dashboard;
-            }
-            console.log(`Updated redirection to ${targetPath} based on user data role: ${updatedRole}`);
+            console.log(`Role updated from user data: ${updatedRole}`);
           }
           
+          // Check for redirect path from localStorage
+          const redirectPath = localStorage.getItem('loginRedirectPath');
+          let targetPath;
+          
+          if (redirectPath && redirectPath.includes('/monitoring') && authStore.userRole === ROLE.SUPPORT) {
+            // If there's a redirect path to monitoring and user has support role, go there
+            targetPath = redirectPath;
+          } else {
+            // Use rolePaths for consistent redirects based on role
+            switch(authStore.userRole) {
+              case ROLE.SUPPORT:
+                targetPath = rolePaths.SUPPORT.dashboard;
+                break;
+              case ROLE.FACULTY:
+                targetPath = rolePaths.FACULTY.dashboard;
+                break;
+              default:
+                targetPath = rolePaths.STUDENT.dashboard;
+            }
+          }
+          
+          // Clear stored redirect path
+          localStorage.removeItem('loginRedirectPath');
+          
           status.value = "Authentication successful! Redirecting...";
+          console.log(`Redirecting to ${targetPath} based on role: ${authStore.userRole}`);
           
           // Give a small delay to show success message
           setTimeout(() => router.push(targetPath), 1000);

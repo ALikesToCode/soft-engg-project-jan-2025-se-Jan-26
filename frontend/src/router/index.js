@@ -6,6 +6,7 @@ import supportRoutes from './supportRoutes';
 import { authService } from '@/api/authService'
 import useAuthStore from '@/stores/useAuthStore'
 import { ROLE } from '@/AppConstants/globalConstants'
+import rolePaths from '@/AppConstants/rolePaths'
 import LoginView from '../views/LoginView.vue'
 import AuthCallback from '../views/AuthCallback.vue'
 
@@ -199,78 +200,73 @@ router.beforeEach(async (to, from, next) => {
     localStorage.setItem('loginRedirectPath', to.fullPath);
   }
 
-  // Special handling for support paths
-  if (to.path.startsWith('/support')) {
-    try {
-      const isAuthenticated = await authService.isAuthenticated();
-      console.log(`Auth check for support route: authenticated = ${isAuthenticated}`);
-      
-      if (!isAuthenticated) {
-        // Not authenticated, redirect to login
-        console.log('Not authenticated, redirecting to login');
-        next({
-          path: '/login',
-          query: { redirect: to.fullPath }
-        });
-        return;
-      }
-      
-      const hasSupportRole = authService.hasSupportRole();
-      console.log(`Support role check: ${hasSupportRole}`);
-      
-      if (!hasSupportRole) {
-        // Authenticated but not support role
-        console.log('Not support role, redirecting to dashboard');
-        next({ path: '/dashboard' });
-        return;
-      }
-      
-      // User is authenticated and has support role
-      console.log('User is authenticated and has support role');
-      next();
-      return;
-    } catch (error) {
-      console.error('Error in navigation guard for support routes:', error);
-      next('/login');
+  try {
+    const isAuthenticated = await authService.isAuthenticated();
+    console.log(`Auth check: authenticated = ${isAuthenticated}`);
+    
+    if (!isAuthenticated) {
+      // Not authenticated, redirect to login
+      console.log('Not authenticated, redirecting to login');
+      next({
+        path: '/login',
+        query: { redirect: to.fullPath }
+      });
       return;
     }
-  }
-  
-  // Handle other routes with requiresAuth meta
-  if (to.matched.some(record => record.meta.requiresAuth)) {
-    try {
-      const isAuthenticated = await authService.isAuthenticated();
-      console.log(`Auth check for protected route: authenticated = ${isAuthenticated}`);
+    
+    // User is authenticated, now check for role-specific paths
+    const authStore = useAuthStore();
+    const userRole = authStore.userRole;
+    
+    // Handle role-specific paths
+    if (to.path.startsWith('/support') && userRole !== ROLE.SUPPORT) {
+      console.log('Attempting to access support route without support role');
+      next({ path: rolePaths.STUDENT.dashboard });
+      return;
+    }
+    
+    if (to.path.startsWith('/faculty') && userRole !== ROLE.FACULTY) {
+      console.log('Attempting to access faculty route without faculty role');
+      next({ path: rolePaths.STUDENT.dashboard });
+      return;
+    }
+    
+    if (to.path.startsWith('/user') && userRole === ROLE.SUPPORT) {
+      console.log('Support user attempting to access student route');
+      next({ path: rolePaths.SUPPORT.dashboard });
+      return;
+    }
+    
+    if (to.path.startsWith('/user') && userRole === ROLE.FACULTY) {
+      console.log('Faculty user attempting to access student route');
+      next({ path: rolePaths.FACULTY.dashboard });
+      return;
+    }
+    
+    // Check for role requirements if specified in meta
+    if (to.meta.role) {
+      const hasRequiredRole = authService.hasRole(to.meta.role);
+      console.log(`Role check for ${to.meta.role}: ${hasRequiredRole}`);
       
-      if (!isAuthenticated) {
-        console.log('Not authenticated, redirecting to login');
-        next({
-          path: '/login',
-          query: { redirect: to.fullPath }
-        });
-        return;
-      }
-      
-      // Check for role requirements if specified in meta
-      if (to.meta.role) {
-        const hasRequiredRole = authService.hasRole(to.meta.role);
-        console.log(`Role check for ${to.meta.role}: ${hasRequiredRole}`);
-        
-        if (!hasRequiredRole) {
-          // User is authenticated but doesn't have the required role
-          console.log('User does not have required role, redirecting to dashboard');
-          next({ path: '/dashboard' });
-          return;
+      if (!hasRequiredRole) {
+        // Redirect to appropriate dashboard based on actual role
+        console.log('User does not have required role, redirecting to dashboard');
+        if (userRole === ROLE.SUPPORT) {
+          next({ path: rolePaths.SUPPORT.dashboard });
+        } else if (userRole === ROLE.FACULTY) {
+          next({ path: rolePaths.FACULTY.dashboard });
+        } else {
+          next({ path: rolePaths.STUDENT.dashboard });
         }
+        return;
       }
-      
-      next();
-    } catch (error) {
-      console.error('Error in navigation guard for protected route:', error);
-      next('/login');
     }
-  } else {
+    
+    // User is authenticated and has proper role access
     next();
+  } catch (error) {
+    console.error('Error in navigation guard:', error);
+    next('/login');
   }
 })
 
