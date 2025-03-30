@@ -155,9 +155,17 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("Default users already initialized, skipping")
         
-        # Start monitoring service background tasks
+        # Start monitoring service background tasks with timeout
         logger.info("Starting monitoring service...")
-        await monitoring_service.start_background_tasks()
+        try:
+            # Add a timeout to prevent hanging on monitoring startup
+            monitoring_task = asyncio.create_task(monitoring_service.start_background_tasks())
+            await asyncio.wait_for(monitoring_task, timeout=5.0)
+            logger.info("Monitoring service started successfully")
+        except asyncio.TimeoutError:
+            logger.warning("Monitoring service startup timed out - continuing anyway")
+        except Exception as e:
+            logger.error(f"Error starting monitoring service: {str(e)} - continuing anyway")
 
         # Set up database connection
         logger.info("Setting up database connection...")
@@ -227,8 +235,17 @@ async def lifespan(app: FastAPI):
             # Verify and create schemas
             await verify_and_create_schemas(pool)
             
-            # Start cleanup task for redis cache
-            await start_cleanup_task()
+            # Start cleanup task for redis cache with timeout
+            try:
+                # Add a timeout to prevent hanging on cache startup
+                cleanup_task = asyncio.create_task(start_cleanup_task())
+                # Wait for the task to complete with a timeout
+                await asyncio.wait_for(cleanup_task, timeout=5.0)
+                logger.info("Redis cache cleanup task started")
+            except asyncio.TimeoutError:
+                logger.warning("Redis cache cleanup task startup timed out - continuing anyway")
+            except Exception as e:
+                logger.warning(f"Failed to start Redis cache cleanup task: {str(e)} - continuing anyway")
             
             logger.info("Application startup completed successfully")
             
