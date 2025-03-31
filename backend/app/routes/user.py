@@ -392,7 +392,7 @@ async def get_user_course_content(
 @router.get("/courses", response_model=List[CourseResponse])
 @async_cache(ttl=30, key_prefix="dashboard")  # Cache for 30 seconds
 async def get_user_courses(
-    current_user: User = Depends(get_current_user), 
+    current_user: dict = Depends(get_current_user), 
     db: AsyncSession = Depends(get_db)
 ):
     """Get all courses for the current user with optimized query"""
@@ -407,7 +407,7 @@ async def get_user_courses(
             CourseEnrollment, 
             CourseEnrollment.course_id == Course.id
         ).where(
-            CourseEnrollment.user_id == current_user.id
+            CourseEnrollment.user_id == current_user["sub"]
         ).options(
             selectinload(Course.modules)  # Eager load modules
         ).order_by(
@@ -433,14 +433,14 @@ async def get_user_courses(
 @router.get("/bookmarked-materials", response_model=List[BookmarkedMaterialResponse])
 @async_cache(ttl=60, key_prefix="dashboard")  # Cache for 60 seconds
 async def get_bookmarked_materials(
-    current_user: User = Depends(get_current_user), 
+    current_user: dict = Depends(get_current_user), 
     db: AsyncSession = Depends(get_db),
     limit: int = Query(50, description="Maximum number of bookmarks to return")
 ):
     """Get bookmarked materials for the current user with optimized query"""
     try:
         query = select(BookmarkedMaterials).where(
-            BookmarkedMaterials.user_id == current_user.id
+            BookmarkedMaterials.user_id == current_user["sub"]
         ).order_by(
             BookmarkedMaterials.date_bookmarked.desc()
         ).limit(limit)
@@ -456,14 +456,14 @@ async def get_bookmarked_materials(
 @router.get("/recommended-courses", response_model=List[UserRecommendedCourseResponse])
 @async_cache(ttl=300, key_prefix="dashboard")  # Cache for 5 minutes
 async def get_recommended_courses(
-    current_user: User = Depends(get_current_user), 
+    current_user: dict = Depends(get_current_user), 
     db: AsyncSession = Depends(get_db),
     limit: int = Query(10, description="Maximum number of recommendations to return")
 ):
     """Get recommended courses for the current user with optimized query"""
     try:
         query = select(UserRecommendedCourses).where(
-            UserRecommendedCourses.user_id == current_user.id
+            UserRecommendedCourses.user_id == current_user["sub"]
         ).limit(limit)
         
         result = await db.execute(query)

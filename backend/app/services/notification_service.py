@@ -134,13 +134,16 @@ class NotificationService:
             logger.info(f"You do not have permission to send this notification")
             raise HTTPException(status_code=403, detail="You are forbidden to user the resource")
         try:
+            # Use the timestamp from notification_content if available, otherwise use current UTC time
+            timestamp = getattr(notification_content, 'timestamp', None) or datetime.utcnow()
+            
             notification = CourseNotification(
                 type=notification_content.type,
                 priority=notification_content.priority,
                 category=notification_content.category,
                 title=notification_content.title,
                 message=notification_content.message,
-                timestamp=datetime.utcnow(),
+                timestamp=timestamp,
                 course_id=notification_content.courseId,
                 sent_by = user_id
             )
@@ -192,13 +195,16 @@ class NotificationService:
             logger.info(f"You do not have permission to send this notification")
             raise HTTPException(status_code=403, detail="You are forbidden to user the resource")
         try:
+            # Use the timestamp from sys_notification_content if available, otherwise use current UTC time
+            timestamp = getattr(sys_notification_content, 'timestamp', None) or datetime.utcnow()
+            
             sys_notification = SystemNotification(
                 type=sys_notification_content.type,
                 priority=sys_notification_content.priority,
                 category=sys_notification_content.category,
                 title=sys_notification_content.title,
                 message=sys_notification_content.message,
-                timestamp=datetime.utcnow(),
+                timestamp=timestamp,
                 sent_by = user_id
             )
             logger.info("Going to insert in SystemNotification table")

@@ -1,8 +1,15 @@
 const formatDateFunc = (date) => {
-    const d = new Date(date)
-    if (isNaN(d.getTime())) {
-        throw new Error("Invalid date format");
+    // Check for null or undefined
+    if (date === null || date === undefined) {
+        return 'N/A';
     }
+    
+    const d = new Date(date);
+    if (isNaN(d.getTime())) {
+        console.warn("Invalid date format:", date);
+        return 'Invalid date';
+    }
+    
     const months = [
         'Jan',
         'Feb',

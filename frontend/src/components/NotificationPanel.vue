@@ -290,7 +290,7 @@ export default {
       try {
         const type = notification.notification_type
         const id = notification.notification_id
-        const response = await api.delete(`/notifications/delete/${type}/${id}`, headers)
+        const response = await api.delete(`/api/v1/notifications/delete/${type}/${id}`, headers)
         this.notifications = this.notifications.filter(
           (n) => n.notification_id !== notification.notification_id,
         )
@@ -331,7 +331,7 @@ export default {
         },
       }
       try {
-        const response = await api.get('/notifications', headers)
+        const response = await api.get('/api/v1/notifications', headers)
         response.data.forEach((notif) => {
           this.notifications.push(notif)
         })
@@ -347,51 +347,56 @@ export default {
 
       const headers = {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
         },
       }
       try {
         const type = notification.notification_type
         const id = notification.notification_id
-        const response = await api.put(`/notifications/${type}/${id}`, {}, headers)
-        if (response.data) {
-          console.log(response.data)
-          notification.read = true
-        }
+        const response = await api.put(`/api/v1/notifications/${type}/${id}`, {}, headers)
+        notification.read = true
+        this.$emit('update:unread-count', this.unreadCount)
+        return response.data
       } catch (error) {
         throw error
-      } finally {
       }
     },
     async markAllNotificationsAsRead() {
+      this.isLoading = true
       const token = localStorage.getItem('token')
       if (!token) throw new Error('No authentication token found')
 
-      // Collect all unread notification IDs
-      const unreadNotificationIds = this.notifications
+      const notificationsToUpdate = this.notifications
         .filter((n) => !n.read)
-        .map((n) => ({ id: n.notification_id, type: n.notification_type }))
+        .map((n) => ({
+          id: n.notification_id,
+          type: n.notification_type,
+        }))
 
-      if (unreadNotificationIds.length === 0) return // No unread notifications
+      if (notificationsToUpdate.length === 0) {
+        this.isLoading = false
+        return
+      }
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
 
       try {
-        const response = await api.put(
-          '/notifications/mark-all',
-          { notifications: unreadNotificationIds }, // Send an array of IDs
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          },
-        )
-
-        if (response.data.success) {
-          this.notifications.forEach((n) => (n.read = true)) // Mark all as read in UI
-          this.$emit('update:unread-count', 0)
+        const payload = {
+          notifications: notificationsToUpdate,
         }
+        await api.put('/api/v1/notifications/mark-all', payload, headers)
+        this.notifications.forEach((n) => {
+          n.read = true
+        })
+        this.$emit('update:unread-count', 0)
       } catch (error) {
-        console.error('Error marking notifications as read:', error)
+        throw error
+      } finally {
+        this.isLoading = false
       }
     },
   },

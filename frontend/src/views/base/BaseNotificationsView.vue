@@ -124,6 +124,7 @@ export default {
       this.recentNotifications.unshift({
         id: Date.now(),
         ...notification,
+        timestamp: new Date().toISOString(),
         createdAt: new Date(),
       })
     },

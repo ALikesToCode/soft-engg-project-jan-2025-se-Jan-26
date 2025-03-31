@@ -39,7 +39,7 @@ export const useFaqStore = defineStore('faq', () => {
       loading.value = true
       const token = localStorage.getItem('token');
       // console.log('Token:', token);
-      const response = await axios.get(`${API_URL}${API_PREFIX}/faqs`, {
+      const response = await axios.get(`${API_URL}${API_PREFIX}/faqs/faqs`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -59,7 +59,7 @@ export const useFaqStore = defineStore('faq', () => {
     try {
       loading.value = true
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_URL}${API_PREFIX}/faqs`, faqData, {
+      const response = await axios.post(`${API_URL}${API_PREFIX}/faqs/faqs`, faqData, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -78,7 +78,7 @@ export const useFaqStore = defineStore('faq', () => {
     try {
       loading.value = true
       const token = localStorage.getItem('token');
-      const response = await axios.put(`${API_URL}${API_PREFIX}/faqs/${faqId}`, faqData, {
+      const response = await axios.put(`${API_URL}${API_PREFIX}/faqs/faqs/${faqId}`, faqData, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -100,7 +100,7 @@ export const useFaqStore = defineStore('faq', () => {
     try {
       loading.value = true
       const token = localStorage.getItem('token');
-      await axios.delete(`${API_URL}${API_PREFIX}/faqs/${faqId}`, {
+      await axios.delete(`${API_URL}${API_PREFIX}/faqs/faqs/${faqId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -118,7 +118,7 @@ export const useFaqStore = defineStore('faq', () => {
     try {
       loading.value = true
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_URL}${API_PREFIX}/faqs/${faqId}/rate`, { isHelpful }, {
+      const response = await axios.post(`${API_URL}${API_PREFIX}/faqs/faqs/${faqId}/rate`, { isHelpful }, {
         headers: {
           Authorization: `Bearer ${token}`
         }

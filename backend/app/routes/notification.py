@@ -22,6 +22,7 @@ class CourseNotification(BaseModel):
     title: str
     message: str
     courseId: UUID4
+    timestamp: Optional[datetime] = None
 
     class Config:
         orm_mode = True
@@ -33,6 +34,7 @@ class SystemNotification(BaseModel):
     category: str
     title: str
     message: str
+    timestamp: Optional[datetime] = None
 
     class Config:
         orm_mode = True

@@ -3,7 +3,7 @@ import { API_ROUTES } from '@/config/api.routes'
 import api from '@/utils/api'
 
 // Fixing API paths by removing duplicate /api/v1/
-const API_PATH_NOTIFICATIONS = '/notifications';
+const API_PATH_NOTIFICATIONS = '/api/v1/notifications';
 
 export const FacultyNotificationService = {
   // Get faculty notifications
@@ -28,10 +28,16 @@ export const FacultyNotificationService = {
   async createNotification(notificationData, headers) {
     console.log(`Inside notificationService.createNotification to send request at ${API_PATH_NOTIFICATIONS}/course/send`)
     try {
-      console.log(notificationData)
+      // Ensure the notification has a timestamp
+      const dataWithTimestamp = {
+        ...notificationData,
+        timestamp: notificationData.timestamp || new Date().toISOString()
+      };
+      
+      console.log(dataWithTimestamp);
       const response = await api.post(
         `${API_PATH_NOTIFICATIONS}/course/send`,
-        notificationData,
+        dataWithTimestamp,
         headers
       );
       console.log("Notification Sent, Response:", response);
@@ -45,17 +51,22 @@ export const FacultyNotificationService = {
   //Support System Notification
   async createSystemNotification(notificationData, headers) {
     try {
-      console.log(notificationData)
+      // Ensure the notification has a timestamp
+      const dataWithTimestamp = {
+        ...notificationData,
+        timestamp: notificationData.timestamp || new Date().toISOString()
+      };
+      
+      console.log(dataWithTimestamp);
       const response = await api.post(
         `${API_PATH_NOTIFICATIONS}/system/send`,
-        notificationData,
+        dataWithTimestamp,
         headers
       );
       return response;
     } catch (error) {
       console.error("Error sending system notification:", error.response?.data || error.message);
       throw error;
-
     }
   },
 

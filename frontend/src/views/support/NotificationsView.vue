@@ -95,7 +95,7 @@ export default {
           //API call to save system notification for support
           console.log('coming here for support system notif')
           try {
-            response = await FacultyNotificationService.createSystemNotification(
+            const response = await FacultyNotificationService.createSystemNotification(
               notification,
               headers,
             )
