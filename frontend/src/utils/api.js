@@ -4,7 +4,7 @@ import { API_URL } from '@/config/constants'
 
 // Create custom axios instance with the base URL
 const api = axios.create({
-  baseURL: `${API_URL}/api/v1`,
+  baseURL: API_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

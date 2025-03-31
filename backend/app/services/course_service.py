@@ -651,10 +651,11 @@ class CourseService:
         total_course_count = 0
         for course, enrollment in result:
             total_course_count += 1
-            if(enrollment.status != 'COMPLETED'):
-                continue
+            # Get instructor info
             instructor_data = await db.execute(select(User).where(User.id==course.faculty_id))
-            instructor_name = instructor_data.scalars().first().name
+            instructor = instructor_data.scalars().first()
+            instructor_name = instructor.name if instructor else "Unknown"
+            
             courses.append({
                 "id": str(course.id),
                 "name": course.name,
@@ -663,16 +664,18 @@ class CourseService:
                 "status": enrollment.status,
                 "grade": enrollment.grade,
                 "credits": course.credits,
-                "instructor":instructor_name,
-                "description":course.description,
-                "completion_date":enrollment.completion_date,
-                "certificate_url":enrollment.certificate_url,
-                "total_enrolled_course":total_course_count
+                "instructor": instructor_name,
+                "description": course.description,
+                "completion_date": enrollment.completion_date,
+                "certificate_url": enrollment.certificate_url,
+                "enrollment_date": enrollment.enrollment_date,
+                "progress": enrollment.progress,
+                "last_activity": enrollment.last_activity
             })
         
-        # Safely add the total count to the last item if we have any courses
-        if courses:
-            courses[-1]["total_enrolled_course"] = total_course_count
+        # Add the total count to all courses
+        for course in courses:
+            course["total_enrolled_course"] = total_course_count
         
         return courses
 

@@ -100,7 +100,7 @@ export const authService = {
             const formData = new URLSearchParams();
             formData.append('username', email);
             formData.append('password', password);
-            console.log('Login Request Data:', { username: email, password });
+            console.log('Login Request Data:', { username: email, password: '*****' });
 
             // Fix: Use proper relative URL and formData directly
             const response = await this.axiosInstance.post('/login', formData, {
@@ -115,9 +115,17 @@ export const authService = {
             // Save auth data
             localStorage.setItem('token', response.data.access_token);
             
-            // Save user role if available from user object
+            // Debug full response to see actual structure
+            console.log('Full login response structure:', JSON.stringify(response.data, null, 2));
+            
+            // Save user role if available from user object - ALWAYS NORMALIZE TO UPPERCASE
             if (response.data.user && response.data.user.role) {
-                localStorage.setItem('userRole', response.data.user.role.toUpperCase());
+                const originalRole = response.data.user.role;
+                const normalizedRole = originalRole.toUpperCase();
+                localStorage.setItem('userRole', normalizedRole);
+                console.log(`User role from login: Original=${originalRole}, Normalized=${normalizedRole}`);
+            } else {
+                console.warn('No role found in login response user object');
             }
             
             return {
@@ -175,32 +183,46 @@ export const authService = {
 
             // Make the request to the backend
             try {
-                // Remove the duplicate /api/v1 prefix since it's already in the baseURL
+                // The correct endpoint should be /user/profile (not using /api/v1)
                 const response = await this.axiosInstance.get('/user/profile');
                 logger.log('Current user data retrieved successfully');
-                logger.debug('User data:', response.data);
                 
-                // Cache the user data for subsequent calls within the same session
-                this._cachedUserData = response.data;
-                
-                // Update local storage with user role if it exists
-                if (response.data && response.data.role) {
-                    localStorage.setItem('userRole', response.data.role.toUpperCase());
-                    logger.debug(`Updated userRole in localStorage: ${response.data.role.toUpperCase()}`);
+                if (!response.data) {
+                    logger.warn('User profile API returned empty response');
+                    return null;
                 }
                 
-                return response.data;
+                // Log the original data for debugging
+                logger.debug('Raw user data from API:', response.data);
+                
+                // Create a well-formed user object with consistent properties
+                const userData = {
+                    id: response.data.id || '',
+                    email: response.data.email || '',
+                    name: response.data.name || '',
+                    role: (response.data.role || 'student').toUpperCase(),
+                    has_password: response.data.has_password || false,
+                    // Add any other properties that might be used
+                };
+                
+                // Normalize the role to uppercase
+                logger.debug(`Setting normalized role in localStorage: ${userData.role}`);
+                localStorage.setItem('userRole', userData.role);
+                
+                // Cache the user data for subsequent calls within the same session
+                this._cachedUserData = userData;
+                
+                return userData;
             } catch (apiError) {
-                logger.error('Response error from user profile endpoint:', apiError.response?.status, apiError.response?.data);
+                logger.error('Response error from user profile endpoint:', 
+                    apiError.response?.status,
+                    apiError.response?.data);
                 
                 // If unauthorized, clear token and retry login
                 if (apiError.response?.status === 401) {
                     logger.warn('Unauthorized access detected - token may be invalid or expired');
-                    logger.error('Error getting current user:', apiError.message);
-                    logger.error('Status:', apiError.response?.status, 'Data:', apiError.response?.data);
                     
                     // Clear invalid token data
-                    logger.warn('Unauthorized - clearing invalid token');
                     localStorage.removeItem('token');
                     localStorage.removeItem('userRole');
                     this._cachedUserData = null;
@@ -210,12 +232,14 @@ export const authService = {
                 const userRole = localStorage.getItem('userRole');
                 if (userRole) {
                     // Create a minimal user object from local storage data
+                    logger.warn('Using fallback user data from localStorage');
                     return {
-                        role: userRole.toLowerCase(),
-                        // Include other basic properties that code might depend on
-                        id: 'local-user',
+                        role: userRole,  // Already uppercase from localStorage
+                        id: 'fallback-user',
                         name: 'User',
-                        isLocal: true
+                        email: '',
+                        has_password: false,
+                        isLocalStorageFallback: true
                     };
                 }
                 

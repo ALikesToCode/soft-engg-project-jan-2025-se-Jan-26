@@ -324,55 +324,70 @@ class MonitoringService {
 
   // WebSocket connection for real-time updates
   setupWebSocket() {
+    if (this.wsConnection) {
+      console.log("WebSocket connection already exists");
+      return this.wsConnection;
+    }
+    
     if (!this.isAuthenticated()) {
-      console.log('Not authenticated, skipping WebSocket setup');
+      console.log("User not authenticated, skipping WebSocket setup");
       return null;
     }
-
+    
     try {
       const token = localStorage.getItem('token');
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      const wsUrl = `${wsProtocol}://${window.location.host}/api/v1/monitoring/ws`;
+      // Fix: Use the backend URL instead of relative URL that defaults to frontend server
+      // Change from relative path to absolute backend URL
+      const wsBaseUrl = API_URL.replace('http://', 'ws://').replace('https://', 'wss://');
+      const wsUrl = `${wsBaseUrl}/monitoring/ws?token=${token}`;
       
-      // Add token to the WebSocket URL
-      const wsWithAuth = token ? `${wsUrl}?token=${token}` : wsUrl;
-      const ws = new WebSocket(wsWithAuth);
+      console.log("Connecting to WebSocket at:", wsUrl);
       
-      ws.onopen = () => {
-        console.log('WebSocket connection established');
+      this.wsConnection = new WebSocket(wsUrl);
+      
+      this.wsConnection.onopen = () => {
+        console.log("WebSocket connection established");
       };
-
-      ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        // Handle different types of real-time updates
-        switch (data.type) {
-          case 'health':
-            this.handleHealthUpdate(data);
-            break;
-          case 'alert':
-            this.handleAlertUpdate(data);
-            break;
-          case 'performance':
-            this.handlePerformanceUpdate(data);
-            break;
-          default:
-            console.log('Received unknown update type:', data.type);
+      
+      this.wsConnection.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("WebSocket message received:", data);
+          
+          // Handle different types of messages
+          switch (data.type) {
+            case 'health_update':
+              this.handleHealthUpdate(data.data);
+              break;
+            case 'alert':
+              this.handleAlertUpdate(data.data);
+              break;
+            case 'performance_update':
+              this.handlePerformanceUpdate(data.data);
+              break;
+            default:
+              console.log("Unknown WebSocket message type:", data.type);
+          }
+        } catch (error) {
+          console.error("Error processing WebSocket message:", error);
         }
       };
-
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+      
+      this.wsConnection.onerror = (error) => {
+        console.error("WebSocket error:", error);
       };
-
-      ws.onclose = () => {
-        console.log('WebSocket connection closed');
-        // Implement reconnection logic here
+      
+      this.wsConnection.onclose = () => {
+        console.log("WebSocket connection closed");
+        this.wsConnection = null;
+        
+        // Attempt to reconnect after a delay
         setTimeout(() => this.setupWebSocket(), 5000);
       };
-
-      return ws;
+      
+      return this.wsConnection;
     } catch (error) {
-      console.error('Error setting up WebSocket:', error);
+      console.error("Error setting up WebSocket:", error);
       return null;
     }
   }

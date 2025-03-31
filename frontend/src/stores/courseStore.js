@@ -27,9 +27,8 @@ export const useCourseStore = defineStore('course', () => {
   // Actions
   async function fetchCourses() {
     try {
-      token = document.
-        loading.value = true
-      const response = await axios.get('/courses')
+      loading.value = true
+      const response = await api.get('/courses')
       courses.value = response.data
       return response
     } catch (err) {
@@ -65,16 +64,8 @@ export const useCourseStore = defineStore('course', () => {
 
   async function createCourse(courseData) {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) throw new Error('No authentication token found')
-
-      const headers = {
-        headers: {
-          Authorization: `Bearer ${token}`, // Add token to Authorization header
-        },
-      }
       loading.value = true
-      const response = await axios.post('/api/v1/courses', courseData, headers)
+      const response = await api.post('/courses', courseData)
       courses.value.push(response.data)
       return response
     } catch (err) {
@@ -87,16 +78,8 @@ export const useCourseStore = defineStore('course', () => {
 
   async function updateCourse(courseId, courseData) {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) throw new Error('No authentication token found')
-
-      const headers = {
-        headers: {
-          Authorization: `Bearer ${token}`, // Add token to Authorization header
-        },
-      }
       loading.value = true
-      const response = await axios.put(`/api/v1/courses/${courseId}`, courseData, headers)
+      const response = await api.put(`/courses/${courseId}`, courseData)
       const index = courses.value.findIndex(c => c.id === courseId)
       if (index !== -1) {
         courses.value[index] = response.data
@@ -112,16 +95,8 @@ export const useCourseStore = defineStore('course', () => {
 
   async function deleteCourse(courseId) {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) throw new Error('No authentication token found')
-
-      const headers = {
-        headers: {
-          Authorization: `Bearer ${token}`, // Add token to Authorization header
-        },
-      }
       loading.value = true
-      await axios.delete(`/api/v1/courses/${courseId}`, headers)
+      await api.delete(`/courses/${courseId}`)
       courses.value = courses.value.filter(c => c.id !== courseId)
     } catch (err) {
       error.value = err.message

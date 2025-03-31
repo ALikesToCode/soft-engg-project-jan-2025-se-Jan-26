@@ -26,6 +26,9 @@ export default {
     const mapBackendRoleToFrontend = (backendRole) => {
       if (!backendRole) return ROLE.STUDENT;
       
+      // Log the original role from backend for debugging
+      console.log(`Mapping backend role: ${backendRole}`);
+      
       switch(backendRole.toLowerCase()) {
         case 'faculty':
           return ROLE.FACULTY;

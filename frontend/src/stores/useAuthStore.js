@@ -116,23 +116,31 @@ export default defineStore('auth', () => {
 
     // Helper method to navigate based on role
     function navigateToRoleDashboard() {
+        // Debug log to see the actual role value
+        console.log("Navigating with role:", userRole.value);
+        
         switch (userRole.value) {
-            case ROLE.STUDENT:
+            case ROLE.STUDENT:  // "STUDENT"
+                console.log("Redirecting to student dashboard");
                 router.push('/user/dashboard');
                 break;
-            case ROLE.FACULTY:
+            case ROLE.FACULTY:  // "FACULTY"
+                console.log("Redirecting to faculty dashboard");
                 router.push('/faculty/dashboard');
                 break;
-            case ROLE.SUPPORT:
+            case ROLE.SUPPORT:  // "SUPPORT"
+                console.log("Redirecting to support dashboard");
                 router.push('/support/dashboard');
                 break;
             default:
-                router.push('/');
+                console.warn(`Unknown role: ${userRole.value}, defaulting to student dashboard`);
+                router.push('/user/dashboard');
         }
     }
 
     function logout() {
-        user.value = null;
+        // Reset user to a new User instance instead of null
+        user.value = new User(null, "", "", "");
         token.value = null;
         userRole.value = ROLE.STUDENT;
         hasPassword.value = false;
@@ -142,18 +150,43 @@ export default defineStore('auth', () => {
     }
 
     function setUser(userData) {
+        console.log('useAuthStore: Setting user with data:', userData);
+        
+        // Check if user.value is null, and reinitialize if needed
+        if (!user.value) {
+            console.warn('user.value is null, reinitializing with new User object');
+            user.value = new User(null, "", "", "");
+        }
+        
+        // Now we can safely set properties
         user.value.id = userData.id;
         user.value.name = userData.name;
         user.value.email = userData.email;
-        user.value.role = userData.role;
+        
+        // Store the role directly from userData
+        if (userData.role) {
+            // Log the role before setting it
+            console.log(`useAuthStore: Setting user.value.role from ${user.value.role} to ${userData.role}`);
+            user.value.role = userData.role;
+        }
+        
         hasPassword.value = userData.has_password || false;
-        setUserRole(userData.role);
+        
+        // Use the separate method to set userRole (which handles normalization)
+        if (userData.role) {
+            setUserRole(userData.role);
+        } else {
+            console.warn('useAuthStore: userData does not contain role');
+        }
     }
 
     function setUserRole(role) {
         if (role && typeof role === 'string') {
             // Normalize role to uppercase
             const normalizedRole = role.toUpperCase();
+            
+            // Log original and normalized role for debugging
+            console.log(`Setting user role - Original: ${role}, Normalized: ${normalizedRole}`);
             
             // Validate against known roles
             if (Object.values(ROLE).includes(normalizedRole)) {

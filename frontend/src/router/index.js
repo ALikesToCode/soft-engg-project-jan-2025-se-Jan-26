@@ -218,6 +218,11 @@ router.beforeEach(async (to, from, next) => {
     const authStore = useAuthStore();
     const userRole = authStore.userRole;
     
+    // Log actual role for debugging
+    console.log(`ROUTER GUARD: User Role = "${userRole}", ROLE.FACULTY = "${ROLE.FACULTY}", ROLE.SUPPORT = "${ROLE.SUPPORT}"`);
+    console.log(`Role comparison: userRole === ROLE.SUPPORT is ${userRole === ROLE.SUPPORT}`);
+    console.log(`Role comparison: userRole === ROLE.FACULTY is ${userRole === ROLE.FACULTY}`);
+    
     // Handle role-specific paths
     if (to.path.startsWith('/support') && userRole !== ROLE.SUPPORT) {
       console.log('Attempting to access support route without support role');

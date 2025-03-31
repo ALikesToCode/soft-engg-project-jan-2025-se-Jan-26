@@ -11,18 +11,29 @@
               <p class="text-gray-600 mt-1">Track your academic journey and achievements</p>
             </div>
             <div class="text-right">
-              <div class="text-2xl font-bold text-gray-900">{{ averageGrade }}%</div>
-              <div class="text-sm text-gray-600">Overall Grade Average</div>
+              <div class="flex items-center">
+                <div class="text-2xl font-bold text-gray-900 mr-2">{{ completedCoursesOnly.length }}</div>
+                <div class="flex flex-col">
+                  <div class="text-sm text-gray-600">Completed</div>
+                  <div class="text-xs text-gray-500">of {{ totalEnrolled }} enrolled</div>
+                </div>
+              </div>
             </div>
           </div>
 
           <!-- Progress Bar -->
           <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div class="flex items-center justify-between text-sm mb-2">
+            <div class="flex flex-wrap items-center justify-between text-sm mb-2">
               <span class="font-medium text-gray-900">Academic Progress</span>
-              <span class="text-gray-600"
-                >{{ completedCourses.length }} of {{ totalEnrolled }} Courses Completed</span
-              >
+              <div class="flex space-x-4">
+                <span class="text-gray-600">
+                  <span class="font-medium">{{ completedCoursesOnly.length }}</span> Completed
+                </span>
+                <span class="text-gray-600">
+                  <span class="font-medium">{{ inProgressCourses.length }}</span> In Progress
+                </span>
+                <span class="text-blue-600 font-medium">{{ completionRate }}% Complete</span>
+              </div>
             </div>
             <div class="w-full bg-gray-100 rounded-full h-2.5">
               <div
@@ -34,7 +45,7 @@
         </div>
 
         <!-- Stats Overview -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
             <div class="p-3 bg-maroon-50 rounded-lg mr-4">
               <span class="material-icons text-maroon-600">school</span>
@@ -55,11 +66,20 @@
           </div>
           <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
             <div class="p-3 bg-green-50 rounded-lg mr-4">
-              <span class="material-icons text-green-600">trending_up</span>
+              <span class="material-icons text-green-600">grade</span>
             </div>
             <div>
-              <div class="text-2xl font-bold text-gray-900">{{ currentSemesterGPA }}</div>
-              <div class="text-sm text-gray-600">Current Semester GPA</div>
+              <div class="text-2xl font-bold text-gray-900">{{ averageGrade }}</div>
+              <div class="text-sm text-gray-600">Average Grade</div>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center">
+            <div class="p-3 bg-purple-50 rounded-lg mr-4">
+              <span class="material-icons text-purple-600">trending_up</span>
+            </div>
+            <div>
+              <div class="text-2xl font-bold text-gray-900">{{ inProgressCourses.length }}</div>
+              <div class="text-sm text-gray-600">In-Progress Courses</div>
             </div>
           </div>
         </div>
@@ -91,6 +111,7 @@
                   <option value="date">Recent First</option>
                   <option value="name">Course Name</option>
                   <option value="grade">Highest Grade</option>
+                  <option value="progress">Highest Progress</option>
                   <option value="credits">Most Credits</option>
                 </select>
                 <span class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
@@ -99,13 +120,14 @@
               </div>
             </div>
             <div class="w-48">
-              <label class="block text-sm font-medium text-gray-900 mb-2">Grade Filter</label>
+              <label class="block text-sm font-medium text-gray-900 mb-2">Course Filter</label>
               <div class="relative">
                 <select
                   v-model="gradeFilter"
                   class="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 text-gray-900 appearance-none"
                 >
-                  <option value="all">All Grades</option>
+                  <option value="all">All Courses</option>
+                  <option value="inprogress">In Progress</option>
                   <option value="A">A Grades (90-100)</option>
                   <option value="B">B Grades (80-89)</option>
                   <option value="C">C Grades (70-79)</option>
@@ -119,8 +141,27 @@
           </div>
         </div>
 
+        <!-- Loading State -->
+        <div v-if="isDataLoading" class="flex justify-center py-12">
+          <LoadingSpinner />
+        </div>
+
+        <!-- Error State -->
+        <div v-else-if="hasError" class="text-center py-12 bg-white rounded-xl shadow-sm border border-red-100">
+          <span class="material-icons text-red-500 text-4xl mb-2">error_outline</span>
+          <div class="text-gray-800 font-medium mb-2">Failed to load your course history</div>
+          <div class="text-gray-600 mb-4">{{ errorMessage }}</div>
+          <button 
+            @click="retry" 
+            class="px-4 py-2 bg-maroon-600 text-white rounded-lg hover:bg-maroon-700 transition-colors inline-flex items-center"
+          >
+            <span class="material-icons text-sm mr-1">refresh</span>
+            Try Again
+          </button>
+        </div>
+
         <!-- Course List -->
-        <div class="space-y-4">
+        <div v-else class="space-y-4">
           <div
             v-for="course in filteredCourses"
             :key="course.id"
@@ -131,11 +172,19 @@
                 <div class="flex items-center space-x-4">
                   <h3 class="text-lg font-semibold text-gray-900">{{ course.name }}</h3>
                   <span
+                    v-if="course.grade"
                     class="px-3 py-1 rounded-full text-sm font-medium flex items-center"
                     :class="getGradeClass(course.grade)"
                   >
                     <span class="material-icons text-sm mr-1">grade</span>
                     {{ course.grade }}
+                  </span>
+                  <span
+                    v-else
+                    class="px-3 py-1 rounded-full text-sm font-medium flex items-center bg-blue-50 text-blue-600"
+                  >
+                    <span class="material-icons text-sm mr-1">school</span>
+                    {{ course.status || 'In Progress' }}
                   </span>
                 </div>
 
@@ -152,10 +201,10 @@
                   <div>
                     <div class="flex items-center text-sm text-gray-600 mb-1">
                       <span class="material-icons text-sm mr-1">event</span>
-                      Completed
+                      {{ course.completion_date ? 'Completed' : 'Enrolled' }}
                     </div>
                     <div class="font-medium text-gray-900">
-                      {{ formatDate(course.completion_date) }}
+                      {{ course.completion_date ? formatDate(course.completion_date) : formatDate(course.enrollment_date) }}
                     </div>
                   </div>
                   <div>
@@ -182,6 +231,19 @@
                     <span v-else class="text-gray-400">Not Available</span>
                   </div>
                 </div>
+                <!-- Display progress if course is in progress -->
+                <div v-if="course.status !== 'COMPLETED' && course.progress !== null" class="mt-4">
+                  <div class="flex items-center justify-between text-sm mb-1">
+                    <span class="font-medium text-gray-700">Course Progress</span>
+                    <span class="text-gray-600">{{ course.progress || 0 }}%</span>
+                  </div>
+                  <div class="w-full bg-gray-100 rounded-full h-2">
+                    <div
+                      class="bg-maroon-600 h-2 rounded-full transition-all duration-500"
+                      :style="{ width: `${course.progress || 0}%` }"
+                    ></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -204,9 +266,6 @@
       </div>
     </div>
   </div>
-  <div v-if="isDataLoading" class="loading-overlay">
-    <LoadingSpinner />
-  </div>
 </template>
 
 <script>
@@ -223,25 +282,14 @@ export default {
   },
   data() {
     return {
+      isDataLoading: true,
+      hasError: false,
+      errorMessage: '',
+      completedCourses: [],
+      totalEnrolled: 0,
       searchQuery: '',
       sortBy: 'date',
       gradeFilter: 'all',
-      totalEnrolled: 0,
-      isDataLoading: false,
-      completedCourses: [
-        // {
-        //   id: 1,
-        //   name: 'Introduction to Programming',
-        //   description:
-        //     'Fundamentals of programming using Python, covering basic syntax, data structures, and algorithms.',
-        //   instructor: 'Dr. Sarah Johnson',
-        //   completionDate: new Date('2023-12-15'),
-        //   grade: 'A',
-        //   credits: 3,
-        //   certificateUrl: '#',
-        //   semester: 'Fall 2023',
-        // },
-      ],
     }
   },
   computed: {
@@ -253,23 +301,34 @@ export default {
         courses = courses.filter(
           (course) =>
             course.name.toLowerCase().includes(query) ||
-            course.instructor.toLowerCase().includes(query) ||
-            course.description.toLowerCase().includes(query),
+            (course.instructor && course.instructor.toLowerCase().includes(query)) ||
+            (course.description && course.description.toLowerCase().includes(query)),
         )
       }
 
       if (this.gradeFilter !== 'all') {
-        courses = courses.filter((course) => course.grade.startsWith(this.gradeFilter))
+        if (this.gradeFilter === 'inprogress') {
+          courses = courses.filter((course) => course.status !== 'COMPLETED')
+        } else {
+          courses = courses.filter((course) => 
+            course.grade && course.grade.startsWith(this.gradeFilter)
+          )
+        }
       }
 
       courses.sort((a, b) => {
         switch (this.sortBy) {
           case 'date':
-            return b.completionDate - a.completionDate
+            // Sort by completion date first, then enrollment date
+            const aDate = a.completion_date ? new Date(a.completion_date) : (a.enrollment_date ? new Date(a.enrollment_date) : new Date(0))
+            const bDate = b.completion_date ? new Date(b.completion_date) : (b.enrollment_date ? new Date(b.enrollment_date) : new Date(0))
+            return bDate - aDate
           case 'name':
-            return a.title.localeCompare(b.title)
+            return a.name.localeCompare(b.name)
           case 'grade':
             return this.getGradeValue(b.grade) - this.getGradeValue(a.grade)
+          case 'progress':
+            return (b.progress || 0) - (a.progress || 0)
           case 'credits':
             return b.credits - a.credits
           default:
@@ -279,27 +338,34 @@ export default {
 
       return courses
     },
+    completedCoursesOnly() {
+      return this.completedCourses.filter(course => course.status === 'COMPLETED')
+    },
+    inProgressCourses() {
+      return this.completedCourses.filter(course => course.status !== 'COMPLETED')
+    },
     averageGrade() {
-      if (this.completedCourses.length === 0) return 0
-      const total = this.completedCourses.reduce(
+      const completedWithGrades = this.completedCoursesOnly.filter(course => course.grade)
+      if (completedWithGrades.length === 0) return 0
+      const total = completedWithGrades.reduce(
         (sum, course) => sum + this.getGradeValue(course.grade),
         0,
       )
-      return (total / this.completedCourses.length).toFixed(1)
+      return Math.round((total / completedWithGrades.length) * 10) / 10
     },
     totalCredits() {
-      return this.completedCourses.reduce((sum, course) => sum + course.credits, 0)
+      return this.completedCoursesOnly.reduce((sum, course) => sum + (course.credits || 0), 0)
     },
     completionRate() {
-      return Math.round((this.completedCourses.length / this.totalEnrolled) * 100)
+      return this.totalEnrolled ? Math.round((this.completedCoursesOnly.length / this.totalEnrolled) * 100) : 0
     },
     certificatesCount() {
-      return this.completedCourses.filter((course) => course.certificate_url).length
+      return this.completedCoursesOnly.filter((course) => course.certificate_url).length
     },
     currentSemesterGPA() {
       const currentSemester = 'Fall'
-      const semesterCourses = this.completedCourses.filter(
-        (course) => course.semester === currentSemester,
+      const semesterCourses = this.completedCoursesOnly.filter(
+        (course) => course.semester === currentSemester && course.grade,
       )
 
       if (semesterCourses.length === 0) return '0.00'
@@ -324,7 +390,13 @@ export default {
       toast.error(message)
     },
     formatDate(date) {
-      const d = new Date(date)
+      if (!date) {
+        return 'Not completed yet';
+      }
+      const d = new Date(date);
+      if (isNaN(d.getTime())) {
+        return 'Invalid date';
+      }
       const months = [
         'Jan',
         'Feb',
@@ -342,7 +414,10 @@ export default {
       return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
     },
     getGradeClass(grade) {
-      const firstLetter = grade.charAt(0)
+      if (!grade) {
+        return 'bg-gray-100 text-gray-600'; // Default styling for no grade
+      }
+      const firstLetter = grade.charAt(0);
       switch (firstLetter) {
         case 'A':
           return 'bg-green-100 text-green-800'
@@ -357,6 +432,9 @@ export default {
       }
     },
     getGradeValue(grade) {
+      if (!grade) {
+        return 0; // Default value when no grade is available
+      }
       const gradeValues = {
         'A+': 100,
         A: 95,
@@ -379,37 +457,67 @@ export default {
       this.sortBy = 'date'
       this.gradeFilter = 'all'
     },
-
-    async getCourseHitoryData() {
+    retry() {
+      this.hasError = false;
+      this.errorMessage = '';
+      this.getCourseHistoryData();
+    },
+    async getCourseHistoryData() {
       try {
-        this.isDataLoading = true
+        this.isDataLoading = true;
+        this.hasError = false;
+        this.errorMessage = '';
+        
         const token = localStorage.getItem('token')
-        if (!token) throw new Error('No authentication token found')
+        if (!token) {
+          this.hasError = true;
+          this.errorMessage = 'Authentication token not found. Please log in again.';
+          throw new Error('No authentication token found');
+        }
 
         const headers = {
           headers: {
-            Authorization: `Bearer ${token}`, // Add token to Authorization header
+            Authorization: `Bearer ${token}`
           },
         }
 
         const response = await api.get('/user/courses/history', headers)
         if (response.status !== 200) throw new Error('Failed to fetch user course data')
-        console.log(response.data)
-        this.completedCourses = response.data
-        this.totalEnrolled = response.data[response.data.length - 1].total_enrolled_course
-        this.isDataLoading = false
-        this.showSuccessToast('User Course History Data Fecthed')
+        
+        this.completedCourses = response.data || []
+        
+        // Set total enrolled if data is available
+        if (this.completedCourses.length > 0 && 
+            this.completedCourses[0].hasOwnProperty('total_enrolled_course')) {
+          this.totalEnrolled = this.completedCourses[0].total_enrolled_course
+        } else {
+          this.totalEnrolled = this.completedCourses.length
+        }
+        
+        // Ensure all course objects have consistent property structure
+        this.completedCourses = this.completedCourses.map(course => ({
+          ...course,
+          grade: course.grade || null,
+          status: course.status || 'IN_PROGRESS',
+          credits: course.credits || 0,
+          progress: course.progress || 0
+        }))
+        
+        this.showSuccessToast('Course history loaded successfully')
       } catch (error) {
-        this.showErrorToast(error, 'Failed to fetch user course data')
-        this.isDataLoading = false
+        console.error('Error fetching course history:', error)
+        this.completedCourses = [] // Reset to empty array on error
+        this.totalEnrolled = 0
+        this.hasError = true;
+        this.errorMessage = error.message || 'Failed to fetch course history';
+        this.showErrorToast(error, 'Failed to fetch course history')
       } finally {
         this.isDataLoading = false
       }
-      return
     },
   },
   mounted() {
-    this.getCourseHitoryData()
+    this.getCourseHistoryData()
   },
 }
 </script>

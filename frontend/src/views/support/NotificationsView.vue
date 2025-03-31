@@ -113,19 +113,26 @@ export default {
     },
 
     async getSupportCourses() {
-      this.isLoading = true
+      this.isLoading = true;
       try {
-        const response = await this.courseStore.getFacultyCourses()
-        response.data.forEach((course) => {
-          this.allCourses.push(course)
-        })
-        this.isLoading = false
+        // Clear existing courses first
+        this.allCourses = [];
+        
+        // Use try-catch for the API call to properly handle errors
+        await this.courseStore.getFacultyCourses();
+        
+        // Access the courses from the store directly
+        if (this.courseStore.courses && this.courseStore.courses.length > 0) {
+          this.allCourses = [...this.courseStore.courses];
+          console.log(`Loaded ${this.allCourses.length} courses for support notifications`);
+        } else {
+          console.log('No courses available in the course store');
+        }
       } catch (error) {
-        this.showErrorToast(error, 'Failed to load the courses')
-        this.isLoading = false
-        throw error
+        console.error('Failed to load courses for support:', error);
+        this.showErrorToast(error, 'Failed to load courses');
       } finally {
-        this.isLoading = false
+        this.isLoading = false;
       }
     },
   },
