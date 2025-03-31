@@ -41,12 +41,12 @@ class StudentInfo(BaseModel):
     name: str
     email: str
     avatar: Optional[str] = None
-    enrollment_date: datetime
+    last_activity: datetime
     status: EnrollmentStatus
 
 class StudentProgress(BaseModel):
     student_id: UUID4
-    progress: float
+    progress: str #float
     last_activity: Optional[datetime] = None
     total_assignments: int
     completed_assignments: int

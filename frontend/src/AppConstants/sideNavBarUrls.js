@@ -37,7 +37,7 @@ const facultyDashboardUrls = [
         label: 'Academic Integrity'
     },
     {
-        path: '/faculty/course/1/enrollment',
+        path: '/faculty/course/enrollment',
         icon: 'group',
         label: 'Course Enrollment'
     }
