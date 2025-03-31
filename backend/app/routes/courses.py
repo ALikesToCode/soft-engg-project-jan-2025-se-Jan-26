@@ -26,6 +26,7 @@ class BulkEnrollment(BaseModel):
     student_ids: List[UUID4]
 
 router = APIRouter(tags=["User Courses"])
+
 @router.get("/user/courses/history",
     summary="Get user's course history",
     description="Retrieves the course history for the currently authenticated user",

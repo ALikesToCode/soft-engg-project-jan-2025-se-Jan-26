@@ -23,7 +23,6 @@ from app.routes.chat import router as chat_history_router
 from app.routes.assignment import router as assignment_router
 from app.routes.faq import router as faq_router
 from app.routes.system_settings import router as system_settings_router
-from app.routes.courses import router as courses_router
 from app.routes.course_routes import course_router
 from app.routes.academic_integrity import router as academic_integrity_router
 from app.services.api_functions import *  # Import all API function declarations
@@ -317,8 +316,8 @@ if STATIC_DIR.exists():
 app.include_router(auth, prefix="/api/v1", tags=["auth"])
 app.include_router(users, prefix="/api/v1/users", tags=["users"])
 app.include_router(healthcheck, prefix="/api/v1", tags=["system"])
-app.include_router(courses, prefix="/api/v1/courses", tags=["courses"])
-app.include_router(course_router, prefix="/api/v1", tags=["faculty_courses"])
+app.include_router(courses,prefix="/api/v1", tags=["courses"])
+app.include_router(course_router,prefix="/api/v1", tags=["faculty-courses"])
 app.include_router(module, prefix="/api/v1/modules", tags=["modules"])
 app.include_router(assignments, prefix="/api/v1/assignments", tags=["assignments"])
 app.include_router(academic_integrity, prefix="/api/v1/academic-integrity", tags=["academic-integrity"])

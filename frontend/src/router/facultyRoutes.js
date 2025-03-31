@@ -109,10 +109,13 @@ const facultyRoutes = {
             }
         },
         {
-            path: '/faculty/course/:courseId/enrollment',
+            path: '/faculty/course/enrollment',
             name: 'CourseEnrollment',
             component: CourseEnrollmentView,
-            meta: { requiresFacultyAuth: true }
+            meta: {
+                requiresFacultyAuth: true,
+                hideFooter: true,
+            }
         },
         {
             path: 'academic-integrity',

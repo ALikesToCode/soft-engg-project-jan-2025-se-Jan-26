@@ -3,13 +3,15 @@ from typing import Dict, List, Optional, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, and_, select
+from sqlalchemy import and_, select
 from enum import Enum
 from pydantic import BaseModel
 
 from app.database import get_db
 from app.services.auth_service import get_current_user
 from app.schemas.enrollment import StudentInfo, StudentProgress
+from app.models.course import Course, CourseEnrollment
+from app.models.user import User
 
 # Define the Role enum locally since it's missing
 class Role(str, Enum):
@@ -29,10 +31,9 @@ STAFF_ROLES = [Role.FACULTY.value, Role.SUPPORT.value, Role.ADMIN.value, Role.SU
 ADMIN_ROLES = [Role.FACULTY.value, Role.ADMIN.value, Role.SUPERUSER.value]
 
 async def validate_course_exists(course_id: UUID, db: AsyncSession) -> bool:
-    """Validate that a course exists in the database."""
-    query = text("SELECT EXISTS(SELECT 1 FROM courses WHERE id = :course_id)")
-    result = await db.execute(query, {"course_id": course_id})
-    return result.scalar()
+    """Validate that a course exists in the database using SQLAlchemy ORM."""
+    result = await db.execute(select(Course).where(Course.id == course_id))
+    return result.scalar_one_or_none() is not None
 
 async def check_user_permissions(current_user: Dict[str, Any], required_roles: List[str], 
                                 course_id: Optional[UUID] = None, 
@@ -69,47 +70,36 @@ async def get_course_students(
     await check_user_permissions(current_user, STAFF_ROLES)
     
     try:
-        # Check if course exists
+        # Check if course exists using SQLAlchemy ORM
         if not await validate_course_exists(course_id, db):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Course not found"
             )
             
-        # Get all students for this course using raw SQL query with explicit JOIN
-        # Ensure we're using student_id from course_enrollments to join with users.id
-        query = text("""
-            SELECT 
-                u.id, 
-                u.name, 
-                u.email, 
-                u.picture as avatar, 
-                ce.enrollment_date, 
-                ce.status
-            FROM 
-                course_enrollments ce
-            JOIN 
-                users u ON ce.student_id = u.id
-            WHERE 
-                ce.course_id = :course_id
-            ORDER BY 
-                u.name
-        """)
+        # Get all students for this course using SQLAlchemy ORM
+        stmt = (
+            select(User.id, User.name, User.email, User.picture.label("avatar"), 
+                CourseEnrollment.enrollment_date, CourseEnrollment.status)
+            .join(CourseEnrollment, User.id == CourseEnrollment.student_id)
+            .where(CourseEnrollment.course_id == course_id)
+            .order_by(User.name)
+        )
         
-        result = await db.execute(query, {"course_id": course_id})
-        students = result.fetchall()
-        
-        # Map students to schema
-        return [
+        result = await db.execute(stmt)
+        students = [
             StudentInfo(
-                id=str(student.id),
-                name=student.name,
-                email=student.email,
-                avatar=student.avatar,
-                enrollment_date=student.enrollment_date,
-                status=student.status
-            ) for student in students
+                id=row.id,
+                name=row.name,
+                email=row.email,
+                avatar=row.avatar,
+                enrollment_date=row.enrollment_date,
+                status=row.status
+            )
+            for row in result.all()
         ]
+        
+        return students
             
     except HTTPException:
         raise
@@ -142,8 +132,9 @@ async def get_course_progress(
                 detail=f"Course with ID {course_id} not found"
             )
 
-        # Get all students' progress for this course using raw SQL
-        # The join structure is defined in the CTE, with course_enrollments as the base table
+        # This query is complex and works well with raw SQL
+        # We'll keep it as raw SQL for now but using SQLAlchemy text()
+        from sqlalchemy import text
         query = text("""
             WITH assignment_counts AS (
                 SELECT 
@@ -173,7 +164,7 @@ async def get_course_progress(
             SELECT 
                 ce.student_id,
                 ce.progress,
-                ce.last_activity,
+                ce.last_activity as last_activity,
                 COALESCE(sa.completed_assignments, 0) as completed_assignments,
                 COALESCE(ac.total_assignments, 0) as total_assignments
             FROM 
@@ -223,7 +214,7 @@ async def get_course_enrollments(
         # Check permissions
         await check_user_permissions(current_user, ADMIN_ROLES)
         
-        # Check if course exists
+        # Check if course exists using SQLAlchemy ORM
         if not await validate_course_exists(course_id, db):
             logger.warning(f"Course with ID {course_id} not found")
             raise HTTPException(
@@ -231,46 +222,42 @@ async def get_course_enrollments(
                 detail=f"Course with ID {course_id} not found"
             )
         
-        # Get all enrollments for this course with user info using raw SQL
-        query = text("""
-            SELECT 
-                ce.id, 
-                ce.student_id,
-                u.name,
-                u.email,
-                u.picture,
-                ce.status,
-                ce.enrollment_date,
-                ce.progress,
-                ce.last_activity,
-                ce.grade,
-                ce.completion_date
-            FROM 
-                course_enrollments ce
-            JOIN 
-                users u ON ce.student_id = u.id
-            WHERE 
-                ce.course_id = :course_id
-            ORDER BY 
-                u.name
-        """)
+        # Get all enrollments for this course with user info using SQLAlchemy ORM
+        stmt = (
+            select(
+                CourseEnrollment.id, 
+                CourseEnrollment.student_id,
+                User.name,
+                User.email,
+                User.picture,
+                CourseEnrollment.status,
+                CourseEnrollment.enrollment_date,
+                CourseEnrollment.progress,
+                CourseEnrollment.last_activity,
+                CourseEnrollment.grade,
+                CourseEnrollment.completion_date
+            )
+            .join(User, CourseEnrollment.student_id == User.id)
+            .where(CourseEnrollment.course_id == course_id)
+            .order_by(User.name)
+        )
         
-        result = await db.execute(query, {"course_id": course_id})
+        result = await db.execute(stmt)
         
         return [
             {
-                "id": str(row[0]),
-                "student_id": str(row[1]),
-                "name": row[2],
-                "email": row[3],
-                "picture": row[4],
-                "status": row[5],
-                "enrollment_date": row[6],
-                "progress": row[7],
-                "last_activity": row[8],
-                "grade": row[9],
-                "completion_date": row[10]
-            } for row in result.fetchall()
+                "id": str(row.id),
+                "student_id": str(row.student_id),
+                "name": row.name,
+                "email": row.email,
+                "picture": row.picture,
+                "status": row.status,
+                "enrollment_date": row.enrollment_date,
+                "progress": row.progress,
+                "last_activity": row.last_activity,
+                "grade": row.grade,
+                "completion_date": row.completion_date
+            } for row in result
         ]
         
     except HTTPException:
@@ -294,16 +281,18 @@ async def get_enrollment_details(
     Returns enrollment details including assignment completion data.
     """
     try:
-        # Get the student_id for this enrollment using raw SQL
-        enrollment_query = text("""
-            SELECT student_id FROM course_enrollments 
-            WHERE id = :enrollment_id AND course_id = :course_id
-        """)
-        
-        result = await db.execute(
-            enrollment_query, 
-            {"enrollment_id": enrollment_id, "course_id": course_id}
+        # Get the student_id for this enrollment using SQLAlchemy ORM
+        stmt = (
+            select(CourseEnrollment.student_id)
+            .where(
+                and_(
+                    CourseEnrollment.id == enrollment_id,
+                    CourseEnrollment.course_id == course_id
+                )
+            )
         )
+        
+        result = await db.execute(stmt)
         enrollment_record = result.first()
         
         if not enrollment_record:
@@ -328,30 +317,31 @@ async def get_enrollment_details(
                 detail=f"Course with ID {course_id} not found"
             )
         
-        # Get enrollment details using raw SQL
-        # Start with course_enrollments table and join users on student_id
-        query = text("""
-            SELECT 
-                ce.id, 
-                ce.student_id,
-                u.name,
-                u.email,
-                u.picture,
-                ce.status,
-                ce.enrollment_date,
-                ce.progress,
-                ce.last_activity,
-                ce.grade,
-                ce.completion_date
-            FROM 
-                course_enrollments ce
-            JOIN 
-                users u ON ce.student_id = u.id
-            WHERE 
-                ce.id = :enrollment_id AND ce.course_id = :course_id
-        """)
+        # Get enrollment details using SQLAlchemy ORM
+        stmt = (
+            select(
+                CourseEnrollment.id, 
+                CourseEnrollment.student_id,
+                User.name,
+                User.email,
+                User.picture,
+                CourseEnrollment.status,
+                CourseEnrollment.enrollment_date,
+                CourseEnrollment.progress,
+                CourseEnrollment.last_activity,
+                CourseEnrollment.grade,
+                CourseEnrollment.completion_date
+            )
+            .join(User, CourseEnrollment.student_id == User.id)
+            .where(
+                and_(
+                    CourseEnrollment.id == enrollment_id,
+                    CourseEnrollment.course_id == course_id
+                )
+            )
+        )
         
-        result = await db.execute(query, {"enrollment_id": enrollment_id, "course_id": course_id})
+        result = await db.execute(stmt)
         enrollment_row = result.first()
         
         if not enrollment_row:
@@ -361,54 +351,62 @@ async def get_enrollment_details(
             )
         
         enrollment = {
-            "id": str(enrollment_row[0]),
-            "student_id": str(enrollment_row[1]),
-            "name": enrollment_row[2],
-            "email": enrollment_row[3],
-            "picture": enrollment_row[4],
-            "status": enrollment_row[5],
-            "enrollment_date": enrollment_row[6],
-            "progress": enrollment_row[7],
-            "last_activity": enrollment_row[8],
-            "grade": enrollment_row[9],
-            "completion_date": enrollment_row[10],
+            "id": str(enrollment_row.id),
+            "student_id": str(enrollment_row.student_id),
+            "name": enrollment_row.name,
+            "email": enrollment_row.email,
+            "picture": enrollment_row.picture,
+            "status": enrollment_row.status,
+            "enrollment_date": enrollment_row.enrollment_date,
+            "progress": enrollment_row.progress,
+            "last_activity": enrollment_row.last_activity,
+            "grade": enrollment_row.grade,
+            "completion_date": enrollment_row.completion_date,
             "assignments": []
         }
         
-        # Get assignment completion data for this enrollment using raw SQL
-        query = text("""
-            SELECT 
-                a.id,
-                a.title,
-                s.id as submission_id,
-                s.status as submission_status,
-                s.score,
-                s.submitted_at
-            FROM 
-                assignments a
-            LEFT JOIN 
-                submissions s ON a.id = s.assignment_id AND s.student_id = :student_id
-            WHERE 
-                a.course_id = :course_id
-            ORDER BY 
-                a.title
-        """)
+        # Get assignment completion data using SQLAlchemy
+        # This query is a bit complex but can be expressed with SQLAlchemy ORM
+        from sqlalchemy import outerjoin
+        from app.models.assignment import Assignment
+        from app.models.submission import Submission
         
-        result = await db.execute(query, {"student_id": enrollment["student_id"], "course_id": course_id})
+        stmt = (
+            select(
+                Assignment.id,
+                Assignment.title,
+                Submission.id.label("submission_id"),
+                Submission.status.label("submission_status"),
+                Submission.score,
+                Submission.submitted_at
+            )
+            .select_from(Assignment)
+            .outerjoin(
+                Submission, 
+                and_(
+                    Assignment.id == Submission.assignment_id,
+                    Submission.student_id == enrollment["student_id"]
+                )
+            )
+            .where(Assignment.course_id == course_id)
+            .order_by(Assignment.title)
+        )
+        
+        result = await db.execute(stmt)
         
         enrollment["assignments"] = [
             {
-                "id": str(row[0]),
-                "title": row[1],
-                "submission_id": str(row[2]) if row[2] else None,
-                "submission_status": row[3],
-                "score": row[4],
-                "submitted_at": row[5]
-            } for row in result.fetchall()
+                "id": str(row.id),
+                "title": row.title,
+                "submission_id": str(row.submission_id) if row.submission_id else None,
+                "submission_status": row.submission_status,
+                "score": row.score,
+                "submitted_at": row.submitted_at
+            } for row in result
         ]
             
         return enrollment
-        
+            
     except HTTPException:
         raise
     except Exception as e:
@@ -416,4 +414,170 @@ async def get_enrollment_details(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=f"Failed to retrieve enrollment details: {str(e)}"
+        )
+
+class EnrollmentRequest(BaseModel):
+    course_id: UUID
+    student_emails: List[str]
+    
+@router.post("/enroll", response_model=Dict)
+async def enroll_students_to_course(
+    enrollment_data: EnrollmentRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict = Depends(get_current_user)
+):
+    """
+    Enroll multiple students in a course.
+    Expects a list of student emails and a course ID.
+    """
+    try:
+        logger.info(f"Received enrollment request: {enrollment_data}")
+
+        # Check user permissions using the permission model from main branch
+        await check_user_permissions(current_user, ADMIN_ROLES)
+
+        course_id = enrollment_data.course_id
+        student_emails = enrollment_data.student_emails
+        logger.info(f"Enrolling students: {student_emails} into course: {course_id}")
+
+        # Check if course exists using SQLAlchemy ORM
+        if not await validate_course_exists(course_id, db):
+            logger.error(f"Course not found: {course_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail=f"Course with ID {course_id} not found"
+            )
+
+        logger.info(f"Course found: {course_id}. Fetching student details...")
+
+        # Get students by email using SQLAlchemy ORM
+        stmt = select(User).where(User.email.in_(student_emails))
+        result = await db.execute(stmt)
+        students = result.scalars().all()
+
+        if not students:
+            logger.warning("No valid students found for enrollment.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="No valid students found for enrollment"
+            )
+
+        logger.info(f"Found {len(students)} students. Checking for existing enrollments...")
+
+        # Prepare enrollments
+        enrollments = []
+        for student in students:
+            # Check if student is already enrolled
+            stmt = select(CourseEnrollment).where(
+                and_(
+                    CourseEnrollment.student_id == student.id, 
+                    CourseEnrollment.course_id == course_id
+                )
+            )
+            result = await db.execute(stmt)
+            existing_enrollment = result.scalar_one_or_none()
+            
+            if existing_enrollment is None:  # Avoid duplicates
+                logger.info(f"Enrolling student {student.email} (ID: {student.id}) into course {course_id}")
+                enrollment_obj = CourseEnrollment(
+                    course_id=course_id,
+                    student_id=student.id, 
+                    user_id=current_user.get("id")
+                )
+                enrollments.append(enrollment_obj)
+            else:
+                logger.info(f"Skipping student {student.email} (ID: {student.id}): Already enrolled")
+
+        # Bulk insert enrollments
+        if enrollments:
+            db.add_all(enrollments)
+            await db.commit()
+            logger.info(f"Successfully enrolled {len(enrollments)} students into course {course_id}")
+        else:
+            logger.info("No new students were enrolled (all were already enrolled).")
+
+        return {"message": f"Enrolled {len(enrollments)} students in the course"}
+
+    except HTTPException as e:
+        await db.rollback()
+        logger.error(f"Failed to enroll students: {str(e)}")
+        raise e
+
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error enrolling students: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to enroll students: {str(e)}"
+        )
+
+@router.delete("/{course_id}/students/{student_id}", response_model=Dict)
+async def remove_student_from_course(
+    course_id: UUID,
+    student_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: Dict = Depends(get_current_user)
+):
+    """
+    Remove a student from a course.
+    """
+    try:
+        # Check user permissions using the permission model from main branch
+        await check_user_permissions(current_user, ADMIN_ROLES)
+
+        # Check if course exists using SQLAlchemy ORM
+        if not await validate_course_exists(course_id, db):
+            logger.error(f"Course not found: {course_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail=f"Course with ID {course_id} not found"
+            )
+
+        # Check if student is enrolled using SQLAlchemy ORM
+        stmt = select(CourseEnrollment).where(
+            and_(
+                CourseEnrollment.student_id == student_id, 
+                CourseEnrollment.course_id == course_id
+            )
+        )
+        result = await db.execute(stmt)
+        enrollment = result.scalar_one_or_none()
+        
+        if not enrollment:
+            logger.error(f"Student {student_id} is not enrolled in course {course_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail=f"Student is not enrolled in this course"
+            )
+
+        # Remove student from course
+        logger.info(f"Removing student {student_id} from course {course_id}")
+        await db.delete(enrollment)
+        await db.commit()
+        logger.info(f"Successfully removed student {student_id} from course {course_id}")
+        
+        # Verify removal
+        stmt = select(CourseEnrollment).where(
+            and_(
+                CourseEnrollment.student_id == student_id, 
+                CourseEnrollment.course_id == course_id
+            )
+        )
+        result = await db.execute(stmt)
+        remaining = result.scalar_one_or_none()
+        logger.info(f"Remaining enrollment after delete: {remaining}")  # Should be None
+        
+        return {"message": "Student removed from course"}
+
+    except HTTPException as e:
+        await db.rollback()
+        logger.error(f"Failed to remove student from course: {str(e)}")
+        raise e
+
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error removing student from course: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Failed to remove student from course: {str(e)}"
         ) 
