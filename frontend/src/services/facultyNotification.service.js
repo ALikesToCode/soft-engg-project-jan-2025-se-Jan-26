@@ -91,12 +91,20 @@ export const FacultyNotificationService = {
   },
 
   // Mark notification as read
-  async markAsRead(notificationId) {
-    return api.put(`${API_PATH_NOTIFICATIONS}/faculty/${notificationId}/read`)
+  async markAsRead(notificationId, type, headers) {
+    console.log(`Marking notification ${notificationId} as read`)
+    return api.put(`${API_PATH_NOTIFICATIONS}/${type}/${notificationId}`, {}, headers)
+  },
+
+  // Mark all notifications as read
+  async markAllAsRead(notifications, headers) {
+    console.log(`Marking multiple notifications as read: ${JSON.stringify(notifications)}`)
+    return api.put(`${API_PATH_NOTIFICATIONS}/mark-all`, { notifications }, headers)
   },
 
   // Delete notification
-  async deleteNotification(notificationId) {
-    return api.delete(`${API_PATH_NOTIFICATIONS}/faculty/${notificationId}`)
+  async deleteNotification(notificationId, type, headers) {
+    console.log(`Deleting notification ${notificationId} of type ${type}`)
+    return api.delete(`${API_PATH_NOTIFICATIONS}/delete/${type}/${notificationId}`, headers)
   }
 } 

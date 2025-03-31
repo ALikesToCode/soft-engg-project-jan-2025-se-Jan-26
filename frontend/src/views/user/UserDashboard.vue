@@ -6,7 +6,11 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { useToast } from 'vue-toastification'
 import AlertMessage from '@/components/common/AlertMessage.vue'
 import { useChatStore } from '@/stores/useChatStore'
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
+import formatDateFunc from '@/utils/formatDate'
+import useAuthStore from '@/stores/useAuthStore'
+import { useCourseStore } from '@/stores/courseStore'
+import { FacultyNotificationService } from '@/services/facultyNotification.service'
 
 export default {
   name: 'DashboardView',
@@ -58,6 +62,7 @@ export default {
       ],
       bookmarkedMaterials: [],
       isDevelopment: import.meta.env.VITE_NODE_ENV === 'development',
+      notifications: []
     }
   },
   components: {
@@ -207,16 +212,170 @@ export default {
         this.isDataLoading = false
       }
     },
+    async getNotifications() {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) return
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+
+        const response = await FacultyNotificationService.getRecentNotifications(headers)
+        if (response && response.data) {
+          this.notifications = response.data.slice(0, 5) // Get only the first 5 notifications
+          console.log('Loaded notifications:', this.notifications)
+        }
+      } catch (error) {
+        console.error('Failed to load notifications:', error)
+      }
+    },
+    formatTime(timestamp) {
+      return formatDateFunc(timestamp)
+    },
+    getNotificationTypeClass(type) {
+      return {
+        'bg-blue-100 text-blue-800': type === 'course',
+        'bg-purple-100 text-purple-800': type === 'system',
+      }
+    },
+    getNotificationPriorityClass(priority) {
+      return {
+        'bg-green-100 text-green-800': priority === 'low',
+        'bg-yellow-100 text-yellow-800': priority === 'medium',
+        'bg-orange-100 text-orange-800': priority === 'high',
+        'bg-red-100 text-red-800': priority === 'urgent',
+      }
+    }
   },
 
   mounted() {
     this.getRecommendedCourses();
     this.getBookMarkedMaterials();
+    this.getNotifications();
 
     // Make sure the GlobalChat component from App.vue is initialized
     const chatStore = useChatStore();
     if (!chatStore.initialized) {
       chatStore.initialize();
+    }
+  },
+
+  setup() {
+    const authStore = useAuthStore()
+    const courseStore = useCourseStore()
+    const toast = useToast()
+    const isLoading = ref(false)
+    const userInfo = ref({
+      name: 'User'
+    })
+
+    const loadNotifications = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) return
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+
+        const response = await FacultyNotificationService.getRecentNotifications(headers)
+        if (response && response.data) {
+          notifications.value = response.data
+        }
+      } catch (error) {
+        console.error('Failed to load notifications:', error)
+      }
+    }
+
+    const loadCourses = async () => {
+      isLoading.value = true
+      try {
+        const response = await courseStore.getUserCourses()
+        if (response && response.data) {
+          courses.value = response.data
+        }
+      } catch (error) {
+        console.error('Failed to load courses:', error)
+        toast.error('Failed to load your courses')
+      } finally {
+        isLoading.value = false
+      }
+    }
+
+    const getUserInfo = async () => {
+      try {
+        const user = authStore.user
+        if (user) {
+          userInfo.value = {
+            name: user.name || 'Student',
+            email: user.email || '',
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user info:', error)
+      }
+    }
+
+    const formatTime = (timestamp) => {
+      return formatDateFunc(timestamp)
+    }
+
+    const getNotificationTypeClass = (type) => {
+      return {
+        'bg-blue-100 text-blue-800': type === 'course',
+        'bg-purple-100 text-purple-800': type === 'system',
+      }
+    }
+
+    const getNotificationPriorityClass = (priority) => {
+      return {
+        'bg-green-100 text-green-800': priority === 'low',
+        'bg-yellow-100 text-yellow-800': priority === 'medium',
+        'bg-orange-100 text-orange-800': priority === 'high',
+        'bg-red-100 text-red-800': priority === 'urgent',
+      }
+    }
+
+    const getStatusClass = (status) => {
+      return {
+        'bg-green-100 text-green-800': status === 'active',
+        'bg-yellow-100 text-yellow-800': status === 'pending',
+        'bg-gray-100 text-gray-800': status === 'completed',
+        'bg-red-100 text-red-800': status === 'inactive',
+      }
+    }
+
+    const getStatusText = (status) => {
+      const statusMap = {
+        active: 'Active',
+        pending: 'Pending',
+        completed: 'Completed',
+        inactive: 'Inactive',
+      }
+      return statusMap[status] || 'Unknown'
+    }
+
+    onMounted(() => {
+      getUserInfo()
+      loadCourses()
+      loadNotifications()
+    })
+
+    return {
+      userInfo,
+      notifications,
+      courses,
+      isLoading,
+      formatTime,
+      getNotificationTypeClass,
+      getNotificationPriorityClass,
+      getStatusClass,
+      getStatusText,
     }
   },
 }
