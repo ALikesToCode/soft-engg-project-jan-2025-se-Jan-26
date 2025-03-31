@@ -344,25 +344,6 @@ export default {
                 response += `${result.name} result: ${JSON.stringify(result.result, null, 2)}\n\n`
               })
               response += "```\n"
-              
-              // Check if we need to do a follow-up call to process the results
-              // This is useful if we want the LLM to interpret the results
-              const includeFollowUp = false // Set to true if you want a follow-up call
-              
-              if (includeFollowUp) {
-                // Send the results back to the AI with a follow-up call
-                const followUpPayload = {
-                  id: threadId.value,
-                  query: "Based on these results, provide a clearer response: " + 
-                         JSON.stringify(data.function_results),
-                  function_results: data.function_results
-                }
-                
-                const followUpResponse = await ChatService.sendMessage(followUpPayload)
-                if (followUpResponse && followUpResponse.content) {
-                  response += "\n\n**Interpretation:**\n" + followUpResponse.content
-                }
-              }
             }
             
             return response
@@ -380,7 +361,21 @@ export default {
       } catch (error) {
         console.error("Error getting AI response:", error)
         isFunctionCalling.value = false
-        throw error
+        
+        // Return a more user-friendly error message based on the error type
+        if (error.response) {
+          const status = error.response.status
+          
+          if (status === 401 || status === 403) {
+            return "You need to be logged in to use this feature. Please sign in and try again."
+          } else if (status === 404) {
+            return "The AI service is currently unavailable. Please try again later."
+          } else if (status >= 500) {
+            return "The server encountered an issue. Our team has been notified and is working to fix it."
+          }
+        }
+        
+        return "I'm having trouble connecting to the AI service. Please check your internet connection and try again."
       }
     }
     

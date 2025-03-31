@@ -1,132 +1,164 @@
 <template>
-  <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
-    <div class="xl:col-span-2 space-y-8">
-      <!-- Lecture Info -->
-      <div class="bg-white rounded-2xl shadow-lg p-6">
-        <div class="flex items-start justify-between">
-          <div class="space-y-3">
-            <h2 class="text-2xl font-bold text-gray-900">{{ lecture.title }}</h2>
-            <p class="text-gray-600 leading-relaxed">{{ lecture.description }}</p>
-          </div>
-          <div class="relative w-20 h-20">
-            <svg class="progress-ring" width="80" height="80">
-              <circle class="text-gray-200" stroke-width="6" fill="transparent" r="37" cx="40" cy="40"/>
-              <circle class="text-primary-500" stroke-width="6" :stroke-dasharray="`${lecture.progress * 2.34}, 234`" 
-                      fill="transparent" r="37" cx="40" cy="40" style="filter: drop-shadow(0 0 8px rgba(2, 132, 199, 0.2))"/>
-            </svg>
-            <button @click="$emit('mark-complete')" 
-                    class="absolute inset-0 flex items-center justify-center w-full h-full
-                           transition-transform duration-300 hover:scale-105">
-              <i class="fas text-2xl" 
-                 :class="lecture.completed ? 'fa-check-circle text-green-500' : 'fa-circle-play text-primary-500'"></i>
-            </button>
-          </div>
-        </div>
-        
-        <div class="mt-6 flex flex-wrap gap-3">
-          <button class="px-5 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 
-                    transition-all duration-300 flex items-center space-x-2 shadow-md hover:shadow-lg">
-            <i class="fas fa-download"></i>
-            <span>Resources</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Key Concepts -->
-      <div class="bg-white rounded-2xl shadow-lg p-6">
-        <h3 class="text-xl font-bold text-gray-900 mb-5">Key Concepts</h3>
-        <ul class="space-y-4">
-          <li v-for="(objective, index) in lecture.objectives" :key="index"
-              class="flex items-start space-x-3 p-3 bg-gray-50/50 rounded-lg hover:bg-gray-50 transition-colors">
-            <i class="fas fa-check-circle text-green-500 mt-1"></i>
-            <span class="text-gray-700 leading-relaxed">{{ objective }}</span>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Discussion -->
-      <div class="bg-white rounded-2xl shadow-lg p-6">
-        <h3 class="text-xl font-bold text-gray-900 mb-5">Community Dialogue</h3>
-        <div class="space-y-5">
-          <textarea
-            placeholder="Engage with peers..."
-            class="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 
-                   focus:border-transparent transition-all duration-300 resize-none"
-            rows="3"
-          ></textarea>
-          <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-2 text-gray-500">
-              <button class="p-2 hover:bg-gray-100 rounded-lg">
-                <i class="fas fa-paperclip"></i>
-              </button>
-              <button class="p-2 hover:bg-gray-100 rounded-lg">
-                <i class="fas fa-at"></i>
-              </button>
-            </div>
-            <button class="px-6 py-2.5 bg-primary-500 text-white rounded-xl hover:bg-primary-600 
-                      transition-all duration-300 flex items-center space-x-2 shadow-md">
-              <i class="fas fa-paper-plane"></i>
-              <span>Post</span>
-            </button>
-          </div>
-        </div>
-      </div>
+  <div class="lecture-content">
+    <h1 class="text-2xl font-bold mb-4">{{ lecture.title }}</h1>
+    
+    <!-- Additional info -->
+    <div class="flex items-center mb-6 text-sm text-gray-600 dark:text-gray-400">
+      <span v-if="lecture.duration" class="flex items-center mr-4">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {{ formatDuration(lecture.duration) }}
+      </span>
+      <span v-if="lecture.created_at" class="flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        {{ formatDate(lecture.created_at) }}
+      </span>
     </div>
-
-    <!-- Sidebar Content -->
-    <div class="space-y-8">
-      <!-- Resources -->
-      <div class="bg-white rounded-2xl shadow-lg p-6">
-        <h3 class="text-xl font-bold text-gray-900 mb-5">Learning Toolkit</h3>
-        <ul class="space-y-3">
-          <li v-for="(material, index) in lecture.materials" :key="index"
-              class="flex items-center justify-between p-3 bg-gray-50/50 rounded-lg hover:bg-gray-50 
-                    transition-colors cursor-pointer group">
-            <div class="flex items-center space-x-3">
-              <i class="fas text-lg transform transition-all"
-                 :class="[getFileIcon(material.type), 'group-hover:scale-110']"></i>
-              <span class="text-sm font-medium text-gray-700">{{ material.title }}</span>
-            </div>
-            <button class="p-2 hover:bg-gray-200 rounded-lg transition-colors">
-              <i class="fas fa-download text-gray-600"></i>
-            </button>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Challenges -->
-      <div class="bg-white rounded-2xl shadow-lg p-6">
-        <h3 class="text-xl font-bold text-gray-900 mb-5">Skill Challenges</h3>
-        <ul class="space-y-4">
-          <li v-for="(question, index) in lecture.questions" :key="index"
-              class="p-3 bg-gray-50/50 rounded-lg hover:bg-gray-50 transition-colors">
-            <div class="flex items-start space-x-3">
-              <span class="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-600 rounded-lg flex items-center 
-                       justify-center text-sm font-bold">
-                {{ index + 1 }}
-              </span>
-              <p class="text-gray-700 leading-relaxed">{{ question }}</p>
-            </div>
-          </li>
-        </ul>
-      </div>
+    
+    <!-- Lecture description/content -->
+    <div v-if="lecture.content" class="prose prose-lg max-w-none dark:prose-invert mb-8">
+      <div v-html="renderedContent"></div>
+    </div>
+    <div v-else class="text-gray-500 italic mb-8">
+      No additional content available for this lecture.
+    </div>
+    
+    <!-- Resources and attachments -->
+    <div v-if="lecture.resources && lecture.resources.length > 0" class="mt-8">
+      <h2 class="text-xl font-semibold mb-4">Additional Resources</h2>
+      <ul class="space-y-2">
+        <li v-for="(resource, index) in lecture.resources" :key="index" class="flex items-center p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div class="mr-3 text-blue-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <div class="flex-1">
+            <a 
+              :href="resource.url" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+            >
+              {{ resource.title || resource.url }}
+            </a>
+            <p v-if="resource.description" class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {{ resource.description }}
+            </p>
+          </div>
+        </li>
+      </ul>
     </div>
   </div>
 </template>
 
 <script>
+import { computed } from 'vue';
+import DOMPurify from 'dompurify';
+import { marked } from 'marked';
+
 export default {
-  name: 'CourseLectureContent',
   props: {
     lecture: {
       type: Object,
       required: true
-    },
-    getFileIcon: {
-      type: Function,
-      required: true
     }
   },
-  emits: ['mark-complete']
+  setup(props) {
+    // Render markdown content safely
+    const renderedContent = computed(() => {
+      if (!props.lecture.content) return '';
+      
+      // Convert markdown to HTML and sanitize to prevent XSS
+      const html = marked(props.lecture.content);
+      return DOMPurify.sanitize(html);
+    });
+    
+    // Format duration (e.g., "10:30")
+    const formatDuration = (seconds) => {
+      if (!seconds) return '';
+      
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      
+      return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+    };
+    
+    // Format date (e.g., "Jan 15, 2024")
+    const formatDate = (dateString) => {
+      if (!dateString) return '';
+      
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    };
+    
+    return {
+      renderedContent,
+      formatDuration,
+      formatDate
+    };
+  }
+};
+</script>
+
+<style>
+.lecture-content {
+  @apply px-1;
 }
-</script> 
+
+/* Style markdown content */
+.lecture-content .prose h1 {
+  @apply text-2xl font-bold mt-6 mb-4;
+}
+
+.lecture-content .prose h2 {
+  @apply text-xl font-semibold mt-5 mb-3;
+}
+
+.lecture-content .prose h3 {
+  @apply text-lg font-medium mt-4 mb-2;
+}
+
+.lecture-content .prose p {
+  @apply mb-4 leading-relaxed;
+}
+
+.lecture-content .prose pre {
+  @apply bg-gray-50 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto;
+}
+
+.lecture-content .prose code {
+  @apply font-mono text-sm bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded;
+}
+
+.lecture-content .prose pre code {
+  @apply bg-transparent dark:bg-transparent px-0 py-0;
+}
+
+.lecture-content .prose blockquote {
+  @apply border-l-4 border-gray-300 dark:border-gray-600 pl-4 italic;
+}
+
+.lecture-content .prose a {
+  @apply text-blue-600 dark:text-blue-400 hover:underline;
+}
+
+.lecture-content .prose img {
+  @apply rounded-lg max-w-full h-auto my-4;
+}
+
+.lecture-content .prose ul {
+  @apply list-disc pl-6 mb-4;
+}
+
+.lecture-content .prose ol {
+  @apply list-decimal pl-6 mb-4;
+}
+</style>

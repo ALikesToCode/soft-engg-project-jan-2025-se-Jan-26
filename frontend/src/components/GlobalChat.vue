@@ -214,7 +214,13 @@ export default {
     
     // Toggle split screen
     const toggleSplitScreen = () => {
-      chatStore.toggleSplitScreen()
+      try {
+        chatStore.toggleSplitScreen()
+      } catch (error) {
+        console.error('Error toggling split screen mode:', error)
+        // Fallback to directly setting the state if the store method fails
+        chatStore.isSplitScreen = !chatStore.isSplitScreen
+      }
     }
 
     // Helper function to ensure we have a valid chat

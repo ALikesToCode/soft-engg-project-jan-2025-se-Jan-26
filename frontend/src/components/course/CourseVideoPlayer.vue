@@ -9,7 +9,8 @@
         <div
           class="w-12 h-12 border-4 border-maroon-500 border-t-transparent rounded-full animate-spin mx-auto"
         ></div>
-        <p class="mt-4 text-slate-200">Loading video... {{ videoUrl }}</p>
+        <p class="mt-4 text-slate-200">Loading video...</p>
+        <p class="mt-2 text-sm text-slate-400 max-w-md break-all">{{ videoUrl }}</p>
       </div>
     </div>
 
@@ -18,20 +19,54 @@
       v-if="error"
       class="absolute inset-0 flex items-center justify-center bg-slate-900/90 z-10"
     >
-      <div class="text-center">
+      <div class="text-center max-w-md p-4">
         <span class="material-symbols-outlined text-4xl text-red-500">error_outline</span>
         <p class="mt-2 text-slate-200">{{ error }}</p>
-        <button
-          @click="retryLoading"
-          class="mt-4 px-4 py-2 bg-maroon-500 text-white rounded-lg hover:bg-maroon-600 transition-colors"
-        >
-          Retry
-        </button>
+        <p class="mt-2 text-sm text-slate-400 break-all">URL: {{ videoUrl }}</p>
+        <div class="mt-4 flex justify-center space-x-3">
+          <button
+            @click="retryLoading"
+            class="px-4 py-2 bg-maroon-500 text-white rounded-lg hover:bg-maroon-600 transition-colors"
+          >
+            Retry
+          </button>
+          <button
+            @click="reportIssue"
+            class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+          >
+            Report Issue
+          </button>
+          <button 
+            v-if="isYoutubeUrl"
+            @click="openInNewTab"
+            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Open in YouTube
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Video Player -->
+    <!-- YouTube Embed -->
+    <iframe
+      v-if="isYoutubeUrl && !error"
+      ref="youtubePlayer"
+      class="w-full h-full"
+      :src="youtubeEmbedUrl"
+      frameborder="0"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      allowfullscreen
+      @load="handleYoutubeLoad"
+      @error="handleYoutubeError"
+      title="Video content"
+      loading="lazy"
+      sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
+      style="aspect-ratio: 16/9;"
+    ></iframe>
+
+    <!-- Standard Video Player (Non-YouTube) -->
     <video
+      v-if="!isYoutubeUrl && !error"
       ref="videoPlayer"
       class="w-full h-full object-cover"
       :src="videoUrl"
@@ -41,14 +76,18 @@
       @loadedmetadata="handleMetadataLoaded"
       @error="handleError"
       :controls="useNativeControls"
+      preload="auto"
+      crossorigin="anonymous"
     >
       <source :src="videoUrl" type="video/mp4" />
+      <source :src="videoUrl" type="video/webm" />
+      <source :src="videoUrl" type="video/ogg" />
       Your browser does not support the video tag.
     </video>
 
     <!-- Custom Controls (when not using native) -->
     <div
-      v-if="!useNativeControls"
+      v-if="!useNativeControls && !isYoutubeUrl && !error"
       class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-900 to-transparent"
     >
       <div class="flex items-center space-x-4">
@@ -103,9 +142,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { VuePlayer } from '@display-studio/vue-player'
-import { useNotification } from '@/composables/useNotification'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 
 const VIDEO_CACHE_PREFIX = 'video_cache_'
 const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
@@ -113,14 +150,14 @@ const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
 export default {
   name: 'CourseVideoPlayer',
-  components: {
-    VuePlayer,
-  },
+  emits: ['timeupdate', 'ended', 'video-complete', 'time-update', 'video-error'],
+  
   data() {
     return {
-      volume: false,
+      volume: 1,
       useNativeControls: true,
-      isFullscreen: true,
+      isFullscreen: false,
+      videoCompleted: false,
     }
   },
 
@@ -137,19 +174,11 @@ export default {
       type: Number,
       default: 1,
     },
-    onProgress: {
-      type: Function,
-      default: () => {},
-    },
-    onComplete: {
-      type: Function,
-      default: () => {},
-    },
   },
 
-  setup(props) {
-    const { notify } = useNotification()
-    const playerRef = ref(null)
+  setup(props, { emit }) {
+    const videoPlayer = ref(null)
+    const youtubePlayer = ref(null)
     const loading = ref(true)
     const error = ref(null)
     const isPlaying = ref(false)
@@ -159,6 +188,74 @@ export default {
     const playbackRate = ref(props.initialPlaybackRate)
     const progress = ref(0)
     const savedTime = ref(0)
+    const videoCompleted = ref(false)
+
+    // YouTube video detection and handling
+    const isYoutubeUrl = computed(() => {
+      if (!props.videoUrl) return false;
+      return props.videoUrl.includes('youtube.com') || props.videoUrl.includes('youtu.be');
+    });
+
+    const youtubeEmbedUrl = computed(() => {
+      if (!isYoutubeUrl.value) return '';
+      
+      // Parse YouTube video ID from URL
+      let videoId = '';
+      
+      // Handle full youtube.com URLs
+      if (props.videoUrl.includes('youtube.com/watch')) {
+        try {
+          const url = new URL(props.videoUrl);
+          videoId = url.searchParams.get('v');
+        } catch (e) {
+          console.error('Invalid YouTube URL:', props.videoUrl);
+          const urlRegex = /[?&]v=([^&#]*)/i;
+          const match = props.videoUrl.match(urlRegex);
+          videoId = match && match[1] ? match[1] : '';
+        }
+      } 
+      // Handle youtu.be short URLs
+      else if (props.videoUrl.includes('youtu.be')) {
+        videoId = props.videoUrl.split('/').pop().split('?')[0];
+      }
+
+      if (!videoId) {
+        console.error('Could not extract YouTube video ID from URL:', props.videoUrl);
+        return '';
+      }
+
+      // Create embed URL with additional parameters for better performance and security
+      return `https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&autoplay=0&rel=0&modestbranding=1&hl=en&color=white`;
+    });
+
+    const handleYoutubeLoad = () => {
+      console.log('YouTube video loaded');
+      loading.value = false;
+      error.value = null;
+    };
+
+    const handleYoutubeError = (e) => {
+      console.error('YouTube embed error:', e);
+      error.value = 'Failed to load YouTube video. Please try opening it directly on YouTube.';
+      loading.value = false;
+      emit('video-error', error.value);
+    };
+
+    const openInNewTab = () => {
+      if (props.videoUrl) {
+        window.open(props.videoUrl, '_blank');
+      }
+    };
+
+    // Watch for URL changes to reset states
+    watch(() => props.videoUrl, (newUrl) => {
+      if (newUrl) {
+        loading.value = true;
+        error.value = null;
+        videoCompleted.value = false;
+        console.log('Video URL changed, resetting player state:', newUrl);
+      }
+    });
 
     // Cache management
     const cacheKey = computed(() => `${VIDEO_CACHE_PREFIX}${props.videoUrl}`)
@@ -170,6 +267,11 @@ export default {
           const data = JSON.parse(cached)
           if (Date.now() - data.timestamp < CACHE_DURATION) {
             savedTime.value = data.currentTime
+            
+            // Set video position
+            if (videoPlayer.value) {
+              videoPlayer.value.currentTime = savedTime.value;
+            }
           } else {
             localStorage.removeItem(cacheKey.value)
           }
@@ -194,73 +296,129 @@ export default {
     }
 
     const handleMetadataLoaded = () => {
-      console.log('Metadata loaded! Calling onPlayerReady...')
-      onPlayerReady()
-    }
-
-    // Player event handlers
-    const onPlayerReady = () => {
-      console.log('here')
+      console.log('Video metadata loaded!')
       loading.value = false
       error.value = null
-      if (playerRef.value) {
-        duration.value = playerRef.value.duration
+      if (videoPlayer.value) {
+        duration.value = videoPlayer.value.duration
         loadVideoProgress()
       }
     }
 
-    const onTimeUpdate = (time) => {
-      currentTime.value = time
-      progress.value = (time / duration.value) * 100
-      props.onProgress(time)
-
+    const handleTimeUpdate = (event) => {
+      if (!videoPlayer.value) return
+      currentTime.value = videoPlayer.value.currentTime
+      progress.value = (currentTime.value / duration.value) * 100
+      
+      // Emit time update for parent component
+      emit('time-update', currentTime.value)
+      
       // Save progress every 5 seconds
-      if (Math.floor(time) % 5 === 0) {
+      if (Math.floor(currentTime.value) % 5 === 0) {
         saveVideoProgress()
+      }
+      
+      // Auto-mark as complete when watched 90% of the video
+      if (!videoCompleted.value && duration.value > 0 && currentTime.value >= duration.value * 0.9) {
+        videoCompleted.value = true
+        emit('video-complete')
       }
     }
 
-    const onVideoEnded = () => {
+    const handleVideoEnd = () => {
       isPlaying.value = false
-      props.onComplete()
+      
+      // Emit video completed event
+      if (!videoCompleted.value) {
+        videoCompleted.value = true
+        emit('video-complete')
+        emit('ended')
+      }
     }
 
-    const onVideoError = (e) => {
-      console.error('Video error:', e)
-      error.value = 'Failed to load video. Please try again.'
-      loading.value = false
-      notify.error('Video playback error')
-    }
+    const handleError = (e) => {
+      console.error('Video error details:', e);
+      
+      // Check if video element is available
+      if (videoPlayer.value) {
+        console.error('Video error code:', videoPlayer.value.error?.code);
+        console.error('Video error message:', videoPlayer.value.error?.message);
+      }
+      
+      // Different error messages based on error code
+      const errorMessages = {
+        1: 'The video playback was aborted',
+        2: 'Network error - please check your connection',
+        3: 'Video decoding failed - the format may not be supported',
+        4: 'Video is not available or has been removed'
+      };
+      
+      const errorCode = videoPlayer.value?.error?.code || 0;
+      const defaultMessage = 'Failed to load video. Please try again.';
+      
+      error.value = errorMessages[errorCode] || defaultMessage;
+      loading.value = false;
+      
+      // Additional debugging
+      console.log('Attempted to load video URL:', props.videoUrl);
+      
+      // Test if URL is accessible
+      testVideoUrl();
+      
+      // Emit the error event to the parent component
+      emit('video-error', error.value);
+    };
+    
+    const testVideoUrl = () => {
+      if (!props.videoUrl) return;
+      
+      const xhr = new XMLHttpRequest();
+      xhr.open('HEAD', props.videoUrl, true);
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === 4) {
+          console.log('Video URL response status:', xhr.status);
+          console.log('Video URL response headers:', xhr.getAllResponseHeaders());
+          
+          if (xhr.status >= 400) {
+            error.value = `Video unavailable (HTTP ${xhr.status}). Please contact support.`;
+            emit('video-error', error.value);
+          }
+        }
+      };
+      xhr.send();
+    };
 
     // Player controls
     const togglePlay = () => {
-      if (!playerRef.value) return
+      if (!videoPlayer.value) return
       if (isPlaying.value) {
-        playerRef.value.pause()
+        videoPlayer.value.pause()
+        isPlaying.value = false
       } else {
-        playerRef.value.play()
+        videoPlayer.value.play()
+        isPlaying.value = true
       }
-      isPlaying.value = !isPlaying.value
     }
 
     const toggleMute = () => {
-      if (!playerRef.value) return
+      if (!videoPlayer.value) return
       isMuted.value = !isMuted.value
-      playerRef.value.muted = isMuted.value
+      videoPlayer.value.muted = isMuted.value
     }
 
-    const onProgressClick = (event) => {
-      if (!playerRef.value) return
+    const seek = (event) => {
+      if (!videoPlayer.value || !duration.value) return
       const rect = event.target.getBoundingClientRect()
       const pos = (event.clientX - rect.left) / rect.width
       const newTime = pos * duration.value
-      playerRef.value.currentTime = newTime
+      videoPlayer.value.currentTime = newTime
+      currentTime.value = newTime
     }
 
     const setPlaybackRate = (rate) => {
-      if (!playerRef.value) return
+      if (!videoPlayer.value) return
       playbackRate.value = rate
-      playerRef.value.playbackRate = rate
+      videoPlayer.value.playbackRate = rate
     }
 
     const togglePlaybackRate = () => {
@@ -270,43 +428,85 @@ export default {
     }
 
     const toggleFullscreen = async () => {
-      if (!playerRef.value) return
+      const container = document.querySelector('.aspect-video')
+      if (!container) return
+      
       try {
         if (document.fullscreenElement) {
           await document.exitFullscreen()
+          isFullscreen.value = false
         } else {
-          await playerRef.value.$el.requestFullscreen()
+          await container.requestFullscreen()
+          isFullscreen.value = true
         }
       } catch (err) {
         console.error('Fullscreen error:', err)
-        notify.error('Failed to toggle fullscreen')
       }
     }
 
     const formatTime = (seconds) => {
+      if (!seconds || isNaN(seconds)) return '0:00'
       const mins = Math.floor(seconds / 60)
       const secs = Math.floor(seconds % 60)
       return `${mins}:${secs.toString().padStart(2, '0')}`
     }
 
     const retryLoading = () => {
-      loading.value = true
+      console.log('Retrying video load...')
       error.value = null
-      if (playerRef.value) {
-        playerRef.value.load()
+      loading.value = true
+      videoCompleted.value = false
+      
+      // Reset video element
+      if (videoPlayer.value) {
+        videoPlayer.value.load()
       }
     }
 
+    const reportIssue = () => {
+      // Simple implementation - could be expanded to send details to backend
+      alert('Issue reported to our team. We will fix it as soon as possible.')
+      console.log('Video issue reported for URL:', props.videoUrl)
+    }
+
+    // Handle YouTube video completion via postMessage API
+    const setupYouTubeCompletionTracking = () => {
+      window.addEventListener('message', (event) => {
+        // Only process messages from YouTube
+        if (event.origin.includes('youtube.com') || event.origin.includes('youtube-nocookie.com')) {
+          try {
+            const data = JSON.parse(event.data);
+            
+            // YouTube API event for video state changes
+            if (data.event === 'onStateChange' && data.info === 0) {
+              // State 0 means the video has ended
+              handleVideoEnd();
+            } else if (data.event === 'infoDelivery' && data.info && data.info.playerState === 0) {
+              // Alternative way to detect video end
+              handleVideoEnd();
+            }
+          } catch (e) {
+            // Not a JSON message or other error, ignore
+          }
+        }
+      });
+    };
+
     // Cleanup
     onBeforeUnmount(() => {
-      if (playerRef.value) {
-        playerRef.value.pause()
+      if (videoPlayer.value) {
+        videoPlayer.value.pause()
       }
       saveVideoProgress()
     })
 
+    onMounted(() => {
+      setupYouTubeCompletionTracking();
+    });
+
     return {
-      playerRef,
+      videoPlayer,
+      youtubePlayer,
       loading,
       error,
       isPlaying,
@@ -316,22 +516,28 @@ export default {
       playbackRate,
       progress,
       savedTime,
-      playbackRates: PLAYBACK_RATES,
-      onPlayerReady,
-      onTimeUpdate,
-      onVideoEnded,
-      onVideoError,
+      isYoutubeUrl,
+      youtubeEmbedUrl,
+      handleYoutubeLoad,
+      handleYoutubeError,
+      openInNewTab,
+      handleMetadataLoaded,
+      handleTimeUpdate,
+      handleVideoEnd,
+      handleError,
       togglePlay,
       toggleMute,
-      onProgressClick,
+      seek,
       setPlaybackRate,
       togglePlaybackRate,
       toggleFullscreen,
       formatTime,
       retryLoading,
-      handleMetadataLoaded,
+      reportIssue,
+      testVideoUrl,
+      videoCompleted
     }
-  },
+  }
 }
 </script>
 
@@ -381,29 +587,6 @@ input[type='range']::-webkit-slider-runnable-track {
   aspect-ratio: 16 / 9;
 }
 
-/* Custom player styles */
-:deep(.vue-player) {
-  width: 100%;
-  height: 100%;
-  background-color: black;
-}
-
-:deep(.vue-player video) {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-/* Hover states */
-.controls-overlay {
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.vue-player:hover .controls-overlay {
-  opacity: 1;
-}
-
 /* Progress bar hover effect */
 .progress-bar {
   height: 4px;
@@ -412,17 +595,5 @@ input[type='range']::-webkit-slider-runnable-track {
 
 .progress-bar:hover {
   height: 6px;
-}
-
-/* Playback rate dropdown */
-.playback-rates {
-  transform: scale(0.95);
-  opacity: 0;
-  transition: all 0.2s ease;
-}
-
-.playback-rates.show {
-  transform: scale(1);
-  opacity: 1;
 }
 </style>

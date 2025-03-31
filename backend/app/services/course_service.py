@@ -669,7 +669,11 @@ class CourseService:
                 "certificate_url":enrollment.certificate_url,
                 "total_enrolled_course":total_course_count
             })
-        courses[-1]["total_enrolled_course"] = total_course_count
+        
+        # Safely add the total count to the last item if we have any courses
+        if courses:
+            courses[-1]["total_enrolled_course"] = total_course_count
+        
         return courses
 
     @staticmethod
@@ -756,50 +760,108 @@ class CourseService:
         
     async def get_user_recommended_courses(db: AsyncSession, user_id: UUID):
         try:
-            #validate if the user is student
+            # Validate if the user exists
+            user_result = await db.execute(select(User).where(User.id == user_id))
+            user = user_result.scalars().first()
+            if not user:
+                logger.warning(f"User with ID {user_id} not found when fetching recommended courses")
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            # Get recommended courses
             result = await db.execute(select(UserRecommendedCourses).where(UserRecommendedCourses.user_id == user_id))
             recommended_courses = result.scalars().all()
             return [rc.to_dict() for rc in recommended_courses]
+        except HTTPException as http_ex:
+            # Re-raise HTTP exceptions
+            raise http_ex
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            logger.error(f"Error getting recommended courses for user {user_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to retrieve recommended courses: {str(e)}")
     
     async def get_user_bookmarked_materials(db: AsyncSession, user_id: UUID):
         try:
-            #validate if the user is student
+            # Validate if the user exists
+            user_result = await db.execute(select(User).where(User.id == user_id))
+            user = user_result.scalars().first()
+            if not user:
+                logger.warning(f"User with ID {user_id} not found when fetching bookmarked materials")
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            # Get bookmarked materials
             result = await db.execute(select(BookmarkedMaterials).where(BookmarkedMaterials.user_id == user_id))
             bookmarked_materials = result.scalars().all()
             return [bm.to_dict() for bm in bookmarked_materials]
+        except HTTPException as http_ex:
+            # Re-raise HTTP exceptions
+            raise http_ex
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            logger.error(f"Error getting bookmarked materials for user {user_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to retrieve bookmarked materials: {str(e)}")
     
     async def add_user_bookmarked_materials(bookmark_data,db, user_id):
         try:
-            #validate if the user is student
+            # Validate if the user exists
             result = await db.execute(select(User).where(User.id == user_id))
             user = result.scalars().first()
             if user is None:
-                raise HTTPException(status_code=404, detail="You are not Authorized")
+                logger.warning(f"User with ID {user_id} not found when adding bookmarked material")
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            # Validate if the course exists
+            if bookmark_data.course_id:
+                course_result = await db.execute(select(Course).where(Course.id == bookmark_data.course_id))
+                course = course_result.scalars().first()
+                if not course:
+                    logger.warning(f"Course with ID {bookmark_data.course_id} not found when adding bookmark")
+                    raise HTTPException(status_code=404, detail="Course not found")
+            
+            # Check if bookmark already exists
+            existing_bookmark = await db.execute(
+                select(BookmarkedMaterials).where(
+                    and_(
+                        BookmarkedMaterials.user_id == user_id,
+                        BookmarkedMaterials.course_id == bookmark_data.course_id,
+                        BookmarkedMaterials.title == bookmark_data.title,
+                        BookmarkedMaterials.type == bookmark_data.type
+                    )
+                )
+            )
+            if existing_bookmark.scalars().first():
+                logger.info(f"Material already bookmarked by user {user_id}")
+                raise HTTPException(status_code=400, detail="Material already bookmarked")
             
             # Create a new bookmark object and add to the database
             new_bookmark = BookmarkedMaterials(
                 user_id=user_id,
                 title=bookmark_data.title,
                 type=bookmark_data.type,
-                date_bookmarked=datetime.datetime.now(),
+                date_bookmarked=datetime.datetime.now(UTC),
                 author=bookmark_data.author,
                 course_id=bookmark_data.course_id,
             )
             db.add(new_bookmark)
             await db.commit()
             await db.refresh(new_bookmark)
+            logger.info(f"Added bookmark for user {user_id}: {bookmark_data.title}")
             return new_bookmark.to_dict()
+        except HTTPException as http_ex:
+            await db.rollback()
+            raise http_ex
         except Exception as e:
-            logger.error(f"Error while saving bookmar ==> {str(e)}")
-            raise HTTPException(status_code=500, detail=str(e))
+            await db.rollback()
+            logger.error(f"Error while saving bookmark: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to save bookmark: {str(e)}")
 
-    async def delete_bookmarked_material(db: AsyncSession, user_id: UUID, bookmark_id:int):
+    async def delete_bookmarked_material(db: AsyncSession, user_id: UUID, bookmark_id: int):
         try:
-            #validate if the user is student
+            # Validate if the user exists
+            user_result = await db.execute(select(User).where(User.id == user_id))
+            user = user_result.scalars().first()
+            if not user:
+                logger.warning(f"User with ID {user_id} not found when deleting bookmark")
+                raise HTTPException(status_code=404, detail="User not found")
+            
+            # Find the bookmark to delete
             result = await db.execute(
                 select(BookmarkedMaterials).where(
                     and_(
@@ -810,17 +872,25 @@ class CourseService:
             )
             bookmark = result.scalars().first()
             if not bookmark:
+                logger.warning(f"Bookmark with ID {bookmark_id} not found for user {user_id}")
                 raise HTTPException(status_code=404, detail="Bookmark not found")
 
             # Delete the bookmark
             await db.delete(bookmark)
             await db.commit()
+            logger.info(f"Deleted bookmark ID {bookmark_id} for user {user_id}")
 
+            # Return updated list of bookmarked materials
             result = await db.execute(select(BookmarkedMaterials).where(BookmarkedMaterials.user_id == user_id))
             bookmarked_materials = result.scalars().all()
             return [bm.to_dict() for bm in bookmarked_materials]
+        except HTTPException as http_ex:
+            await db.rollback()
+            raise http_ex
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            await db.rollback()
+            logger.error(f"Error deleting bookmark {bookmark_id} for user {user_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to delete bookmark: {str(e)}")
 
 async def get_students_by_course(course_id: UUID, db: AsyncSession):
     """

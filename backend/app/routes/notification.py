@@ -12,7 +12,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/notification")
+router = APIRouter()
 
 # Course Notification Schema
 class CourseNotification(BaseModel):

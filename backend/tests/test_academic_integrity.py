@@ -474,7 +474,7 @@ async def test_get_all_flags(mock_get_all, client, faculty_token):
     
     # Send request with status filter
     response = client.get(
-        "/api/v1/academic-integrity/academic-integrity/flags?status=pending",
+        "/api/v1/academic-integrity/flags?status=pending",
         headers={"Authorization": f"Bearer {faculty_token}"}
     )
     

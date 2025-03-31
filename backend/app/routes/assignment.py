@@ -78,7 +78,7 @@ class GradeSubmission(BaseModel):
     feedback: Optional[str] = Field(None, description="Feedback text from the instructor")
 
 # Assignment endpoints
-@router.post("/assignments", response_model=dict, summary="Create a new assignment", 
+@router.post("/", response_model=dict, summary="Create a new assignment", 
              description="Create a new assignment for a course. Only faculty members can create assignments.")
 async def create_assignment(
     assignment: AssignmentCreate,
@@ -107,7 +107,7 @@ async def create_assignment(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/assignments", response_model=List[dict], summary="Get all assignments for a course",
+@router.get("/", response_model=List[dict], summary="Get all assignments for a course",
             description="Get all assignments for a specified course. Course ID is required as a query parameter.")
 async def get_assignments(
     course_id: Optional[uuid.UUID] = Query(None, description="ID of the course to get assignments for"),
@@ -164,7 +164,7 @@ async def get_assignments(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/assignments/{assignment_id}", response_model=dict, summary="Get assignment details",
+@router.get("/{assignment_id}", response_model=dict, summary="Get assignment details",
             description="Get detailed information about a specific assignment by its ID.")
 async def get_assignment(
     assignment_id: uuid.UUID = Path(..., description="ID of the assignment to retrieve"),
@@ -217,7 +217,7 @@ async def get_assignment(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/assignments/{assignment_id}", response_model=dict, summary="Update an assignment",
+@router.put("/{assignment_id}", response_model=dict, summary="Update an assignment",
             description="Update an existing assignment. Only faculty members can update assignments.")
 async def update_assignment(
     assignment_id: uuid.UUID = Path(..., description="ID of the assignment to update"),
@@ -250,7 +250,7 @@ async def update_assignment(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/assignments/{assignment_id}", response_model=dict, summary="Delete an assignment",
+@router.delete("/{assignment_id}", response_model=dict, summary="Delete an assignment",
                description="Delete an existing assignment. Only faculty members can delete assignments.")
 async def delete_assignment(
     assignment_id: uuid.UUID = Path(..., description="ID of the assignment to delete"),
@@ -282,7 +282,7 @@ async def delete_assignment(
         raise HTTPException(status_code=500, detail=str(e))
 
 # Submission endpoints
-@router.post("/assignments/{assignment_id}/submit", response_model=dict, summary="Submit an assignment",
+@router.post("/{assignment_id}/submit", response_model=dict, summary="Submit an assignment",
              description="Submit an assignment. Supports file uploads, text entries, and URL submissions.")
 async def submit_assignment(
     assignment_id: uuid.UUID = Path(..., description="ID of the assignment to submit"),
@@ -362,7 +362,7 @@ async def submit_assignment(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/assignments/{assignment_id}/submissions", response_model=List[dict], summary="Get all submissions for an assignment",
+@router.get("/{assignment_id}/submissions", response_model=List[dict], summary="Get all submissions for an assignment",
             description="Get all submissions for a specific assignment. Only faculty members can access this endpoint.")
 async def get_submissions(
     assignment_id: uuid.UUID = Path(..., description="ID of the assignment to get submissions for"),
@@ -408,7 +408,7 @@ async def get_submissions(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/assignments/{assignment_id}/my-submission", response_model=dict, summary="Get current user's submission",
+@router.get("/{assignment_id}/my-submission", response_model=dict, summary="Get current user's submission",
             description="Get the current user's submission for a specific assignment.")
 async def get_my_submission(
     assignment_id: uuid.UUID = Path(..., description="ID of the assignment to get submission for"),
@@ -459,7 +459,7 @@ async def get_my_submission(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/assignments/{assignment_id}/grade/{submission_id}", response_model=dict, summary="Grade a submission",
+@router.put("/{assignment_id}/grade/{submission_id}", response_model=dict, summary="Grade a submission",
             description="Grade a submission for a specific assignment. Only faculty members can grade submissions.")
 async def grade_submission(
     assignment_id: uuid.UUID = Path(..., description="ID of the assignment"),
@@ -522,7 +522,7 @@ async def grade_submission(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/assignments/{assignment_id}/submissions/{submission_id}/download", response_class=FileResponse, 
+@router.get("/{assignment_id}/submissions/{submission_id}/download", response_class=FileResponse, 
             summary="Download submission file", description="Download the file for a specific submission.")
 async def download_submission_file(
     assignment_id: uuid.UUID = Path(..., description="ID of the assignment"),
@@ -580,7 +580,7 @@ async def download_submission_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/assignments/{assignment_id}/submissions/{submission_id}/plagiarism", response_model=dict, 
+@router.get("/{assignment_id}/submissions/{submission_id}/plagiarism", response_model=dict, 
             summary="Get plagiarism report", description="Get the plagiarism report for a specific submission. Only faculty members can access this endpoint.")
 async def get_plagiarism_report(
     assignment_id: uuid.UUID = Path(..., description="ID of the assignment"),
@@ -627,7 +627,7 @@ async def get_plagiarism_report(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/assignments/files/{submission_id}/url", 
+@router.get("/files/{submission_id}/url", 
     summary="Get a pre-signed URL for a submission file",
     description="Generates a pre-signed URL for accessing a submission file",
     response_description="Pre-signed URL for the file"

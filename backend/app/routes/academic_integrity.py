@@ -18,7 +18,6 @@ from app.models.user import User
 from app.services.gemini_integrity_service import gemini_integrity_service
 
 router = APIRouter(
-    prefix="/academic-integrity",
     tags=["academic-integrity"],
     responses={404: {"description": "Not found"}},
 )
@@ -636,7 +635,7 @@ async def update_submission_flag(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/academic-integrity/flags", response_model=List[dict], summary="Get all academic integrity flags")
+@router.get("/flags", response_model=List[dict], summary="Get all academic integrity flags")
 async def get_all_flags(
     status: Optional[str] = Query(None, description="Filter flags by status"),
     db: AsyncSession = Depends(get_db),

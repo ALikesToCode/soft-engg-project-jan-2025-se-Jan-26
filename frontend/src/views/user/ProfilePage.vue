@@ -1,15 +1,22 @@
 <template>
-  <BaseProfilePage :user-type="userType" :user-info="userInfo" :is-editable="true">
-    <template #role-content>
-      <div>
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">My Enrolled Courses</h2>
-        <StudentCourseList :courses="courses" @continue-course="continueCourseToDashboard" />
-      </div>
-    </template>
-  </BaseProfilePage>
-  <!-- Loading Overlay -->
-  <div v-if="isProfileDataLoading || isCourseEnrolledDataLoading" class="loading-overlay">
-    <LoadingSpinner />
+  <!-- Only show content when not loading -->
+  <div v-if="!isLoading">
+    <BaseProfilePage :user-type="userType" :user-info="userInfo" :is-editable="true">
+      <template #role-content>
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800 mb-4">My Enrolled Courses</h2>
+          <StudentCourseList :courses="courses" @continue-course="continueCourseToDashboard" />
+        </div>
+      </template>
+    </BaseProfilePage>
+  </div>
+  
+  <!-- Loading Overlay - Always visible when loading -->
+  <div v-if="isLoading" class="loading-overlay">
+    <div class="loading-container">
+      <LoadingSpinner size="large" />
+      <p class="loading-text">Loading your profile...</p>
+    </div>
   </div>
 </template>
 
@@ -57,6 +64,11 @@ export default {
       isCourseEnrolledDataLoading: false,
     }
   },
+  computed: {
+    isLoading() {
+      return this.isProfileDataLoading || this.isCourseEnrolledDataLoading;
+    }
+  },
   methods: {
     showSuccessToast(msg) {
       const toast = useToast() // Call inside the method
@@ -71,49 +83,68 @@ export default {
       this.$router.push({ path: '/user/courses' })
     },
 
-    //APIs
-    async getUserProfile() {
+    // Combined data loading method
+    async loadData() {
+      this.isProfileDataLoading = true
+      this.isCourseEnrolledDataLoading = true
+      
       try {
-        this.isProfileDataLoading = true
-        const token = localStorage.getItem('token') // Retrieve token from localStorage
+        // Get token once
+        const token = localStorage.getItem('token')
         if (!token) throw new Error('No authentication token found')
-
+        
         const headers = {
           headers: {
-            Authorization: `Bearer ${token}`, // Add token to Authorization header
+            Authorization: `Bearer ${token}`,
           },
         }
+        
+        // Load profile data first
+        await this.getUserProfile(headers)
+        
+        // Then load courses
+        await this.getUserEnrolledCourses(headers)
+        
+      } catch (error) {
+        console.error('Error loading data:', error)
+        this.showErrorToast(error, 'Failed to load user data')
+      } finally {
+        // Ensure loading states are cleared even if errors occur
+        this.isProfileDataLoading = false
+        this.isCourseEnrolledDataLoading = false
+      }
+    },
 
+    //APIs
+    async getUserProfile(headers) {
+      try {
         const response = await api.get('/user/profile', headers)
         if (response.status !== 200) throw new Error('Failed to fetch user profile data')
+
+        console.log('Profile data received:', response.data)
+        console.log('Profile picture URL:', response.data.profile_pic_url)
 
         this.userInfo.id = response.data.id
         this.userInfo.name = response.data.name
         this.userInfo.email = response.data.email
-        this.userInfo.profilePictureUrl = response.data.profile_pic_url
-        this.isProfileDataLoading = false
-        this.showSuccessToast('Successfully fetched user profile data')
-        console.log(response.data)
+        this.userInfo.profilePictureUrl = response.data.profile_pic_url || this.userInfo.profilePictureUrl
+        
+        this.showSuccessToast('Profile loaded successfully')
+        return true
       } catch (error) {
-        this.isProfileDataLoading = false
-        this.showErrorToast(error, 'Failed to fetch user profile data')
         console.error('Error fetching user profile:', error)
+        throw error
       }
     },
-    async getUserEnrolledCourses() {
+    
+    async getUserEnrolledCourses(headers) {
       try {
-        this.isCourseEnrolledDataLoading = true
-        const token = localStorage.getItem('token') // Retrieve token from localStorage
-        if (!token) throw new Error('No authentication token found')
-
-        const headers = {
-          headers: {
-            Authorization: `Bearer ${token}`, // Add token to Authorization header
-          },
-        }
         const response = await api.get('/user/courses', headers)
         if (response.status !== 200) throw new Error('Failed to fetch user course data')
 
+        // Clear existing courses
+        this.courses = []
+        
         response.data.forEach((c) => {
           const course = new Course({
             id: c.id,
@@ -127,18 +158,17 @@ export default {
           })
           this.courses.push(course)
         })
-        this.isCourseEnrolledDataLoading = false
-        console.log('c = ' + this.courses)
-        this.showSuccessToast('User course data fetched successfully')
+        
+        console.log('Courses loaded:', this.courses.length)
+        return true
       } catch (error) {
-        this.isCourseEnrolledDataLoading = false
-        this.showErrorToast(error, 'Failed to fetch user course data')
         console.error('Error fetching user courses:', error)
+        throw error
       }
     },
   },
   mounted() {
-    this.getUserProfile(), this.getUserEnrolledCourses()
+    this.loadData()
   },
 }
 </script>
@@ -161,6 +191,15 @@ export default {
 }
 
 .loading-overlay {
-  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+  @apply fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50;
+}
+
+.loading-container {
+  @apply bg-white rounded-lg p-8 flex flex-col items-center justify-center;
+  min-width: 250px;
+}
+
+.loading-text {
+  @apply mt-4 text-lg font-medium text-gray-700;
 }
 </style>

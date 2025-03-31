@@ -143,7 +143,7 @@ oauth.register(
     access_token_url="https://oauth2.googleapis.com/token",
     access_token_params=None,
     refresh_token_url=None,
-    redirect_uri=f"http://localhost:8000{settings.API_PREFIX}/auth/callback",
+    redirect_uri="http://localhost:8000/auth/callback",
     userinfo_url="https://www.googleapis.com/oauth2/v3/userinfo",
     client_kwargs={"scope": "openid email profile"},
     jwks_uri = "https://www.googleapis.com/oauth2/v3/certs"
@@ -152,7 +152,7 @@ oauth.register(
 # Step 1: Redirect to Login
 # noraml email/password login
 # such users can only be added by support
-@router.post("/auth/login", 
+@router.post("/login", 
     summary="Login with email and password",
     description="Authenticate a user with email and password credentials",
     response_description="Authentication token and user information",
@@ -226,7 +226,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
     }
 
 # google login
-@router.get("/auth/login/google", 
+@router.get("/login/google", 
     summary="Login with Google",
     description="Initiates the Google OAuth2 authentication flow",
     response_description="Redirects to Google for authentication",
@@ -260,12 +260,12 @@ async def login_with_google(request: Request):
     """
     logger.info("Starting Google login process")
     # Use the same redirect URI as configured in the OAuth client
-    redirect_uri = f"http://localhost:8000{settings.API_PREFIX}/auth/callback"
+    redirect_uri = "http://localhost:8000/auth/callback"
     logger.info(f"Using redirect URI: {redirect_uri}")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 # Step 2: Google Callback
-@router.get("/auth/callback", 
+@router.get("/callback", 
     summary="Google OAuth callback",
     description="Handles the callback from Google OAuth2 authentication",
     response_description="Redirects to frontend with authentication token",
@@ -317,6 +317,10 @@ async def auth_callback(request: Request, db=Depends(get_db)):
         user_data = await oauth.google.parse_id_token(token, None)
         logger.info(f"Parsed user data: {user_data.get('email')}")
         
+        # Log complete user data for debugging
+        logger.info(f"Google user data: {user_data}")
+        logger.info(f"Google profile picture: {user_data.get('picture')}")
+        
         request.session["user"] = user_data
 
         # Check if user is already stored in db
@@ -347,7 +351,7 @@ async def auth_callback(request: Request, db=Depends(get_db)):
         return RedirectResponse(url=error_url)
 
 # Step 3: Get Current User (Frontend Calls This)
-@router.get("/auth/me", 
+@router.get("/me", 
     summary="Get current user information",
     description="Retrieves information about the currently authenticated user",
     response_description="User information from the JWT token",
@@ -424,7 +428,7 @@ async def get_user(token: str = Depends(oauth2_scheme)):
     return payload
 
 # Step 4: Logout
-@router.get("/auth/logout", 
+@router.get("/logout", 
     summary="Logout user",
     description="Invalidates the current authentication token",
     response_description="Confirmation of successful logout",
@@ -495,7 +499,7 @@ async def logout(token: str = Depends(oauth2_scheme)):
         return {"message": "Invalid token, no action taken"}
 
 # Step 5: Refresh Token
-@router.post("/auth/refresh", 
+@router.post("/refresh", 
     summary="Refresh authentication token",
     description="Issues a new JWT token to extend the user's session",
     response_description="New authentication token",
@@ -633,7 +637,7 @@ class PasswordUpdate(BaseModel):
         }
     )
 
-@router.post("/auth/set-password", 
+@router.post("/set-password", 
     summary="Set or update user password",
     description="Allows users to set a password for their account, particularly useful for users who initially logged in with Google",
     response_description="Confirmation message upon successful password update",

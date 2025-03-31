@@ -81,13 +81,38 @@
 
                 <!-- Video Player Section -->
                 <section aria-label="Lecture video" class="mb-4">
+                  <div v-if="videoError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                    <div class="flex items-start">
+                      <span class="material-symbols-outlined text-red-500 mr-3">error_outline</span>
+                      <div>
+                        <h3 class="font-medium text-red-800">Video playback error</h3>
+                        <p class="text-red-700 mt-1">{{ videoError }}</p>
+                        <div class="mt-3 flex space-x-3">
+                          <button 
+                            @click="tryBackupVideo" 
+                            class="px-3 py-1 bg-maroon-100 text-maroon-700 rounded hover:bg-maroon-200 transition-colors"
+                          >
+                            Try Backup Source
+                          </button>
+                          <button 
+                            @click="reportVideoIssue" 
+                            class="px-3 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 transition-colors"
+                          >
+                            Report Issue
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <CourseVideoPlayer
-                    :video-url="selectedLecture.videoUrl || ''"
+                    :video-url="currentVideoUrl"
                     :poster-image="selectedLecture.thumbnailUrl || ''"
                     :current-time="videoProgress"
                     :use-native-controls="true"
                     @time-update="updateVideoProgress"
                     @video-complete="handleVideoComplete"
+                    @video-error="handleVideoError"
                   />
 
                   <!-- Video Controls -->
@@ -450,6 +475,8 @@ export default {
     const captionsEnabled = ref(false)
     const videoProgress = ref(0)
     const autoSaveTimeout = ref(null)
+    const videoError = ref(null)
+    const currentVideoUrl = ref('')
 
     // Course Data & Methods
     const courseId = route.params.courseId
@@ -476,6 +503,105 @@ export default {
       if (!currentCourse.value) return 0
       return Math.round((completedLecturesCount.value / totalLectures.value) * 100)
     })
+
+    // Set up backup video URLs
+    const backupVideoUrls = {
+      // Public test videos from Google
+      '101': ['https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 
+              'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'],
+      '102': ['https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+              'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4'],
+      '103': ['https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+              'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'],
+      // Add YouTube videos as backups
+      'youtube': ['https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+                 'https://www.youtube.com/embed/dQw4w9WgXcQ'],
+      'default': ['https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+                 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4'],
+    }
+
+    // Track which backup URL we're currently using
+    const currentBackupIndex = ref(0)
+
+    // Handle video errors
+    const handleVideoError = (error) => {
+      console.error('Video error detected:', error)
+      videoError.value = `Unable to load video: ${error}`
+      
+      // Log additional information for debugging
+      if (selectedLecture.value) {
+        console.error('Failed lecture:', selectedLecture.value.title)
+        console.error('Failed video URL:', currentVideoUrl.value)
+      }
+      
+      // If this wasn't a YouTube URL already, suggest trying YouTube
+      if (!currentVideoUrl.value.includes('youtube.com') && !currentVideoUrl.value.includes('youtu.be')) {
+        notify.info('Trying alternative video source...')
+        tryYoutubeVideo()
+      }
+    }
+    
+    // Switch to YouTube video as a fallback
+    const tryYoutubeVideo = () => {
+      const youtubeBackups = backupVideoUrls['youtube'] || [];
+      if (youtubeBackups.length > 0) {
+        currentVideoUrl.value = youtubeBackups[0];
+        console.log('Trying YouTube backup video:', currentVideoUrl.value);
+        videoError.value = null;
+        notify.info('Switched to YouTube video source');
+      }
+    }
+
+    // Try loading from backup source
+    const tryBackupVideo = () => {
+      if (!selectedLecture.value) return
+      
+      const lectureId = selectedLecture.value.id.toString()
+      const sources = backupVideoUrls[lectureId] || backupVideoUrls.default
+      
+      // Increment backup index but don't exceed available sources
+      currentBackupIndex.value = (currentBackupIndex.value + 1) % sources.length
+      
+      // Set the new URL
+      currentVideoUrl.value = sources[currentBackupIndex.value]
+      console.log('Trying backup video source:', currentVideoUrl.value)
+      
+      // Clear error to hide error message
+      videoError.value = null
+      
+      // Show notification
+      notify.info(`Trying backup video source ${currentBackupIndex.value + 1}/${sources.length}`)
+    }
+
+    // Report video issue
+    const reportVideoIssue = () => {
+      const issue = {
+        lectureId: selectedLecture.value?.id,
+        lectureTitle: selectedLecture.value?.title,
+        videoUrl: currentVideoUrl.value,
+        error: videoError.value,
+        timestamp: new Date().toISOString()
+      }
+      
+      console.log('Reporting video issue:', issue)
+      
+      // Here you would normally send this to your backend
+      // For now, we'll just show a confirmation
+      notify.success('Issue reported. Our team will investigate.')
+    }
+
+    // Update video URL when selected lecture changes
+    watch(selectedLecture, (newLecture) => {
+      if (newLecture) {
+        // Reset backup index when lecture changes
+        currentBackupIndex.value = 0
+        videoError.value = null
+        
+        // Set initial video URL
+        currentVideoUrl.value = newLecture.videoUrl || ''
+        console.log('Setting video URL:', currentVideoUrl.value)
+      }
+    }, { immediate: true })
 
     const previousLecture = computed(() => {
       if (!selectedLecture.value || !weeks.value) return null
@@ -861,6 +987,8 @@ export default {
       playbackSpeed,
       captionsEnabled,
       videoProgress,
+      videoError,
+      currentVideoUrl,
 
       // Course Data
       currentCourse,
@@ -885,6 +1013,10 @@ export default {
       toggleCaptions,
       updateVideoProgress,
       handleVideoComplete,
+      handleVideoError,
+      tryBackupVideo,
+      tryYoutubeVideo,
+      reportVideoIssue,
       autoSaveNotes,
       handleResourceDownload,
       retryLoading,

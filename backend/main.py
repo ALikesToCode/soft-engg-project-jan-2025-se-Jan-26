@@ -315,6 +315,7 @@ if STATIC_DIR.exists():
 # Include routers
 app.include_router(auth, prefix="/api/v1", tags=["auth"])
 app.include_router(users, prefix="/api/v1/users", tags=["users"])
+app.include_router(user_router, prefix="/api/v1", tags=["user"])  # Add user router for /user/profile endpoints
 app.include_router(healthcheck, prefix="/api/v1", tags=["system"])
 app.include_router(courses,prefix="/api/v1", tags=["courses"])
 app.include_router(course_router,prefix="/api/v1", tags=["faculty-courses"])
@@ -326,9 +327,16 @@ app.include_router(lectures, prefix="/api/v1/lectures", tags=["lectures"])
 app.include_router(vector_search, prefix="/api/v1/vector", tags=["search"])
 app.include_router(upload, prefix="/api/v1/upload", tags=["files"])
 app.include_router(llm, prefix="/api/v1/llm", tags=["llm"])
+app.include_router(chat_history_router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(roadmap, prefix="/api/v1/roadmap", tags=["roadmap"])
 app.include_router(notification, prefix="/api/v1/notifications", tags=["notifications"])
 app.include_router(enrollments, prefix="/api/v1", tags=["enrollments"])  # Update prefix structure
+
+# Special case: Mount the auth callback directly at the root path to match the Google OAuth redirect
+from app.routes.auth import auth_callback
+app.add_api_route("/auth/callback", auth_callback, methods=["GET"], include_in_schema=True,
+                 summary="Google OAuth callback",
+                 description="Handles the callback from Google OAuth2 authentication")
 
 # Monitoring endpoints
 app.include_router(monitoring.router, prefix="/api/v1/monitoring", tags=["monitoring"])

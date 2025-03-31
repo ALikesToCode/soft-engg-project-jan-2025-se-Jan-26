@@ -4,7 +4,7 @@
     <div class="flex items-center space-x-6">
       <div class="relative">
         <img
-          :src="user.profilePictureUrl || '/images/default-avatar.png'"
+          :src="profileImageSrc"
           :alt="`${user.name}'s Profile Picture`"
           class="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
         />
@@ -56,6 +56,9 @@
 </template>
 
 <script>
+// Base64 dummy image as a reliable fallback
+const dummyAvatar = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2NjYyIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iMzYiIHI9IjIwIiBmaWxsPSIjOTA5MDkwIi8+PHBhdGggZD0iTTIwLDg1IEMzMCw2NSA3MCw2NSA4MCw4NSIgZmlsbD0iIzkwOTA5MCIvPjwvc3ZnPg=="
+
 export default {
   name: 'ProfileHeader',
   props: {
@@ -71,6 +74,17 @@ export default {
       type: Boolean,
       default: false,
     },
+  },
+  computed: {
+    profileImageSrc() {
+      // Use profile picture URL if available
+      if (this.user.profilePictureUrl) {
+        return this.user.profilePictureUrl
+      }
+      
+      // Use base64 encoded SVG as a guaranteed fallback
+      return dummyAvatar
+    }
   },
   emits: ['update-photo', 'edit-profile'],
 }

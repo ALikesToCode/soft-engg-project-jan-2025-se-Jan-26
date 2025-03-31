@@ -111,6 +111,15 @@ async def get_or_create_user(db: AsyncSession, user_data: dict) -> User:
 
         if user:
             print(f"User already exists: {email}")
+            
+            # Update the user's picture if they're logging in with Google and have a profile picture
+            picture_url = user_data.get("picture")
+            if picture_url and (user.picture is None or user.picture != picture_url):
+                print(f"Updating profile picture for user: {email}")
+                user.picture = picture_url
+                await db.commit()
+                await db.refresh(user)
+                
             return user
         else:
             print(f"Creating new user: {email}")

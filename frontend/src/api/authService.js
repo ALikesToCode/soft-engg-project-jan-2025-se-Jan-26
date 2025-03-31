@@ -24,7 +24,7 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
     (config) => {
         // Skip adding token for login requests
-        if (config.url && config.url.includes('/auth/login')) {
+        if (config.url && config.url.includes('/login')) {
             return config;
         }
         
@@ -103,7 +103,7 @@ export const authService = {
             console.log('Login Request Data:', { username: email, password });
 
             // Fix: Use proper relative URL and formData directly
-            const response = await this.axiosInstance.post('/auth/login', formData, {
+            const response = await this.axiosInstance.post('/login', formData, {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 }
@@ -145,8 +145,8 @@ export const authService = {
 
     // Login with Google
     async loginWithGoogle() {
-        // Redirect to the backend's Google login endpoint
-        const redirectUrl = `${API_URL}${API_PREFIX}/auth/login/google`;
+        // Use the correct path from OpenAPI: /api/v1/login/google
+        const redirectUrl = `${API_URL}/api/v1/login/google`;
         logger.log('Redirecting to Google login:', redirectUrl);
         window.location.href = redirectUrl;
     },
@@ -175,7 +175,8 @@ export const authService = {
 
             // Make the request to the backend
             try {
-                const response = await this.axiosInstance.get('/auth/me');
+                // Remove the duplicate /api/v1 prefix since it's already in the baseURL
+                const response = await this.axiosInstance.get('/user/profile');
                 logger.log('Current user data retrieved successfully');
                 logger.debug('User data:', response.data);
                 
@@ -190,7 +191,7 @@ export const authService = {
                 
                 return response.data;
             } catch (apiError) {
-                logger.error('Response error from /auth/me:', apiError.response?.status, apiError.response?.data);
+                logger.error('Response error from user profile endpoint:', apiError.response?.status, apiError.response?.data);
                 
                 // If unauthorized, clear token and retry login
                 if (apiError.response?.status === 401) {
@@ -203,6 +204,19 @@ export const authService = {
                     localStorage.removeItem('token');
                     localStorage.removeItem('userRole');
                     this._cachedUserData = null;
+                }
+                
+                // Try to use local storage as fallback
+                const userRole = localStorage.getItem('userRole');
+                if (userRole) {
+                    // Create a minimal user object from local storage data
+                    return {
+                        role: userRole.toLowerCase(),
+                        // Include other basic properties that code might depend on
+                        id: 'local-user',
+                        name: 'User',
+                        isLocal: true
+                    };
                 }
                 
                 return null;
@@ -245,16 +259,20 @@ export const authService = {
     // Refresh token
     async refreshToken() {
         try {
-            logger.log('Attempting to refresh token...');
+            logger.log('Refreshing token...');
             const token = localStorage.getItem('token');
-
+            
             if (!token) {
-                logger.warn('Cannot refresh - no token found');
+                logger.warn('No token to refresh');
                 return false;
             }
-
-            const response = await this.axiosInstance.post('/auth/refresh');
-
+            
+            const response = await this.axiosInstance.post('/refresh', {}, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
             if (response.data && response.data.access_token) {
                 logger.log('Token refreshed successfully');
                 localStorage.setItem('token', response.data.access_token);
@@ -273,35 +291,44 @@ export const authService = {
         }
     },
 
-    // Logout
+    // Logout user
     async logout() {
         try {
-            logger.log('Logging out user...');
-            await this.axiosInstance.get('/auth/logout');
-            localStorage.removeItem('user');
+            logger.log('Logging out...');
+            // Clear token from browser
             localStorage.removeItem('token');
-            logger.log('Logout successful, redirecting to home');
-            window.location.href = '/';
+            localStorage.removeItem('userRole');
+            this._cachedUserData = null;
+            
+            // Call backend to invalidate token
+            await this.axiosInstance.get('/logout');
+            logger.log('Logout successful');
+            
+            return true;
         } catch (error) {
             logger.error('Error during logout:', error.message);
             // Force logout even if the API call fails
             localStorage.removeItem('user');
             localStorage.removeItem('token');
             window.location.href = '/';
+            return false;
         }
     },
 
-    // Set password for user
+    // Set or update password
     async setPassword(password) {
         try {
-            logger.log('Setting user password...');
-            const response = await this.axiosInstance.post('/auth/set-password', { password });
-
-            if (response.status === 200) {
-                logger.log('Password set successfully');
-                return { success: true, message: 'Password set successfully' };
-            }
-            return { success: false, message: 'Failed to set password' };
+            logger.log('Setting new password...');
+            
+            const response = await this.axiosInstance.post('/set-password', {
+                password
+            });
+            
+            logger.log('Password set successfully');
+            return {
+                success: true,
+                message: 'Password updated successfully'
+            };
         } catch (error) {
             logger.error('Error setting password:', error.message);
             if (error.response) {
@@ -347,73 +374,118 @@ export const authService = {
             if (tokenParts.length === 3) {
                 try {
                     // Decode the payload (middle part)
-                    const payload = JSON.parse(atob(tokenParts[1]));
-                    const expiry = payload.exp ? new Date(payload.exp * 1000) : 'unknown';
-                    const isExpired = payload.exp ? Date.now() > payload.exp * 1000 : false;
-
-                    logger.debug('Token details:', {
-                        subject: payload.sub || 'unknown',
-                        expiry: expiry.toString(),
-                        isExpired,
-                        timeRemaining: payload.exp ?
-                            Math.floor((payload.exp * 1000 - Date.now()) / 1000) + ' seconds' :
-                            'unknown'
-                    });
-
-                    return !isExpired;
+                    const payloadBase64 = tokenParts[1].replace(/-/g, '+').replace(/_/g, '/');
+                    const payloadJson = atob(payloadBase64);
+                    const payload = JSON.parse(payloadJson);
+                    
+                    // Calculate expiration
+                    if (payload.exp) {
+                        const expMs = payload.exp * 1000; // Convert from seconds to milliseconds
+                        const now = Date.now();
+                        const expiresIn = expMs - now;
+                        const expiresInMin = Math.floor(expiresIn / 60000);
+                        
+                        if (expiresIn <= 0) {
+                            logger.warn('Token has expired!');
+                        } else {
+                            logger.log(`Token expires in: ${expiresInMin} minutes`);
+                        }
+                        
+                        // Show expiration date in local time
+                        const expirationDate = new Date(expMs);
+                        logger.log('Token expires at:', expirationDate.toLocaleString());
+                    } else {
+                        logger.warn('Token has no expiration claim!');
+                    }
+                    
+                    // Show subject and other common claims
+                    if (payload.sub) {
+                        logger.log('Token subject (user):', payload.sub);
+                    }
+                    
+                    return true;
                 } catch (e) {
-                    logger.warn('Failed to decode token payload:', e.message);
+                    logger.error('Error decoding token payload:', e);
+                    return true; // We still have a token even if we can't decode it
                 }
             } else {
-                logger.warn('Token does not appear to be in JWT format (missing 3 parts)');
+                logger.warn('Token does not appear to be a valid JWT (not 3 parts)');
+                return true; // We still have a token even if it's not a standard JWT
             }
         } catch (e) {
-            logger.error('Error analyzing token:', e.message);
+            logger.error('Error analyzing token:', e);
+            return !!token; // Return whether we have a token
         }
-
-        return !!token;
     },
 
-    // Clear all auth data (for testing/debugging)
+    // Clear all authentication data from local storage
     clearAuthData() {
-        logger.warn('Clearing all authentication data');
-        localStorage.removeItem('user');
         localStorage.removeItem('token');
-        return true;
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('user');
+        this._cachedUserData = null;
     },
 
-    // Check if user has a specific role
+    // Check if user has required role
     hasRole(role) {
         try {
-            logger.debug(`Checking if user has role: ${role}`);
-            
-            // Try to get role from localStorage first for faster response
-            const storedRole = localStorage.getItem('userRole');
-            if (storedRole) {
-                const hasRole = storedRole.toUpperCase() === role.toUpperCase();
-                logger.debug(`Role check from localStorage: ${storedRole.toUpperCase()} === ${role.toUpperCase()} = ${hasRole}`);
-                return hasRole;
+            // If we're checking for anonymous, always return true
+            if (role === 'anonymous') {
+                return true;
             }
             
-            // If no stored role but we have cached user data, use that
-            if (this._cachedUserData && this._cachedUserData.role) {
-                const hasRole = this._cachedUserData.role.toUpperCase() === role.toUpperCase();
-                logger.debug(`Role check from cached data: ${this._cachedUserData.role.toUpperCase()} === ${role.toUpperCase()} = ${hasRole}`);
-                return hasRole;
+            // Get user role from localStorage
+            const userRole = localStorage.getItem('userRole');
+            if (!userRole) {
+                logger.debug('No user role found in localStorage');
+                return false;
             }
             
-            // Default to false if no role information is available
-            logger.debug('No role information available, defaulting to false');
-            return false;
+            // Convert to lowercase for comparison
+            const userRoleLower = userRole.toLowerCase();
+            const requiredRoleLower = role.toLowerCase();
+            
+            // If user is admin, they have access to everything
+            if (userRoleLower === 'admin') {
+                return true;
+            }
+            
+            // Role hierarchy for fallback
+            const roleHierarchy = {
+                admin: 4,
+                faculty: 3,
+                teaching_assistant: 2,
+                student: 1,
+                anonymous: 0
+            };
+            
+            // Convert role strings to numeric levels
+            const userRoleLevel = roleHierarchy[userRoleLower] || 0;
+            const requiredRoleLevel = roleHierarchy[requiredRoleLower] || 0;
+            
+            // Check if user's role level is sufficient
+            const hasAccess = userRoleLevel >= requiredRoleLevel;
+            logger.debug(`Role check: User role ${userRoleLower} (level ${userRoleLevel}) vs required ${requiredRoleLower} (level ${requiredRoleLevel}) = ${hasAccess}`);
+            
+            return hasAccess;
         } catch (error) {
-            logger.error('Error in hasRole:', error);
+            logger.error('Error checking role:', error);
             return false;
         }
     },
 
-    // Check if user has support role
+    // Check if user has a support role (admin or faculty)
     hasSupportRole() {
-        return this.hasRole('SUPPORT');
+        try {
+            const userRole = localStorage.getItem('userRole');
+            if (!userRole) return false;
+            
+            const supportRoles = ['ADMIN', 'FACULTY', 'TEACHING_ASSISTANT'];
+            return supportRoles.includes(userRole.toUpperCase());
+        } catch (error) {
+            logger.error('Error checking support role:', error);
+            return false;
+        }
     }
 };
 

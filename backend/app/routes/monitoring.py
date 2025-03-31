@@ -26,7 +26,7 @@ class AlertResolution(BaseModel):
     """Schema for resolving alerts"""
     resolution_note: str
 
-@router.get("/monitoring/health",
+@router.get("/health",
     summary="Get system health status",
     description="Returns the current health status of the system and its components",
     response_description="System health information",
@@ -74,7 +74,7 @@ async def get_health():
         logger.error(f"Error getting system health: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/monitoring/metrics",
+@router.get("/metrics",
     summary="Get system metrics",
     description="Returns detailed system performance metrics",
     response_description="System metrics",
@@ -131,7 +131,7 @@ async def get_metrics(
     
     return response
 
-@router.get("/monitoring/logs",
+@router.get("/logs",
     summary="Get system logs",
     description="Returns system logs with optional filtering",
     response_description="System logs",
@@ -166,7 +166,7 @@ async def get_logs(
     """
     return await monitoring_service.get_system_logs(level, limit)
 
-@router.post("/monitoring/alerts",
+@router.post("/alerts",
     summary="Create system alert",
     description="Creates a new system alert",
     response_description="Created alert",
@@ -204,7 +204,7 @@ async def create_alert(
         alert.message
     )
 
-@router.get("/monitoring/alerts",
+@router.get("/alerts",
     summary="Get system alerts",
     description="Returns system alerts with optional filtering",
     response_description="System alerts",
@@ -253,7 +253,7 @@ async def get_alerts(
     
     return alerts
 
-@router.get("/monitoring/summary",
+@router.get("/summary",
     summary="Get system summary",
     description="Returns a comprehensive summary of the system status",
     response_description="System summary",
@@ -311,7 +311,7 @@ async def get_system_summary(
         logger.error(f"Error getting system summary: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/monitoring/services",
+@router.get("/services",
     summary="Get service status",
     description="Returns the status of all monitored services",
     response_description="Service status information",
@@ -338,7 +338,7 @@ async def get_service_status(
     """Get status of all services"""
     return await monitoring_service.check_service_health()
 
-@router.post("/monitoring/alerts/{alert_id}/acknowledge",
+@router.post("/alerts/{alert_id}/acknowledge",
     summary="Acknowledge alert",
     description="Acknowledge an existing alert",
     response_description="Updated alert",
@@ -372,7 +372,7 @@ async def acknowledge_alert(
         acknowledgement.comment
     )
 
-@router.post("/monitoring/alerts/{alert_id}/resolve",
+@router.post("/alerts/{alert_id}/resolve",
     summary="Resolve alert",
     description="Mark an alert as resolved",
     response_description="Updated alert",
@@ -405,7 +405,7 @@ async def resolve_alert(
         resolution.resolution_note
     )
 
-@router.get("/monitoring/dashboard",
+@router.get("/dashboard",
     summary="Get dashboard data",
     description="Returns aggregated dashboard data for the support dashboard",
     response_description="Dashboard data",
@@ -478,7 +478,7 @@ async def get_dashboard_data(
         "response_time_change": response_time_change
     }
 
-@router.get("/monitoring/performance", 
+@router.get("/performance", 
     summary="Get performance metrics history",
     description="Returns historical performance metrics for charting",
     response_description="Performance metrics history",
@@ -551,7 +551,7 @@ async def get_performance_metrics(
         "history": history
     }
 
-@router.get("/monitoring/endpoints",
+@router.get("/endpoints",
     summary="Get endpoint performance metrics",
     description="Returns performance metrics for individual API endpoints",
     response_description="Endpoint performance metrics",
@@ -614,7 +614,7 @@ async def get_endpoint_performance(
     
     return endpoints
 
-@router.post("/monitoring/alerts/{alert_id}/dismiss",
+@router.post("/alerts/{alert_id}/dismiss",
     summary="Dismiss an alert",
     description="Marks an alert as dismissed without resolving it",
     response_description="Dismissed alert",
@@ -650,7 +650,7 @@ async def dismiss_alert(
     
     raise HTTPException(status_code=404, detail=f"Alert with ID {alert_id} not found")
 
-@router.get("/monitoring/errors",
+@router.get("/errors",
     summary="Get error logs",
     description="Returns error logs with optional filtering",
     response_description="Error logs",
@@ -764,7 +764,7 @@ async def get_error_logs(
     
     return filtered_logs
 
-@router.post("/monitoring/errors/{error_id}/resolve",
+@router.post("/errors/{error_id}/resolve",
     summary="Resolve an error",
     description="Marks an error as resolved",
     response_description="Resolution result",

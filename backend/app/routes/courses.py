@@ -8,6 +8,9 @@ from typing import List, Optional, Dict
 from uuid import UUID
 from app.services.function_router import function_router
 from pydantic import BaseModel, UUID4
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CourseBookmarkData(BaseModel):
     course_id: UUID
@@ -75,7 +78,7 @@ async def get_course_history(
     """
     try:
         courses = await CourseService.get_user_course_history(db, current_user["sub"])
-        return courses
+        return courses if courses else []
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
@@ -84,62 +87,186 @@ async def get_course_history(
     
 
 
-@router.get("/user/recommended-courses")
+@router.get("/user/recommended-courses",
+    summary="Get User Recommended Courses",
+    description="Retrieves recommended courses for the currently authenticated user",
+    response_model=List[dict],
+    responses={
+        200: {
+            "description": "Recommended courses retrieved successfully"
+        },
+        401: {
+            "description": "Unauthorized - User not authenticated"
+        },
+        404: {
+            "description": "User not found"
+        },
+        500: {
+            "description": "Internal server error"
+        }
+    }
+)
 async def get_user_recommended_courses(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(require_auth)
 ):
-    user_id = current_user['sub']
+    """
+    Get recommended courses for the current user.
+    
+    This endpoint returns a list of courses recommended for the user based on their
+    preferences, past courses, and other factors.
+    
+    Returns:
+        List of recommended course objects with their details
+    """
     try:
+        user_id = current_user['sub']
         courses = await CourseService.get_user_recommended_courses(db, user_id)
         return courses
+    except HTTPException as http_ex:
+        raise http_ex
     except Exception as e:
-        raise HTTPException(status=500, detail=str(e))
+        logger.error(f"Error fetching recommended courses: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve recommended courses: {str(e)}")
     
-@router.get("/user/bookmarked-materials")
+@router.get("/user/bookmarked-materials",
+    summary="Get User Bookmarked Materials",
+    description="Retrieves bookmarked materials for the currently authenticated user",
+    response_model=List[dict],
+    responses={
+        200: {
+            "description": "Bookmarked materials retrieved successfully"
+        },
+        401: {
+            "description": "Unauthorized - User not authenticated"
+        },
+        404: {
+            "description": "User not found"
+        },
+        500: {
+            "description": "Internal server error"
+        }
+    }
+)
 async def get_user_bookmarked_materials(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(require_auth)
 ):
-    user_id = current_user['sub']
+    """
+    Get bookmarked materials for the current user.
+    
+    This endpoint returns a list of all materials (lectures, resources, etc.) that
+    the user has bookmarked across various courses.
+    
+    Returns:
+        List of bookmarked material objects with their details
+    """
     try:
-        bookmarkeds = await CourseService.get_user_bookmarked_materials(db, user_id)
-        return bookmarkeds
+        user_id = current_user['sub']
+        bookmarked_materials = await CourseService.get_user_bookmarked_materials(db, user_id)
+        return bookmarked_materials
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
-        raise HTTPException(status=500, detail=str(e))
+        logger.error(f"Error fetching bookmarked materials: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve bookmarked materials: {str(e)}")
 
-@router.post("/user/bookmarked-materials")
+@router.post("/user/bookmarked-materials",
+    summary="Add User Bookmarked Materials",
+    description="Adds a new bookmarked material for the currently authenticated user",
+    response_model=dict,
+    responses={
+        200: {
+            "description": "Material bookmarked successfully"
+        },
+        400: {
+            "description": "Material already bookmarked"
+        },
+        401: {
+            "description": "Unauthorized - User not authenticated"
+        },
+        404: {
+            "description": "User or Course not found"
+        },
+        500: {
+            "description": "Internal server error"
+        }
+    }
+)
 async def add_user_bookmarked_materials(
     bookmark_data: CourseBookmarkData,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(require_auth)
 ):
-    user_id = current_user['sub']
+    """
+    Add a new bookmarked material for the current user.
+    
+    This endpoint allows users to bookmark course materials like lectures,
+    resources, assignments, etc. for later access.
+    
+    Args:
+        bookmark_data: Data for the new bookmark, including course ID, material type,
+                      title, and author
+    
+    Returns:
+        Details of the newly created bookmark
+    """
     try:
-        bookmarkeds = await CourseService.add_user_bookmarked_materials(bookmark_data,db, user_id)
-        return bookmarkeds
+        user_id = current_user['sub']
+        bookmark = await CourseService.add_user_bookmarked_materials(bookmark_data, db, user_id)
+        return bookmark
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
-        raise HTTPException(status=500, detail=str(e))
+        logger.error(f"Error adding bookmark: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to add bookmark: {str(e)}")
 
 
-@router.delete("/user/bookmarked-materials/{bookmark_id}")
+@router.delete("/user/bookmarked-materials/{bookmark_id}",
+    summary="Delete Bookmarked Material",
+    description="Removes a bookmarked material for the currently authenticated user",
+    response_model=List[dict],
+    responses={
+        200: {
+            "description": "Bookmark deleted and updated list returned"
+        },
+        401: {
+            "description": "Unauthorized - User not authenticated"
+        },
+        404: {
+            "description": "User or Bookmark not found"
+        },
+        500: {
+            "description": "Internal server error"
+        }
+    }
+)
 async def delete_bookmarked_material(
     bookmark_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(require_auth)
 ):
-    user_id = current_user['sub']
+    """
+    Delete a bookmarked material for the current user.
+    
+    This endpoint removes a previously bookmarked material and returns
+    the updated list of bookmarks.
+    
+    Args:
+        bookmark_id: ID of the bookmark to delete
+    
+    Returns:
+        Updated list of bookmarked materials
+    """
     try:
-        bookmarkeds = await CourseService.delete_bookmarked_material(db, user_id, bookmark_id)
-        return bookmarkeds
+        user_id = current_user['sub']
+        updated_bookmarks = await CourseService.delete_bookmarked_material(db, user_id, bookmark_id)
+        return updated_bookmarks
     except HTTPException as http_ex:
         raise http_ex
     except Exception as e:
-        raise HTTPException(status=500, detail=str(e))
+        logger.error(f"Error deleting bookmark: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete bookmark: {str(e)}")
 
 @router.get("/faculty/courses/{course_id}/enrollment",
     summary="Get course enrollment",

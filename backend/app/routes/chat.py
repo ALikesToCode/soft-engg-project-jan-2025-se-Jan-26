@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
+import uuid
 
 from app.database import get_db
 from app.services.chat_service import ChatService
@@ -16,8 +17,24 @@ from app.services.auth_service import get_current_user
 from app.models.user import User
 from app.schemas.user import User as UserSchema
 from app.services.function_router import function_router
+from langchain.schema import HumanMessage
+from pydantic import BaseModel
+from fastapi import Request
 
 router = APIRouter()
+
+# Request model for root chat endpoint
+class ChatRequest(BaseModel):
+    id: Optional[str] = None
+    query: str
+    context: Optional[Dict[str, Any]] = None
+    function_results: Optional[List[Dict[str, Any]]] = None
+
+# Response model for root chat endpoint
+class ChatResponse(BaseModel):
+    content: str
+    function_calls: Optional[List[Dict[str, Any]]] = None
+    function_results: Optional[List[Dict[str, Any]]] = None
 
 @router.post("/sessions", response_model=ChatSession, status_code=status.HTTP_201_CREATED)
 async def create_chat_session(
@@ -321,4 +338,90 @@ async def get_available_functions(current_user: Optional[Dict[str, Any]] = Depen
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error getting available functions: {str(e)}"
+        ) 
+
+@router.post("/", response_model=ChatResponse)
+async def process_chat(
+    request: ChatRequest,
+    req: Request,
+    current_user: Optional[User] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Process a chat message and return a response
+    This endpoint is a proxy to the LLM service for compatibility with the frontend
+    """
+    try:
+        # Forward the request to the LLM service
+        from app.routes.llm import chat as llm_chat
+        
+        # Create a LLMRequest for the llm_chat function
+        from app.routes.llm import LLMRequest
+        llm_request = LLMRequest(
+            id=request.id or str(uuid.uuid4()),
+            query=request.query
+        )
+        
+        # Call the LLM chat function
+        result = await llm_chat(llm_request, req, current_user)
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process chat: {str(e)}"
+        )
+
+@router.get("/", response_model=Dict[str, Any])
+async def get_chat_history(
+    id: Optional[str] = None,
+    current_user: Optional[User] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get chat history for a specific thread or all chat sessions
+    """
+    try:
+        if id:
+            # Get messages for a specific session
+            session = await ChatService.get_session_by_id(db, id)
+            if not session:
+                return {"messages": []}
+                
+            messages = await ChatService.get_messages(db, id)
+            return {"messages": messages}
+        else:
+            # Get all sessions
+            if not current_user:
+                return {"sessions": []}
+                
+            sessions = await ChatService.get_sessions_by_user(db, current_user.id)
+            return {"sessions": sessions}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get chat history: {str(e)}"
+        )
+
+@router.delete("/", status_code=status.HTTP_200_OK)
+async def clear_chat(
+    id: str,
+    current_user: Optional[User] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Clear chat history for a specific thread
+    """
+    try:
+        # Check if session exists
+        session = await ChatService.get_session_by_id(db, id)
+        if not session:
+            return {"success": True, "message": "Chat session not found or already deleted"}
+            
+        # Delete the session
+        await ChatService.delete_session(db, id)
+        return {"success": True, "message": "Chat session cleared successfully"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to clear chat: {str(e)}"
         ) 
