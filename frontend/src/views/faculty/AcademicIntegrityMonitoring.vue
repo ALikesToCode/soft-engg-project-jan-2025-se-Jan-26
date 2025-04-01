@@ -61,6 +61,12 @@
           </div>
         </div>
 
+        <!-- LLM Validation Tools Section -->
+        <div class="grid grid-cols-1 md:grid-cols-1 gap-6 mb-8">
+          <!-- LLM Chat with Integrity Checking -->
+          <LLMChatIntegrityCheck />
+        </div>
+
         <!-- Flagged Items Table -->
         <div class="bg-white shadow rounded-lg overflow-hidden">
           <div class="px-6 py-4 border-b border-gray-200">
@@ -291,11 +297,13 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { AcademicIntegrityService } from '@/services/academicIntegrity.service'
 import SideNavBar from '@/layouts/SideNavBar.vue'
+import LLMChatIntegrityCheck from '@/components/LLMChatIntegrityCheck.vue'
 
 export default {
   name: 'AcademicIntegrityMonitoring',
   components: {
-    SideNavBar
+    SideNavBar,
+    LLMChatIntegrityCheck
   },
   setup() {
     // Mock Data

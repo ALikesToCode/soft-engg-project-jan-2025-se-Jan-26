@@ -1,16 +1,17 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint, LargeBinary, Float, Boolean
 from sqlalchemy.orm import relationship
-from app.database import Base, engine
+from app.database import Base, engine, UUID
 from app.models.assignment import Assignment
-from datetime import datetime
+from datetime import datetime, UTC
 import enum
+import uuid
+from sqlalchemy.dialects.postgresql import ENUM
 
 # Enums for course and enrollment status
 class CourseStatus(str, enum.Enum):
-    DRAFT = "draft"
-    ACTIVE = "active" 
-    ARCHIVED = "archived"
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE" 
+    ARCHIVED = "ARCHIVED"
 
 class EnrollmentStatus(str, enum.Enum):
     ENROLLED = "enrolled"
@@ -18,19 +19,19 @@ class EnrollmentStatus(str, enum.Enum):
     DROPPED = "dropped"
     WAITLISTED = "waitlisted"
 
-# Many-to-Many: Users & Courses
+# Association table for many-to-many relationship between users and courses
 user_courses = Table(
     "user_courses",
     Base.metadata,
-    Column("user_id", UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("course_id", UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True)
+    Column("user_id", UUID, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column("course_id", UUID, ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True),
 )
 
 # Course Model
 class Course(Base):
     __tablename__ = "courses"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     code = Column(String, nullable=False, unique=True)
     title = Column(String, nullable=False)
@@ -40,11 +41,21 @@ class Course(Base):
     duration = Column(Integer, nullable=False)  # e.g., Weeks or Months
     semester = Column(String, nullable=False)
     year = Column(Integer, nullable=False)
-    status = Column(Enum(CourseStatus), nullable=False, default=CourseStatus.DRAFT)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    faculty_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # Use String type with enum validation instead of PostgreSQL ENUM type
+    # status = Column(String, nullable=False, default=CourseStatus.DRAFT.value)
+    status = Column(ENUM(CourseStatus, name="coursestatus"), nullable=False, default=CourseStatus.DRAFT)
+    level = Column(String, nullable=True, default="Beginner")
+    start_date = Column(DateTime(timezone=True), nullable=True)
+    end_date = Column(DateTime(timezone=True), nullable=True)
+    enrollment_limit = Column(Integer, nullable=True)
+    waitlist_limit = Column(Integer, nullable=True)
+    capacity = Column(Integer, nullable=True, default=50)  # Maximum number of students allowed
+    enrolled_count = Column(Integer, nullable=False, default=0)  # Current number of enrolled students
+    image = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.now(UTC))
+    updated_at = Column(DateTime(timezone=True), default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    created_by = Column(UUID, ForeignKey("users.id"), nullable=False)
+    faculty_id = Column(UUID, ForeignKey("users.id"), nullable=True)  # Making this nullable since faculty may not be assigned initially
 
     # Relationships
     faculty = relationship("User", foreign_keys=[faculty_id], back_populates="courses_taught")
@@ -66,36 +77,52 @@ class Course(Base):
             "duration": self.duration,
             "semester": self.semester,
             "year": self.year,
-            "status": self.status.value,
-            "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat()
+            "status": self.status,
+            "start_date": self.start_date.isoformat() if self.start_date else None,
+            "end_date": self.end_date.isoformat() if self.end_date else None,
+            "enrollment_limit": self.enrollment_limit,
+            "waitlist_limit": self.waitlist_limit,
+            "capacity": self.capacity,
+            "enrolled_count": self.enrolled_count,
+            "image": self.image,
+            "level": self.level,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "faculty_id": str(self.faculty_id) if self.faculty_id else None
         }
 
 class CourseEnrollment(Base):
     __tablename__ = "course_enrollments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id"), nullable=False)
-    student_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    status = Column(Enum(EnrollmentStatus), nullable=False, default=EnrollmentStatus.ENROLLED)
-    enrollment_date = Column(DateTime, nullable=False, default=datetime.utcnow)
-    completion_date = Column(DateTime)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
+    course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    # status = Column(String, nullable=False, default=EnrollmentStatus.ENROLLED.value)
+    status = Column(ENUM(EnrollmentStatus, name="enrollmentstatus"), nullable=False, default=EnrollmentStatus.ENROLLED)
+    enrollment_date = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC))
+    completion_date = Column(DateTime(timezone=True))
     grade = Column(String)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC), onupdate=datetime.now(UTC))
+    certificate_url = Column(String, nullable=True)
+    progress = Column(Float, default=0.0)  # Percentage of course completed (0-100)
+    last_activity = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_favorited = Column(Boolean, default=False)
 
     # Relationships
     course = relationship("Course", back_populates="enrollments")
-    student = relationship("User", back_populates="course_enrollments")
+    student = relationship("User", foreign_keys=[student_id], back_populates="course_enrollments")
+    user = relationship("User", foreign_keys=[user_id], back_populates="enrollments")
 
 # Module Model (Course → Modules)
 class Module(Base):
     __tablename__ = "module"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False)  # e.g., "Week 1"
-    position = Column(Integer, nullable=False)  # Ordering field
+    position = Column(Integer, nullable=False)  # 1 week 1, 2 week 2
     course = relationship("Course", back_populates="modules")
     lectures = relationship("Lecture", back_populates="module", cascade="all, delete-orphan")
 
@@ -158,7 +185,7 @@ class LectureContentDoc(Base):
     lecture_id = Column(Integer, ForeignKey("lecture.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False)  # e.g., "Introduction to Python"
     content_desc = Column(Text, nullable=True)
-    content_doc = Column(LargeBinary, nullable=False)  # Stores actual file content (PDF, DOC, PPT, PPTX)
+    content_doc = Column(String, nullable=False)  # Stores path of the file content (PDF, DOC, PPT, PPTX)
     file_type = Column(String, nullable=False)  # Stores MIME type (e.g., application/pdf, application/vnd.ms-powerpoint)
 
     lecture = relationship("Lecture", back_populates="contents_doc")
@@ -169,11 +196,69 @@ class LectureContentDoc(Base):
             "lecture_id": str(self.lecture_id),
             "lecture_title": self.title,
             "file_type": self.file_type,
+            "driveLink": self.content_doc,
             "content_desc": self.content_desc,
+        }
+
+
+class UserRecommendedCourses(Base):
+    __tablename__ = "user_recommended_courses"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # Links to the user
+    title = Column(String, nullable=False)  # Course title
+    type = Column(String, nullable=False)  # Course type
+    progress = Column(Integer, default=0)  # Progress percentage
+    thumbnail_path = Column(String, nullable=False, default="https://placehold.co/100x100")  # Default thumbnail
+    reason = Column(Text, nullable=True)  # Recommendation reason
+    tutorial_url = Column(String, nullable=False)  # for Tutorial type else Null
+    
+    # Relationships
+    user = relationship("User", back_populates="recommended_courses")
+
+    def to_dict(self):
+        """Converts the UserRecommendedCourses object to a dictionary"""
+        return {
+            "id": self.id,
+            "user_id": str(self.user_id),  # Convert UUID to string
+            "title": self.title,
+            "type": self.type,
+            "progress": self.progress,
+            "thumbnail_path": self.thumbnail_path,
+            "reason": self.reason,
+            "tutorial_url": self.tutorial_url
+        }
+
+class BookmarkedMaterials(Base):
+    __tablename__ = "bookmarked_materials"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # Links to the user
+    title = Column(String, nullable=False)  # Material title
+    type = Column(String, nullable=False)  # e.g., Article, Video, Course
+    author = Column(String, nullable=True)  # Author name (optional)
+    date_bookmarked = Column(DateTime, default=datetime.utcnow)  # Timestamp of bookmarking
+    course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=True)  # Links to the course (optional)
+    
+    # Relationships
+    user = relationship("User", back_populates="bookmarks")
+    
+    def to_dict(self):
+        """Converts the BookmarkedMaterials object to a dictionary"""
+        return {
+            "id": self.id,
+            "user_id": str(self.user_id),  # Convert UUID to string
+            "title": self.title,
+            "type": self.type,
+            "author": self.author,
+            "date_bookmarked": self.date_bookmarked.isoformat()  # Convert datetime to string
         }
 
 # Initialize Database Tables
 async def init_db():
     """Initialize the database tables asynchronously."""
     async with engine.begin() as conn:
+        # Drop all tables first to ensure clean state
+        await conn.run_sync(Base.metadata.drop_all)
+        # Create all tables
         await conn.run_sync(Base.metadata.create_all)

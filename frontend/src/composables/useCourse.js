@@ -21,21 +21,20 @@ export function useCourse(courseId) {
     try {
       loading.value = true
       error.value = null
-      
+
       // In production, this would be an API call
-      const course = getCourseById(parseInt(courseId))
+      const course = await getCourseById(courseId)
       if (!course) {
         throw new Error('Course not found')
       }
-      
       currentCourse.value = course
       isBookmarked.value = course.isBookmarked || false
-      
+
       // Load saved progress
       loadProgress()
     } catch (err) {
       error.value = err.message
-      notify.error('Failed to load course data')
+      // notify.error('Failed to load course data')
     } finally {
       loading.value = false
     }
@@ -44,7 +43,7 @@ export function useCourse(courseId) {
   // Save progress to localStorage
   const saveProgress = () => {
     if (!currentCourse.value) return
-    
+
     const progress = {
       courseId: currentCourse.value.id,
       completedLectures: completedLectures.value,
@@ -52,7 +51,7 @@ export function useCourse(courseId) {
       notes: currentNotes.value,
       timestamp: Date.now()
     }
-    
+
     try {
       localStorage.setItem(
         `${STORAGE_KEY}_${courseId}`,
@@ -69,7 +68,7 @@ export function useCourse(courseId) {
       const saved = localStorage.getItem(`${STORAGE_KEY}_${courseId}`)
       if (saved) {
         const progress = JSON.parse(saved)
-        
+
         // Restore completed lectures
         if (progress.completedLectures) {
           currentCourse.value.syllabus.forEach(week => {
@@ -78,7 +77,7 @@ export function useCourse(courseId) {
             })
           })
         }
-        
+
         // Restore last viewed lecture
         if (progress.lastLectureId) {
           const lastLecture = findLectureById(progress.lastLectureId)
@@ -86,7 +85,7 @@ export function useCourse(courseId) {
             selectedLecture.value = lastLecture
           }
         }
-        
+
         // Restore notes
         if (progress.notes) {
           currentNotes.value = progress.notes
@@ -124,7 +123,7 @@ export function useCourse(courseId) {
 
   const totalLectures = computed(() => {
     if (!currentCourse.value) return 0
-    return currentCourse.value.syllabus.reduce((acc, week) => 
+    return currentCourse.value.syllabus.reduce((acc, week) =>
       acc + week.lectures.length, 0)
   })
 
@@ -154,7 +153,7 @@ export function useCourse(courseId) {
     if (selectedLecture.value) {
       selectedLecture.value.completed = !selectedLecture.value.completed
       // Update the lecture in the course syllabus
-      const week = weeks.value.find(week => 
+      const week = weeks.value.find(week =>
         week.lectures.some(lecture => lecture.id === selectedLecture.value.id)
       )
       if (week) {

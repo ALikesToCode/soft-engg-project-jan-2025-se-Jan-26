@@ -1,15 +1,92 @@
-import axios from "axios";
+import axios from 'axios'
+import router from '@/router'
+import { API_URL } from '@/config'
 
-const apiUrl = "http://localhost:8000";
-const apiPrefix = "api/v1";
-
+// Create custom axios instance with the base URL
 const api = axios.create({
-    baseURL: `${apiUrl}/${apiPrefix}`,
-    headers: {
-        "Content-Type": "application/json",
-    },
-});
+  baseURL: API_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+})
 
-console.log("Axios Base URL:", api.defaults.baseURL);
+// Request interceptor - add auth token to requests
+api.interceptors.request.use(
+  config => {
+    // Add authorization token if available
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
+    }
+    
+    // Add a timestamp to prevent caching issues for GET requests
+    if (config.method === 'get') {
+      // Initialize params object if it doesn't exist
+      config.params = config.params || {}
+      
+      // Only add timestamp if it hasn't been added manually
+      if (!config.params['_t']) {
+        config.params['_t'] = Date.now()
+      }
+      
+      // Ensure Cache-Control header is set to prevent browser caching
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+      config.headers['Pragma'] = 'no-cache'
+      config.headers['Expires'] = '0'
+    }
+    
+    return config
+  },
+  error => {
+    console.error('Request error:', error)
+    return Promise.reject(error)
+  }
+)
 
-export default api;
+// Response interceptor - handle common errors
+api.interceptors.response.use(
+  response => response,
+  async error => {
+    console.error('API error:', error.response || error.message)
+    
+    // Handle authentication errors
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      
+      // Only redirect to login if not already going there
+      if (router.currentRoute.value.path !== '/login') {
+        router.push({ path: '/login', query: { redirect: router.currentRoute.value.path } })
+      }
+    }
+    
+    // Handle network errors with potential retry
+    if (!error.response && error.code === 'ECONNABORTED') {
+      console.log('Request timeout, retrying...')
+      
+      // Retry the request once
+      try {
+        // Create a new request with original config but increased timeout
+        const config = {...error.config}
+        config.timeout = config.timeout * 1.5 // Increase timeout for retry
+        
+        // Don't retry a failed retry
+        if (config._isRetry) {
+          throw error
+        }
+        
+        config._isRetry = true
+        return await axios(config)
+      } catch (retryError) {
+        console.error('Retry failed:', retryError)
+        return Promise.reject(error) // Return original error if retry fails
+      }
+    }
+    
+    return Promise.reject(error)
+  }
+)
+
+export default api

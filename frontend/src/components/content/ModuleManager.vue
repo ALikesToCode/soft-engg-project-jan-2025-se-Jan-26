@@ -10,7 +10,7 @@
       >
         <option value="">Select a course</option>
         <option v-for="course in courses" :key="course.id" :value="course.id">
-          {{ course.title }}
+          {{ course.name }}
         </option>
       </select>
     </div>
@@ -33,7 +33,13 @@
         >
           <div @click="fetchModuleLectures(module.id)" class="flex items-center">
             <span class="material-icons text-gray-400 mr-3 cursor-move">drag_indicator</span>
-            <span class="text-gray-900">{{ module.title }}</span>
+            <div class="flex flex-col">
+              <span class="text-gray-900">{{ module.title }}</span>
+              <span class="text-xs text-gray-600 flex items-center">
+                View Content
+                <span class="material-symbols-outlined text-base ml-1">keyboard_arrow_down</span>
+              </span>
+            </div>
           </div>
           <div class="flex space-x-2">
             <button @click.stop="editModule(module)" class="text-blue-600 hover:text-blue-700">
@@ -203,7 +209,15 @@ export default {
 
     const fetchModuleContent = async () => {
       try {
-        const response = await api.get(`courses/module/${courseId}`)
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+        const response = await api.get(`courses/module/${courseId}`, headers)
         modules.value = response.data
         return response
       } catch (error) {
@@ -222,7 +236,17 @@ export default {
 
         loadingLectureData.value = true
         lectures.value = []
-        const response = await api.get(`courses/module/lecture/${moduleId}`)
+
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.get(`courses/module/lecture/${moduleId}`, headers)
         loadingLectureData.value = false
         lectures.value = response.data
         return response
@@ -236,12 +260,24 @@ export default {
 
     const fetchLectureContentData = async (lectureId) => {
       try {
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
         isDataLoading.value = true
-        const response = await api.get(`courses/lecture/content/${lectureId}`)
+        const response = await api.get(`courses/lecture/content/${lectureId}`, headers)
         isDataLoading.value = false
+        console.log(response.data)
         emit('lecture-data-content', { isExistingData: true, ...response.data })
       } catch (error) {
+        isDataLoading.value = false
         handleError(error, 'Failed to fetch the lecture content')
+      } finally {
+        isDataLoading.value = false
       }
     }
 
@@ -279,9 +315,22 @@ export default {
           title: 'Week ' + moduleForm.value.week,
           position: moduleForm.value.week,
         }
-        const response = await api.post('/courses/module', {
-          ...moduleData,
-        })
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.post(
+          '/courses/module',
+          {
+            ...moduleData,
+          },
+          headers,
+        )
         await loadModules()
         closeModuleModal()
       } catch (error) {

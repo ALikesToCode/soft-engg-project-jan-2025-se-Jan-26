@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import FetchFunction from '../utils/FetchFunction';
 import router from '../router/index';
 import { User } from '@/models/User';
@@ -13,7 +13,7 @@ export default defineStore('auth', () => {
     // Parse token from localStorage, handling both string and JSON string formats
     const storedToken = localStorage.getItem('token');
     let parsedToken = null;
-    
+
     try {
         // Try to parse as JSON first
         parsedToken = storedToken ? JSON.parse(storedToken) : null;
@@ -21,7 +21,7 @@ export default defineStore('auth', () => {
         // If not valid JSON, use as is
         parsedToken = storedToken;
     }
-    
+
     const token = ref(parsedToken);
     const returnUrl = ref(null);
     const user = ref(new User(null, "", "", ""));
@@ -29,6 +29,44 @@ export default defineStore('auth', () => {
     const isAdmin = ref(false);
     const isDevelopment = ref(DEV_MODE);
     const hasPassword = ref(false);
+    const isInitialized = ref(false);
+
+    // Initialize auth state when store is created
+    async function initialize() {
+        console.log("Initializing auth store");
+        
+        if (isInitialized.value) {
+            console.log("Auth store already initialized");
+            return;
+        }
+        
+        // Check if we have a token
+        if (!token.value) {
+            console.log("No token found, skipping initialization");
+            isInitialized.value = true;
+            return;
+        }
+        
+        try {
+            // Get user data
+            const userData = await authService.getCurrentUser();
+            if (userData) {
+                setUser(userData);
+                console.log(`Auth store initialized for user: ${userData.email}, role: ${userData.role}`);
+            } else {
+                console.warn("Failed to get user data during initialization");
+                // Keep the token in case it's valid but the API call failed
+            }
+        } catch (error) {
+            console.error("Error initializing auth store:", error);
+            // Clear auth data on critical errors
+            if (error.response && error.response.status === 401) {
+                logout();
+            }
+        } finally {
+            isInitialized.value = true;
+        }
+    }
 
     // Development only - helper to switch roles
     function switchRole(role) {
@@ -44,7 +82,7 @@ export default defineStore('auth', () => {
             // For development, just set a dummy token and keep current role
             token.value = "dummy-token";
             localStorage.setItem('token', JSON.stringify(token.value));
-            
+
             // Navigate based on current role
             navigateToRoleDashboard();
             return;
@@ -68,6 +106,7 @@ export default defineStore('auth', () => {
                 setUserRole(data.role);
                 localStorage.setItem('token', JSON.stringify(token.value));
                 navigateToRoleDashboard();
+                console.log(data)
             }
         } catch (error) {
             console.log("error = " + error);
@@ -77,44 +116,90 @@ export default defineStore('auth', () => {
 
     // Helper method to navigate based on role
     function navigateToRoleDashboard() {
-        switch(userRole.value) {
-            case ROLE.STUDENT:
+        // Debug log to see the actual role value
+        console.log("Navigating with role:", userRole.value);
+        
+        switch (userRole.value) {
+            case ROLE.STUDENT:  // "STUDENT"
+                console.log("Redirecting to student dashboard");
                 router.push('/user/dashboard');
                 break;
-            case ROLE.FACULTY:
+            case ROLE.FACULTY:  // "FACULTY"
+                console.log("Redirecting to faculty dashboard");
                 router.push('/faculty/dashboard');
                 break;
-            case ROLE.SUPPORT:
+            case ROLE.SUPPORT:  // "SUPPORT"
+                console.log("Redirecting to support dashboard");
                 router.push('/support/dashboard');
                 break;
             default:
-                router.push('/');
+                console.warn(`Unknown role: ${userRole.value}, defaulting to student dashboard`);
+                router.push('/user/dashboard');
         }
     }
 
     function logout() {
-        user.value = null;
+        // Reset user to a new User instance instead of null
+        user.value = new User(null, "", "", "");
         token.value = null;
         userRole.value = ROLE.STUDENT;
+        hasPassword.value = false;
         localStorage.removeItem('token');
         localStorage.removeItem('userRole');
+        router.push('/login');
     }
 
     function setUser(userData) {
+        console.log('useAuthStore: Setting user with data:', userData);
+        
+        // Check if user.value is null, and reinitialize if needed
+        if (!user.value) {
+            console.warn('user.value is null, reinitializing with new User object');
+            user.value = new User(null, "", "", "");
+        }
+        
+        // Now we can safely set properties
         user.value.id = userData.id;
         user.value.name = userData.name;
         user.value.email = userData.email;
-        user.value.role = userData.role;
+        
+        // Store the role directly from userData
+        if (userData.role) {
+            // Log the role before setting it
+            console.log(`useAuthStore: Setting user.value.role from ${user.value.role} to ${userData.role}`);
+            user.value.role = userData.role;
+        }
+        
         hasPassword.value = userData.has_password || false;
-        setUserRole(userData.role);
+        
+        // Use the separate method to set userRole (which handles normalization)
+        if (userData.role) {
+            setUserRole(userData.role);
+        } else {
+            console.warn('useAuthStore: userData does not contain role');
+        }
     }
 
     function setUserRole(role) {
-        if (Object.values(ROLE).includes(role)) {
-            userRole.value = role;
-            localStorage.setItem('userRole', role);
+        if (role && typeof role === 'string') {
+            // Normalize role to uppercase
+            const normalizedRole = role.toUpperCase();
+            
+            // Log original and normalized role for debugging
+            console.log(`Setting user role - Original: ${role}, Normalized: ${normalizedRole}`);
+            
+            // Validate against known roles
+            if (Object.values(ROLE).includes(normalizedRole)) {
+                userRole.value = normalizedRole;
+                localStorage.setItem('userRole', normalizedRole);
+                console.log(`User role set to: ${normalizedRole}`);
+            } else {
+                console.warn(`Invalid role: ${role}, defaulting to STUDENT`);
+                userRole.value = ROLE.STUDENT;
+                localStorage.setItem('userRole', ROLE.STUDENT);
+            }
         } else {
-            console.warn('Invalid role:', role);
+            console.warn(`Invalid role value: ${role}, defaulting to STUDENT`);
             userRole.value = ROLE.STUDENT;
             localStorage.setItem('userRole', ROLE.STUDENT);
         }
@@ -156,6 +241,10 @@ export default defineStore('auth', () => {
         }
     }
 
+    // Initialize the store on creation
+    // Note: This is called when the store is first accessed
+    setTimeout(initialize, 0);
+
     return {
         token,
         returnUrl,
@@ -164,6 +253,8 @@ export default defineStore('auth', () => {
         isAdmin,
         isDevelopment,
         hasPassword,
+        isInitialized,
+        initialize,
         switchRole,
         login,
         logout,

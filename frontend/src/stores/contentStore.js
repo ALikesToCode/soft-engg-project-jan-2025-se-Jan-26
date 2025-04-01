@@ -26,7 +26,15 @@ export const useContentStore = defineStore('content', () => {
   // Actions
   async function getModules(courseId) {
     try {
-      const response = await api.get(`courses/module/${courseId}`)
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
+      const response = await api.get(`courses/module/${courseId}`, headers)
       modules.value = response.data
       return response
     } catch (error) {
@@ -37,7 +45,15 @@ export const useContentStore = defineStore('content', () => {
 
   async function createContent(contentData, url) {
     try {
-      const response = await api.post(url, { ...contentData })
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
+      const response = await api.post(url, { ...contentData }, headers)
       return response
     }
     catch (error) {
@@ -48,7 +64,15 @@ export const useContentStore = defineStore('content', () => {
 
   async function updateContent(contentData, url) {
     try {
-      const response = await api.put(url, { ...contentData })
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
+      const response = await api.put(url, { ...contentData }, headers)
       return response
     }
     catch (error) {
@@ -59,7 +83,15 @@ export const useContentStore = defineStore('content', () => {
 
   async function createModule(moduleData) {
     try {
-      const response = await axios.post('/api/v1/modules', moduleData)
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
+      const response = await axios.post('/api/v1/modules', moduleData, headers)
       modules.value.push(response.data)
       return response
     } catch (error) {
@@ -70,7 +102,15 @@ export const useContentStore = defineStore('content', () => {
 
   async function updateModule(moduleId, moduleData) {
     try {
-      const response = await axios.put(`/api/v1/modules/${moduleId}`, moduleData)
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
+      const response = await axios.put(`/api/v1/modules/${moduleId}`, moduleData, headers)
       const index = modules.value.findIndex(m => m.id === moduleId)
       if (index !== -1) {
         modules.value[index] = response.data
@@ -84,7 +124,15 @@ export const useContentStore = defineStore('content', () => {
 
   async function deleteModule(moduleId) {
     try {
-      await api.delete(`/courses/module/${moduleId}`)
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
+      await api.delete(`/courses/module/${moduleId}`, headers)
       modules.value = modules.value.filter(m => m.id !== moduleId)
     } catch (error) {
       console.error('Error deleting module:', error)
@@ -94,10 +142,18 @@ export const useContentStore = defineStore('content', () => {
 
   async function publishContent(contentData) {
     try {
+      const token = localStorage.getItem('token')
+      if (!token) throw new Error('No authentication token found')
+
+      const headers = {
+        headers: {
+          Authorization: `Bearer ${token}`, // Add token to Authorization header
+        },
+      }
       const response = await axios.post('/api/v1/content', {
         ...contentData,
         status: 'published'
-      })
+      }, headers)
 
       // Update module contents
       const moduleIndex = modules.value.findIndex(m => m.id === contentData.moduleId)

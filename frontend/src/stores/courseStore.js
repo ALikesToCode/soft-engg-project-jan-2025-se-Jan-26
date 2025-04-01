@@ -28,7 +28,7 @@ export const useCourseStore = defineStore('course', () => {
   async function fetchCourses() {
     try {
       loading.value = true
-      const response = await axios.get('/courses')
+      const response = await api.get('/courses')
       courses.value = response.data
       return response
     } catch (err) {
@@ -42,12 +42,19 @@ export const useCourseStore = defineStore('course', () => {
   async function getFacultyCourses() {
     try {
       loading.value = true
-      const response = await api.get("/courses")
-      console.log(response.data)
+      // Don't add custom headers, let the api interceptor handle the authorization
+      // This was causing an issue with the cache busting timestamp
+      const response = await api.get('/courses', { 
+        params: { 
+          _t: Date.now() // Explicitly add timestamp to prevent caching
+        }
+      })
+      console.log('Faculty courses response:', response.data)
       courses.value = response.data
       return response
     } catch (err) {
       error.value = err.message
+      console.error('Error fetching faculty courses:', err)
       throw err
     } finally {
       loading.value = false
@@ -57,7 +64,7 @@ export const useCourseStore = defineStore('course', () => {
   async function createCourse(courseData) {
     try {
       loading.value = true
-      const response = await axios.post('/api/v1/courses', courseData)
+      const response = await api.post('/courses', courseData)
       courses.value.push(response.data)
       return response
     } catch (err) {
@@ -71,7 +78,7 @@ export const useCourseStore = defineStore('course', () => {
   async function updateCourse(courseId, courseData) {
     try {
       loading.value = true
-      const response = await axios.put(`/api/v1/courses/${courseId}`, courseData)
+      const response = await api.put(`/courses/${courseId}`, courseData)
       const index = courses.value.findIndex(c => c.id === courseId)
       if (index !== -1) {
         courses.value[index] = response.data
@@ -88,7 +95,7 @@ export const useCourseStore = defineStore('course', () => {
   async function deleteCourse(courseId) {
     try {
       loading.value = true
-      await axios.delete(`/api/v1/courses/${courseId}`)
+      await api.delete(`/courses/${courseId}`)
       courses.value = courses.value.filter(c => c.id !== courseId)
     } catch (err) {
       error.value = err.message

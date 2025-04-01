@@ -6,11 +6,19 @@ import supportRoutes from './supportRoutes';
 import { authService } from '@/api/authService'
 import useAuthStore from '@/stores/useAuthStore'
 import { ROLE } from '@/AppConstants/globalConstants'
+import rolePaths from '@/AppConstants/rolePaths'
+import LoginView from '../views/LoginView.vue'
+import AuthCallback from '../views/AuthCallback.vue'
 
 // Import support routes
 import SupportDashboard from '../views/support/SupportDashboard.vue';
 import NotificationsView from '../views/support/NotificationsView.vue';
 import ProfilePage from '../views/support/ProfilePage.vue';
+
+// Import monitoring components
+import SystemHealth from '@/components/support/monitoring/SystemHealth.vue';
+import PerformanceMetrics from '@/components/support/monitoring/PerformanceMetrics.vue';
+import ErrorReporting from '@/components/support/monitoring/ErrorReporting.vue';
 
 const routes = [
   {
@@ -43,7 +51,7 @@ const routes = [
   {
     path: '/login',
     name: 'login',
-    component: () => import('../views/LoginView.vue'),
+    component: LoginView,
     meta: {
       title: 'Login | Cognitum',
       hideUserNavbar: true
@@ -52,10 +60,19 @@ const routes = [
   {
     path: '/auth/callback',
     name: 'auth-callback',
-    component: () => import('../views/AuthCallback.vue'),
+    component: AuthCallback,
     meta: {
       title: 'Authentication | Cognitum',
       hideUserNavbar: true
+    }
+  },
+  {
+    path: '/set-password',
+    name: 'set-password',
+    component: () => import('../views/SetPasswordView.vue'),
+    meta: { 
+      title: 'Set Password | Cognitum', 
+      requiresAuth: true 
     }
   },
   {
@@ -109,6 +126,38 @@ const routes = [
     meta: { requiresAuth: true, role: 'support' }
   },
 
+  // Explicit monitoring routes
+  {
+    path: '/monitoring/system-health',
+    name: 'monitoring-system-health',
+    component: SystemHealth,
+    meta: { 
+      requiresAuth: true, 
+      role: 'support',
+      title: 'System Health | Monitoring'
+    }
+  },
+  {
+    path: '/monitoring/performance',
+    name: 'monitoring-performance',
+    component: PerformanceMetrics,
+    meta: { 
+      requiresAuth: true, 
+      role: 'support',
+      title: 'Performance Metrics | Monitoring'
+    }
+  },
+  {
+    path: '/monitoring/errors',
+    name: 'monitoring-errors',
+    component: ErrorReporting,
+    meta: { 
+      requiresAuth: true, 
+      role: 'support',
+      title: 'Error Reporting | Monitoring'
+    }
+  },
+
   {
     path: '/:pathMatch(.*)*',
     redirect: '/'
@@ -135,18 +184,94 @@ router.beforeEach((to, from, next) => {
 
 // Navigation guard
 router.beforeEach(async (to, from, next) => {
-  if (to.matched.some(record => record.meta.requiresAuth)) {
-    const isAuthenticated = await authService.isAuthenticated()
+  // Skip auth check for public routes or the auth callback route
+  if (to.path === '/auth/callback' || to.path === '/login' || to.path === '/' || 
+      to.path === '/about' || to.path === '/contact' || to.path === '/faq' || 
+      to.path === '/privacy-policy' || to.path === '/terms-of-service') {
+    next();
+    return;
+  }
+
+  console.log(`Navigation guard: checking auth for route ${to.fullPath}`);
+  
+  // Store the intended path if user needs to authenticate
+  if (to.meta.requiresAuth || to.path.startsWith('/support') || 
+      to.path.startsWith('/user') || to.path.startsWith('/faculty')) {
+    localStorage.setItem('loginRedirectPath', to.fullPath);
+  }
+
+  try {
+    const isAuthenticated = await authService.isAuthenticated();
+    console.log(`Auth check: authenticated = ${isAuthenticated}`);
+    
     if (!isAuthenticated) {
+      // Not authenticated, redirect to login
+      console.log('Not authenticated, redirecting to login');
       next({
         path: '/login',
         query: { redirect: to.fullPath }
-      })
-    } else {
-      next()
+      });
+      return;
     }
-  } else {
-    next()
+    
+    // User is authenticated, now check for role-specific paths
+    const authStore = useAuthStore();
+    const userRole = authStore.userRole;
+    
+    // Log actual role for debugging
+    console.log(`ROUTER GUARD: User Role = "${userRole}", ROLE.FACULTY = "${ROLE.FACULTY}", ROLE.SUPPORT = "${ROLE.SUPPORT}"`);
+    console.log(`Role comparison: userRole === ROLE.SUPPORT is ${userRole === ROLE.SUPPORT}`);
+    console.log(`Role comparison: userRole === ROLE.FACULTY is ${userRole === ROLE.FACULTY}`);
+    
+    // Handle role-specific paths
+    if (to.path.startsWith('/support') && userRole !== ROLE.SUPPORT) {
+      console.log('Attempting to access support route without support role');
+      next({ path: rolePaths.STUDENT.dashboard });
+      return;
+    }
+    
+    if (to.path.startsWith('/faculty') && userRole !== ROLE.FACULTY) {
+      console.log('Attempting to access faculty route without faculty role');
+      next({ path: rolePaths.STUDENT.dashboard });
+      return;
+    }
+    
+    if (to.path.startsWith('/user') && userRole === ROLE.SUPPORT) {
+      console.log('Support user attempting to access student route');
+      next({ path: rolePaths.SUPPORT.dashboard });
+      return;
+    }
+    
+    if (to.path.startsWith('/user') && userRole === ROLE.FACULTY) {
+      console.log('Faculty user attempting to access student route');
+      next({ path: rolePaths.FACULTY.dashboard });
+      return;
+    }
+    
+    // Check for role requirements if specified in meta
+    if (to.meta.role) {
+      const hasRequiredRole = authService.hasRole(to.meta.role);
+      console.log(`Role check for ${to.meta.role}: ${hasRequiredRole}`);
+      
+      if (!hasRequiredRole) {
+        // Redirect to appropriate dashboard based on actual role
+        console.log('User does not have required role, redirecting to dashboard');
+        if (userRole === ROLE.SUPPORT) {
+          next({ path: rolePaths.SUPPORT.dashboard });
+        } else if (userRole === ROLE.FACULTY) {
+          next({ path: rolePaths.FACULTY.dashboard });
+        } else {
+          next({ path: rolePaths.STUDENT.dashboard });
+        }
+        return;
+      }
+    }
+    
+    // User is authenticated and has proper role access
+    next();
+  } catch (error) {
+    console.error('Error in navigation guard:', error);
+    next('/login');
   }
 })
 

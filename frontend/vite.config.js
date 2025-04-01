@@ -16,6 +16,15 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       port: 5173,
+      host: true,
+      strictPort: true,
+      hmr: {
+        protocol: 'ws',
+        host: 'localhost',
+        port: 5173,
+        timeout: 5000,
+        overlay: true
+      },
       proxy: {
         [env.VITE_API_PREFIX]: {
           target: env.VITE_API_URL,

@@ -4,6 +4,8 @@ import { createPinia } from 'pinia'
 import Toast from 'vue-toastification'
 import '@fortawesome/fontawesome-free/css/all.css'
 import 'vue-toastification/dist/index.css'
+// Configure Material Symbols (ensure icons render correctly)
+import './plugins/material-symbols'
 
 import App from './App.vue'
 import router from './router'

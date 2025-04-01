@@ -2,15 +2,28 @@ from fastapi import HTTPException, Depends
 from starlette.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from typing import Optional
+from typing import Optional, Callable
 from app.database import get_db
 from app.models.user import User
 from app.utils.jwt_utils import create_access_token, decode_access_token
 from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+import logging
+import uuid
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/login",
+    scheme_name="bearerAuth"  # Match the scheme name in OpenAPI schema
+)
+pwd_context = CryptContext(
+    schemes=['bcrypt'],
+    deprecated='auto',
+    bcrypt__rounds=12,
+    bcrypt__ident='2b'
+)
 
 async def get_user(db: AsyncSession, email: str) -> Optional[User]:
     """
@@ -25,8 +38,34 @@ async def get_user(db: AsyncSession, email: str) -> Optional[User]:
     Returns:
         The User object if found, otherwise None
     """
-    result = await db.execute(select(User).where(User.email == email))
-    return result.scalars().first()
+    try:
+        from sqlalchemy import text
+        
+        # Use direct SQL query to avoid ORM mapping issues
+        result = await db.execute(
+            text("SELECT id, email, name, hashed_password, is_google_user, picture, created_at, updated_at, role FROM users WHERE email = :email"),
+            {"email": email}
+        )
+        
+        row = result.fetchone()
+        if not row:
+            return None
+            
+        # Create a User object from the row
+        user = User(
+            id=row.id,
+            email=row.email,
+            name=row.name,
+            hashed_password=row.hashed_password,
+            is_google_user=row.is_google_user,
+            picture=row.picture,
+            role=row.role
+        )
+            
+        return user
+    except Exception as e:
+        logger.error(f"Error retrieving user: {str(e)}")
+        return None
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> Optional[User]:
     """
@@ -42,27 +81,49 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> Opti
         password: The plaintext password to verify
         
     Returns:
-        The User object if authentication is successful, otherwise False
+        The User object if authentication is successful, otherwise None
         
     Raises:
         HTTPException: If an error occurs during authentication
     """
     try:
-        # Fetch the user by email
-        user = await get_user(db, email)
-        if not user:
-            return False
+        # Use direct SQL query to avoid ORM mapping issues
+        from sqlalchemy import text
+        
+        # Fetch the user by email using raw SQL
+        logger.info(f"Authenticating user: {email}")
+        result = await db.execute(
+            text("SELECT id, email, name, hashed_password, is_google_user, picture, created_at, updated_at, role FROM users WHERE email = :email"),
+            {"email": email}
+        )
+        
+        row = result.fetchone()
+        if not row:
+            logger.warning(f"User not found: {email}")
+            return None
             
         # If user has no password set (Google user without password)
-        if not user.hashed_password:
-            return False
+        if not row.hashed_password:
+            return None
             
         # Check if the password is correct using passlib
-        if not pwd_context.verify(password, user.hashed_password):
-            return False
+        if not pwd_context.verify(password, row.hashed_password):
+            return None
+        
+        # Create a User object from the row
+        user = User(
+            id=row.id,
+            email=row.email,
+            name=row.name,
+            hashed_password=row.hashed_password,
+            is_google_user=row.is_google_user,
+            picture=row.picture,
+            role=row.role
+        )
             
         return user
     except Exception as e:
+        logger.error(f"Authentication error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 async def get_or_create_user(db: AsyncSession, user_data: dict) -> User:
@@ -90,12 +151,28 @@ async def get_or_create_user(db: AsyncSession, user_data: dict) -> User:
         HTTPException: If an error occurs during user creation or retrieval
     """
     try:
+        from sqlalchemy import text
+        
         # Attempt to fetch an existing user by email
         email = user_data.get("email")
         user = await get_user(db, email)
 
         if user:
             print(f"User already exists: {email}")
+            
+            # Update the user's picture if they're logging in with Google and have a profile picture
+            picture_url = user_data.get("picture")
+            if picture_url and (user.picture is None or user.picture != picture_url):
+                print(f"Updating profile picture for user: {email}")
+                await db.execute(
+                    text("UPDATE users SET picture = :picture WHERE email = :email"),
+                    {"picture": picture_url, "email": email}
+                )
+                await db.commit()
+                
+                # Update the user object
+                user.picture = picture_url
+                
             return user
         else:
             print(f"Creating new user: {email}")
@@ -109,21 +186,47 @@ async def get_or_create_user(db: AsyncSession, user_data: dict) -> User:
                 elif email.endswith("@study.iitm.ac.in"):
                     role = "support"
             
-            # Create a new user using available fields
+            # Create a new user using direct SQL
+            user_id = uuid.uuid4()
+            from datetime import datetime, UTC
+            now = datetime.now(UTC)
+            
+            await db.execute(
+                text("""
+                    INSERT INTO users (id, email, name, hashed_password, is_google_user, picture, role, created_at, updated_at)
+                    VALUES (:id, :email, :name, :hashed_password, :is_google_user, :picture, :role, :created_at, :updated_at)
+                """),
+                {
+                    "id": user_id,
+                    "email": email,
+                    "name": user_data.get("name", ""),
+                    "hashed_password": "",
+                    "is_google_user": True,
+                    "picture": user_data.get("picture"),
+                    "role": role,
+                    "created_at": now,
+                    "updated_at": now
+                }
+            )
+            await db.commit()
+            
+            # Create and return a User object
             new_user = User(
+                id=user_id,
                 email=email,
-                picture=user_data.get("picture"),
-                name=user_data.get("name"),
+                name=user_data.get("name", ""),
                 hashed_password="",
                 is_google_user=True,
-                role=role
+                picture=user_data.get("picture"),
+                role=role,
+                created_at=now,
+                updated_at=now
             )
-            db.add(new_user)
-            await db.commit()  # Commit changes to the database
-            await db.refresh(new_user)  # Refresh the instance to load new data
+            
             return new_user
             
     except Exception as e:
+        logger.error(f"Error in get_or_create_user: {str(e)}")
         await db.rollback()  # Rollback in case of any error
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -167,7 +270,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
         )
     return payload # this returns the payload of the token containing email and role
 
-def get_current_faculty(token: str = Depends(oauth2_scheme)) -> dict:
+async def get_current_faculty(token: str = Depends(oauth2_scheme)) -> dict:
     """
     Get the current user and verify they have faculty role.
     
@@ -184,16 +287,42 @@ def get_current_faculty(token: str = Depends(oauth2_scheme)) -> dict:
     Raises:
         HTTPException: If the token is invalid or the user is not a faculty member
     """
-    user = get_current_user(token)
-    if user.get("role") != "faculty":
+    user = await get_current_user(token)
+    if user.get("role") != "faculty" and user.get("role") != "admin":
         raise HTTPException(
             status_code=403,
-            detail="Faculty privileges required",
+            detail="Faculty role required",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
 
-def require_auth(token: str = Depends(oauth2_scheme)) -> dict:
+async def get_current_admin_user(token: str = Depends(oauth2_scheme)) -> dict:
+    """
+    Get the current user and verify they have admin role.
+    
+    This function extends get_current_user by adding a role check to ensure
+    the authenticated user has admin privileges. It's used as a dependency
+    in routes that should only be accessible to administrators.
+    
+    Args:
+        token: The JWT token from the Authorization header
+        
+    Returns:
+        Dictionary containing the user information from the token
+        
+    Raises:
+        HTTPException: If the token is invalid or the user is not an admin
+    """
+    user = await get_current_user(token)
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Admin role required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+async def require_auth(token: str = Depends(oauth2_scheme)) -> dict:
     """
     Dependency that enforces authentication by ensuring a valid JWT token.
     
@@ -210,7 +339,7 @@ def require_auth(token: str = Depends(oauth2_scheme)) -> dict:
     Raises:
         HTTPException: If authentication fails or the token is invalid
     """
-    user = get_current_user(token)
+    user = await get_current_user(token)
     if not user:
         raise HTTPException(status_code=401, detail="Authentication required")
     return user
@@ -247,22 +376,30 @@ async def set_user_password(db: AsyncSession, user_id: str, password: str) -> bo
         HTTPException: If an error occurs during the password update
     """
     try:
-        # Find the user
-        result = await db.execute(select(User).where(User.id == user_id))
-        user = result.scalars().first()
+        from sqlalchemy import text
         
-        if not user:
+        # Check if the user exists
+        result = await db.execute(
+            text("SELECT id FROM users WHERE id = :user_id"),
+            {"user_id": user_id}
+        )
+        
+        if not result.fetchone():
             return False
             
         # Hash the password
         hashed_password = pwd_context.hash(password)
         
-        # Update the user's password
-        user.hashed_password = hashed_password
+        # Update the user's password using direct SQL
+        await db.execute(
+            text("UPDATE users SET hashed_password = :hashed_password WHERE id = :user_id"),
+            {"hashed_password": hashed_password, "user_id": user_id}
+        )
         
         await db.commit()
         return True
     except Exception as e:
+        logger.error(f"Error setting user password: {str(e)}")
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -282,45 +419,152 @@ async def create_default_users(db: AsyncSession) -> None:
         
     Returns:
         None
-        
+    
     Note:
         This function catches and logs exceptions but does not propagate them,
         to prevent application startup failures.
     """
     try:
-        # Check if support user exists
-        support_email = "support@study.iitm.ac.in"
-        support_user = await get_user(db, support_email)
+        from sqlalchemy import text
         
-        if not support_user:
-            # Create support user
-            support_user = User(
-                email=support_email,
-                name="Support Admin",
-                hashed_password=pwd_context.hash("support123"),
-                is_google_user=False,
-                role="support"
+        # First check if the users table exists
+        try:
+            # Check if the users table exists
+            table_exists = False
+            try:
+                async with db.begin():
+                    result = await db.execute(text(
+                        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users')"
+                    ))
+                    table_exists = result.scalar()
+            except Exception as e:
+                logger.error(f"Error checking if users table exists: {e}")
+                return
+                
+            if not table_exists:
+                logger.warning("Users table does not exist yet. Skipping default user creation.")
+                return
+                
+            # Check if support user exists
+            support_email = "support@study.iitm.ac.in"
+            result = await db.execute(
+                text("SELECT id FROM users WHERE email = :email"),
+                {"email": support_email}
             )
-            db.add(support_user)
-            print(f"Created default support user: {support_email}")
-        
-        # Check if faculty user exists
-        faculty_email = "faculty@study.iitm.ac.in"
-        faculty_user = await get_user(db, faculty_email)
-        
-        if not faculty_user:
-            # Create faculty user
-            faculty_user = User(
-                email=faculty_email,
-                name="Faculty Admin",
-                hashed_password=pwd_context.hash("faculty123"),
-                is_google_user=False,
-                role="faculty"
+            
+            support_user = result.fetchone()
+            
+            if not support_user:
+                # Create support user
+                logger.info(f"Creating support user {support_email}")
+                hashed_password = pwd_context.hash("support123")
+                
+                from datetime import datetime, UTC
+                now = datetime.now(UTC)
+                
+                # Use direct SQL to avoid ORM issues
+                support_id = str(uuid.uuid4())
+                await db.execute(
+                    text("""
+                        INSERT INTO users (id, email, name, hashed_password, is_google_user, role, created_at, updated_at) 
+                        VALUES (:id, :email, :name, :password, :is_google, :role, :created_at, :updated_at)
+                    """),
+                    {
+                        "id": support_id,
+                        "email": support_email,
+                        "name": "Default Support",
+                        "password": hashed_password,
+                        "is_google": False,
+                        "role": "support",
+                        "created_at": now,
+                        "updated_at": now
+                    }
+                )
+                print(f"Created default support user: {support_email}")
+            
+            # Check if faculty user exists
+            faculty_email = "faculty@study.iitm.ac.in"
+            result = await db.execute(
+                text("SELECT id FROM users WHERE email = :email"),
+                {"email": faculty_email}
             )
-            db.add(faculty_user)
-            print(f"Created default faculty user: {faculty_email}")
-        
-        await db.commit()
+            
+            faculty_user = result.fetchone()
+            
+            if not faculty_user:
+                # Create faculty user
+                logger.info(f"Creating faculty user {faculty_email}")
+                hashed_password = pwd_context.hash("faculty123")
+                
+                from datetime import datetime, UTC
+                now = datetime.now(UTC)
+                
+                # Use direct SQL to avoid ORM issues
+                faculty_id = str(uuid.uuid4())
+                await db.execute(
+                    text("""
+                        INSERT INTO users (id, email, name, hashed_password, is_google_user, role, created_at, updated_at) 
+                        VALUES (:id, :email, :name, :password, :is_google, :role, :created_at, :updated_at)
+                    """),
+                    {
+                        "id": faculty_id,
+                        "email": faculty_email,
+                        "name": "Default Faculty",
+                        "password": hashed_password,
+                        "is_google": False,
+                        "role": "faculty",
+                        "created_at": now,
+                        "updated_at": now
+                    }
+                )
+                print(f"Created default faculty user: {faculty_email}")
+            
+            # Commit changes
+            await db.commit()
+            
+        except Exception as e:
+            await db.rollback()
+            logger.error(f"Error in user creation transaction: {e}")
+            
     except Exception as e:
-        await db.rollback()
-        print(f"Error creating default users: {str(e)}")
+        logger.error(f"Failed to create default users: {e}")
+
+def require_role(required_role):
+    """
+    Create a dependency that requires a specific role or one of multiple roles.
+    
+    This function returns a dependency that checks if the current user has
+    the required role(s). It's used to protect routes that should only be
+    accessible to users with specific roles.
+    
+    Args:
+        required_role: The role or list of roles required to access the route
+        
+    Returns:
+        A dependency function that validates the user's role
+        
+    Raises:
+        HTTPException: If the user doesn't have the required role
+    """
+    async def role_checker(token: str = Depends(oauth2_scheme)) -> dict:
+        user = await get_current_user(token)
+        user_role = user.get("role", "").lower()
+        
+        if isinstance(required_role, list):
+            # Check if user role is in the list of required roles
+            if user_role not in [r.lower() for r in required_role]:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Insufficient permissions. Required roles: {', '.join(required_role)}",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        else:
+            # Check against a single required role
+            if user_role != required_role.lower():
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"{required_role} role required",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        return user
+    return role_checker

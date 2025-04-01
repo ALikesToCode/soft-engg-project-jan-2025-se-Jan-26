@@ -53,6 +53,7 @@ class SubmissionCreate(BaseModel):
     """
     Model for creating a new submission.
     """
+    assignment_id: Optional[str] = Field(None, description="ID of the assignment this submission is for")
     content: Optional[str] = Field(None, description="Text content of the submission (for text submissions)")
     url: Optional[str] = Field(None, description="URL for the submission (for url submissions)")
     status: str = Field("draft", description="Submission status (draft, submitted)")

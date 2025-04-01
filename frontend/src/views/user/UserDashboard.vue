@@ -1,46 +1,34 @@
 <script>
 import SideNavBar from '@/layouts/SideNavBar.vue'
 import ChatBotWrapper from '@/components/ChatBotWrapper.vue'
+import api from '@/utils/api'
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import { useToast } from 'vue-toastification'
+import AlertMessage from '@/components/common/AlertMessage.vue'
+import { useChatStore } from '@/stores/useChatStore'
+import { onMounted, ref } from 'vue'
+import formatDateFunc from '@/utils/formatDate'
+import useAuthStore from '@/stores/useAuthStore'
+import { useCourseStore } from '@/stores/courseStore'
+import { FacultyNotificationService } from '@/services/facultyNotification.service'
 
 export default {
   name: 'DashboardView',
   data() {
     return {
+      showAlertMessage: false,
+      isDataLoading: false,
       queryEmpty: true,
       showSplitScreen: false,
       recommendedMaterials: [
-        {
-          id: 1,
-          title: 'Advanced Python Programming',
-          type: 'Course',
-          progress: 0,
-          thumbnail: 'https://placehold.co/100x100',
-          reason: 'Based on your interest in Programming',
-        },
-        {
-          id: 2,
-          title: 'Data Structures Practice',
-          type: 'Exercise',
-          progress: 0,
-          thumbnail: 'https://placehold.co/100x100',
-          reason: 'Recommended for your next topic',
-        },
-        {
-          id: 3,
-          title: 'Web Development Basics',
-          type: 'Tutorial',
-          progress: 0,
-          thumbnail: 'https://placehold.co/100x100',
-          reason: 'Popular in your field',
-        },
-        {
-          id: 4,
-          title: 'Algorithm Analysis',
-          type: 'Course',
-          progress: 0,
-          thumbnail: 'https://placehold.co/100x100',
-          reason: 'Next step in your learning path',
-        },
+        // {
+        //   id: 1,
+        //   title: 'Advanced Python Programming',
+        //   type: 'Course',
+        //   progress: 0,
+        //   thumbnail: 'https://placehold.co/100x100',
+        //   reason: 'Based on your interest in Programming',
+        // },
       ],
       personalizedRoadmaps: [
         {
@@ -72,28 +60,16 @@ export default {
           completedSteps: 9,
         },
       ],
-      bookmarkedMaterials: [
-        {
-          id: 1,
-          title: 'Design Patterns in Python',
-          type: 'Article',
-          author: 'Dr. Sarah Johnson',
-          dateBookmarked: '2024-01-15',
-        },
-        {
-          id: 2,
-          title: 'REST API Best Practices',
-          type: 'Tutorial',
-          author: 'Tech Academy',
-          dateBookmarked: '2024-01-20',
-        },
-      ],
+      bookmarkedMaterials: [],
       isDevelopment: import.meta.env.VITE_NODE_ENV === 'development',
+      notifications: []
     }
   },
   components: {
     SideNavBar,
     ChatBotWrapper,
+    LoadingSpinner,
+    AlertMessage,
   },
   computed: {
     mainContentClass() {
@@ -102,22 +78,303 @@ export default {
         'md:grid-cols-3': this.showSplitScreen,
       }
     },
+    chatStore() {
+      return useChatStore()
+    },
+    authStore() {
+      return useAuthStore()
+    }
   },
   methods: {
+    showSuccessToast(msg) {
+      const toast = useToast() // Call inside the method
+      toast.success(msg, { timeout: 3000 })
+    },
+    showErrorToast(error, defaultMessage) {
+      const toast = useToast()
+      const message = error.response?.data?.message || defaultMessage
+      toast.error(message)
+    },
     startMaterial(material) {
       // TODO: Implement navigation to material
+      if (material.tutorial_url === null) {
+        this.showAlertMessage = true
+        setTimeout(() => {
+          this.showAlertMessage = false
+        }, 3000)
+      } else {
+        //open a new window to the material
+        window.open(material.tutorial_url, '_blank')
+      }
       console.log('Starting material:', material.title)
     },
     viewRoadmap(roadmap) {
-      this.$router.push(`/user/roadmap/${roadmap.id}`);
+      this.$router.push(`/user/roadmap/${roadmap.id}`)
     },
-    removeBookmark(material) {
+    removeBookmark(bookmark_id) {
       // TODO: Implement bookmark removal
-      this.bookmarkedMaterials = this.bookmarkedMaterials.filter((m) => m.id !== material.id)
+      this.deleteBookMarkedMaterial(bookmark_id)
     },
     toggleSplitScreen() {
       this.showSplitScreen = !this.showSplitScreen
+      
+      // If we're closing split screen, ensure chat is also closed
+      if (!this.showSplitScreen && this.chatStore.isOpen) {
+        this.chatStore.closeChat()
+      }
     },
+    activateChat() {
+      // Directly open the chat without setTimeout
+      const chatStore = useChatStore();
+      // First make sure we have a valid selected chat
+      if (chatStore.chatHistory.length > 0 && !chatStore.currentChatId) {
+        chatStore.setCurrentChat(chatStore.chatHistory[0].id);
+      } else if (chatStore.chatHistory.length === 0) {
+        // Create a new chat if there are none
+        chatStore.startNewChat("New Conversation");
+      }
+      
+      // Open the chat - use direct property access instead of the method
+      chatStore.isOpen = true;
+      console.log("Chat activated from dashboard, open state:", chatStore.isOpen);
+    },
+    //API calls
+    async getRecommendedCourses() {
+      try {
+        this.isDataLoading = true
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.get('/user/recommended-courses', headers)
+        if (response.status !== 200) throw new Error('Failed to fetch user data')
+        console.log(response.data)
+        this.recommendedMaterials = response.data
+        this.showSuccessToast('Reccommended Courses fetched successfully')
+      } catch (error) {
+        this.showErrorToast(error, 'Failed to Load Recommended Courses')
+        throw error
+      } finally {
+        this.isDataLoading = false
+      }
+    },
+
+    async getBookMarkedMaterials() {
+      try {
+        this.isDataLoading = true
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.get('/user/bookmarked-materials', headers)
+        if (response.status !== 200) throw new Error('Failed to fetch user data')
+        console.log(response.data)
+        this.bookmarkedMaterials = response.data
+        this.showSuccessToast('Bookmarked Materials fetched successfully')
+      } catch (error) {
+        this.showErrorToast(error, 'Failed to Load Bookmarked Materials')
+        throw error
+      } finally {
+        this.isDataLoading = false
+      }
+    },
+    async deleteBookMarkedMaterial(bookmarkId) {
+      try {
+        this.isDataLoading = true
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.delete(`/user/bookmarked-materials/${bookmarkId}`, headers)
+        if (response.status !== 200) {
+          this.showErrorToast(error, 'Failed to delete the Bookmark')
+          throw new Error('Failed to delete the data')
+        }
+        console.log(response.data)
+        this.bookmarkedMaterials = response.data
+        this.showSuccessToast('Bookmark Deleted Successfully')
+      } catch (error) {
+        this.showErrorToast(error, 'Failed to delete the Bookmark')
+        throw error
+      } finally {
+        this.isDataLoading = false
+      }
+    },
+    getNotifications() {
+      if (!this.authStore.isLoggedIn) {
+        console.log('User not logged in, skipping notifications')
+        return
+      }
+      
+      console.log('Getting notifications')
+      try {
+        // Don't pass custom headers, let the API interceptor handle authorization
+        FacultyNotificationService.getRecentNotifications()
+          .then(response => {
+            if (response && response.data) {
+              this.notifications = response.data.slice(0, 5) // Get only the first 5 notifications
+              console.log('Loaded notifications:', this.notifications)
+            }
+          })
+          .catch(error => {
+            console.error('Failed to load notifications:', error)
+          })
+      } catch (error) {
+        console.error('Failed to load notifications:', error)
+      }
+    },
+    formatTime(timestamp) {
+      return formatDateFunc(timestamp)
+    },
+    getNotificationTypeClass(type) {
+      return {
+        'bg-blue-100 text-blue-800': type === 'course',
+        'bg-purple-100 text-purple-800': type === 'system',
+      }
+    },
+    getNotificationPriorityClass(priority) {
+      return {
+        'bg-green-100 text-green-800': priority === 'low',
+        'bg-yellow-100 text-yellow-800': priority === 'medium',
+        'bg-orange-100 text-orange-800': priority === 'high',
+        'bg-red-100 text-red-800': priority === 'urgent',
+      }
+    }
+  },
+
+  mounted() {
+    this.getRecommendedCourses();
+    this.getBookMarkedMaterials();
+    this.getNotifications();
+
+    // Make sure the GlobalChat component from App.vue is initialized
+    const chatStore = useChatStore();
+    if (!chatStore.initialized) {
+      chatStore.initialize();
+    }
+  },
+
+  setup() {
+    const authStore = useAuthStore()
+    const courseStore = useCourseStore()
+    const toast = useToast()
+    const isLoading = ref(false)
+    const userInfo = ref({
+      name: 'User'
+    })
+
+    const loadNotifications = async () => {
+      try {
+        // Don't pass custom headers, let the API interceptor handle authorization
+        const response = await FacultyNotificationService.getRecentNotifications()
+        if (response && response.data) {
+          notifications.value = response.data
+        }
+      } catch (error) {
+        console.error('Failed to load notifications:', error)
+      }
+    }
+
+    const loadCourses = async () => {
+      isLoading.value = true
+      try {
+        const response = await courseStore.getUserCourses()
+        if (response && response.data) {
+          courses.value = response.data
+        }
+      } catch (error) {
+        console.error('Failed to load courses:', error)
+        toast.error('Failed to load your courses')
+      } finally {
+        isLoading.value = false
+      }
+    }
+
+    const getUserInfo = async () => {
+      try {
+        const user = authStore.user
+        if (user) {
+          userInfo.value = {
+            name: user.name || 'Student',
+            email: user.email || '',
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user info:', error)
+      }
+    }
+
+    const formatTime = (timestamp) => {
+      return formatDateFunc(timestamp)
+    }
+
+    const getNotificationTypeClass = (type) => {
+      return {
+        'bg-blue-100 text-blue-800': type === 'course',
+        'bg-purple-100 text-purple-800': type === 'system',
+      }
+    }
+
+    const getNotificationPriorityClass = (priority) => {
+      return {
+        'bg-green-100 text-green-800': priority === 'low',
+        'bg-yellow-100 text-yellow-800': priority === 'medium',
+        'bg-orange-100 text-orange-800': priority === 'high',
+        'bg-red-100 text-red-800': priority === 'urgent',
+      }
+    }
+
+    const getStatusClass = (status) => {
+      return {
+        'bg-green-100 text-green-800': status === 'active',
+        'bg-yellow-100 text-yellow-800': status === 'pending',
+        'bg-gray-100 text-gray-800': status === 'completed',
+        'bg-red-100 text-red-800': status === 'inactive',
+      }
+    }
+
+    const getStatusText = (status) => {
+      const statusMap = {
+        active: 'Active',
+        pending: 'Pending',
+        completed: 'Completed',
+        inactive: 'Inactive',
+      }
+      return statusMap[status] || 'Unknown'
+    }
+
+    onMounted(() => {
+      getUserInfo()
+      loadCourses()
+      loadNotifications()
+    })
+
+    return {
+      userInfo,
+      notifications,
+      courses,
+      isLoading,
+      formatTime,
+      getNotificationTypeClass,
+      getNotificationPriorityClass,
+      getStatusClass,
+      getStatusText,
+    }
   },
 }
 </script>
@@ -130,6 +387,12 @@ export default {
       </div>
       <div class="flex-1 p-6 overflow-y-auto bg-gray-50">
         <div class="max-w-7xl mx-auto">
+          <!-- Alert Message -->
+          <AlertMessage v-if="showAlertMessage" message="This material doesn't have a learning path or tutorial yet." />
+          
+          <!-- Loading Spinner -->
+          <LoadingSpinner v-if="isDataLoading" />
+
           <!-- Recommended Section -->
           <div class="mb-8">
             <h2 class="text-2xl font-bold text-gray-800 mb-4">Recommended for You</h2>
@@ -141,7 +404,7 @@ export default {
               >
                 <div class="flex items-start space-x-4">
                   <img
-                    :src="material.thumbnail"
+                    :src="material.thumbnail_path"
                     :alt="material.title"
                     class="w-16 h-16 rounded-lg object-cover"
                   />
@@ -217,11 +480,11 @@ export default {
                         <span class="text-sm text-gray-500 truncate">{{ material.author }}</span>
                       </div>
                       <div class="text-sm text-gray-500 mt-1">
-                        Bookmarked on {{ new Date(material.dateBookmarked).toLocaleDateString() }}
+                        Bookmarked on {{ new Date(material.date_bookmarked).toLocaleDateString() }}
                       </div>
                     </div>
                     <button
-                      @click="removeBookmark(material)"
+                      @click="removeBookmark(material.id)"
                       class="text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <span class="material-icons">bookmark_remove</span>
@@ -238,10 +501,19 @@ export default {
           </div>
         </div>
       </div>
-
-      <!-- Floating Chat Bot (when not in split screen) -->
-      <ChatBotWrapper v-if="!showSplitScreen" />
     </div>
+    
+    <!-- Floating Chat Toggle Button -->
+    <button
+      v-if="!chatStore.isOpen && !showSplitScreen"
+      @click="activateChat"
+      class="fixed bottom-6 right-6 bg-maroon-600 text-white rounded-full p-4 shadow-lg hover:bg-maroon-700 transition-all z-[100] group"
+    >
+      <span class="material-icons">chat</span>
+      <span class="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-3 py-1 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+        Ask Learning Assistant
+      </span>
+    </button>
   </div>
 </template>
 
@@ -273,5 +545,23 @@ export default {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+.loading-overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+}
+
+/* Make sure the chat components are properly positioned */
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+.h-screen {
+  height: calc(100vh - 4rem); /* Adjust for header height */
+  position: relative;
+  z-index: 0; /* Ensure proper stacking with global chat */
 }
 </style>

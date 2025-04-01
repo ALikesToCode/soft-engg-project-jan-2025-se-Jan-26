@@ -42,7 +42,7 @@
                 </span>
               </div>
               <span class="text-sm text-gray-500">
-                {{ formatDate(notification.createdAt) }}
+                {{ formatDate(notification.timestamp) }}
               </span>
             </div>
             <h3 class="font-semibold text-gray-800">{{ notification.title }}</h3>
@@ -60,49 +60,40 @@
 <script>
 import NotificationForm from '@/components/NotificationForm.vue'
 import formatDateFunc from '@/utils/formatDate'
+import { FacultyNotificationService } from '@/services/facultyNotification.service'
 
 export default {
   name: 'BaseNotificationsView',
   components: {
-    NotificationForm
+    NotificationForm,
   },
   props: {
     courses: {
       type: Array,
-      required: true
+      required: true,
     },
     isAdmin: {
       type: Boolean,
-      default: false
+      default: false,
     },
     description: {
       type: String,
-      required: true
-    }
+      required: true,
+    },
   },
   data() {
     return {
       recentNotifications: [
-        {
-          id: 1,
-          type: 'system',
-          priority: 'urgent',
-          category: 'maintenance',
-          title: 'Scheduled Maintenance',
-          message: 'The system will be under maintenance this Sunday from 2 AM to 4 AM.',
-          createdAt: new Date('2024-01-20T10:00:00'),
-        },
-        {
-          id: 2,
-          type: 'course',
-          courseId: 1,
-          priority: 'high',
-          category: 'announcement',
-          title: 'Course Update',
-          message: 'Important updates have been made to the course materials.',
-          createdAt: new Date('2024-01-19T15:30:00'),
-        }
-      ]
+        // {
+        //   id: 1,
+        //   type: 'system',
+        //   priority: 'urgent',
+        //   category: 'maintenance',
+        //   title: 'Scheduled Maintenance',
+        //   message: 'The system will be under maintenance this Sunday from 2 AM to 4 AM.',
+        //   createdAt: new Date('2024-01-20T10:00:00'),
+        // },
+      ],
     }
   },
   methods: {
@@ -115,7 +106,7 @@ export default {
 
       // For course notifications, verify the course exists
       if (notification.type === 'course') {
-        const courseExists = this.courses.some(course => course.id === notification.courseId)
+        const courseExists = this.courses.some((course) => course.id === notification.courseId)
         if (!courseExists) {
           console.warn('Attempted to send notification for non-existent course')
           return
@@ -123,12 +114,17 @@ export default {
       }
 
       // Emit the notification to parent component for processing
-      this.$emit('notification', notification)
+      try {
+        this.$emit('notification', notification)
+      } catch (error) {
+        throw error
+      }
 
       // For demo purposes, add to recent notifications
       this.recentNotifications.unshift({
         id: Date.now(),
         ...notification,
+        timestamp: new Date().toISOString(),
         createdAt: new Date(),
       })
     },
@@ -152,7 +148,33 @@ export default {
         'bg-orange-100 text-orange-800': priority === 'high',
         'bg-red-100 text-red-800': priority === 'urgent',
       }
-    }
-  }
+    },
+    async getRecentNotifications() {
+      try {
+        // Don't pass custom headers, let the API interceptor handle authorization
+        const response = await FacultyNotificationService.getRecentNotifications()
+        if (!response || response.status !== 200) {
+          throw new Error('Unexpected response format')
+        }
+        response.data.forEach((notif) => {
+          let date = notif.timestamp
+
+          if (!(date instanceof Date)) {
+            date = new Date(date) // Only convert if it's NOT already a Date object
+          }
+          if (isNaN(date.getTime())) {
+            console.error('Invalid date format received:', notif.timestamp)
+          } else {
+            this.recentNotifications.push(notif)
+          }
+        })
+      } catch (error) {
+        console.error('Error fetching notifications:', error)
+      }
+    },
+  },
+  mounted() {
+    this.getRecentNotifications()
+  },
 }
-</script> 
+</script>

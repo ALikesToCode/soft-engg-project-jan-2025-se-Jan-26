@@ -221,7 +221,11 @@
 </template>
 
 <script>
-import { authService } from '@/api/authService';
+import { authService } from '@/api/authService'
+import { useToast } from 'vue-toastification'
+import { ROLE } from '@/AppConstants/globalConstants'
+import rolePaths from '@/AppConstants/rolePaths'
+import useAuthStore from '@/stores/useAuthStore'
 
 export default {
   name: 'LoginView',
@@ -244,7 +248,11 @@ export default {
         email: '',
         password: '',
       },
+      toast: null,
     }
+  },
+  mounted() {
+    this.toast = useToast()
   },
   methods: {
     validateForm() {
@@ -274,10 +282,72 @@ export default {
 
       this.loading = true
       try {
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-        this.$router.push('/dashboard')
+        console.log('Attempting to log in with email:', this.form.email);
+        const response = await authService.loginWithEmail(this.form.email, this.form.password);
+        
+        // Check if login failed
+        if (!response || response.success === false) {
+          // Login failed, show toast notification
+          this.toast.error(response?.message || 'Login failed. Please check your credentials.');
+          this.loading = false;
+          return;
+        }
+        
+        console.log('Login successful, getting current user data...');
+        
+        // Login successful - get user data to determine correct dashboard
+        try {
+          const userData = await authService.getCurrentUser();
+          if (!userData) {
+            this.toast.error('Unable to retrieve user data');
+            this.loading = false;
+            return;
+          }
+          
+          // Get user role - userData.role is already normalized to uppercase in getCurrentUser
+          const userRole = userData.role; 
+          
+          // Debug info to troubleshoot role issues
+          console.log(`LOGIN: User data from getCurrentUser:`, userData);
+          console.log(`LOGIN: User role = "${userRole}"`);
+          console.log(`LOGIN: ROLE constants = `, JSON.stringify(ROLE));
+          console.log(`LOGIN: Role comparisons: STUDENT=${userRole === ROLE.STUDENT}, FACULTY=${userRole === ROLE.FACULTY}, SUPPORT=${userRole === ROLE.SUPPORT}`);
+          
+          try {
+            // Force refresh the auth store with latest user data
+            const authStore = useAuthStore();
+            authStore.setUser(userData);
+            
+            let dashboardPath;
+            
+            // Use exact string comparison for safety
+            if (userRole === 'FACULTY') {
+              dashboardPath = '/faculty/dashboard';
+              console.log('Directing faculty to faculty dashboard');
+            } else if (userRole === 'SUPPORT') {
+              dashboardPath = '/support/dashboard';
+              console.log('Directing support to support dashboard');
+            } else {
+              // Default to student dashboard
+              dashboardPath = '/user/dashboard';
+              console.log('Directing to student dashboard (default)');
+            }
+            
+            console.log(`Redirecting to ${dashboardPath}`);
+            this.$router.push(dashboardPath);
+          } catch (storeError) {
+            console.error('Error with auth store:', storeError);
+            this.toast.error('Error setting up user session. Please try again.');
+            this.loading = false;
+          }
+        } catch (userError) {
+          console.error('Error getting user data:', userError);
+          this.toast.error('Error loading user data after login');
+          this.loading = false;
+        }
       } catch (error) {
-        console.error('Login error:', error)
+        console.error('Login error:', error);
+        this.toast.error('Login failed. Please try again later.');
       } finally {
         this.loading = false
       }
@@ -286,11 +356,11 @@ export default {
       try {
         this.loading = true;
         // Use our authService to handle Google Sign In
-        await authService.loginWithGoogle();
+        await authService.loginWithGoogle()
       } catch (error) {
-        console.error('Google Sign In error:', error);
+        console.error('Google Sign In error:', error)
       } finally {
-        this.loading = false;
+        this.loading = false
       }
     },
   },

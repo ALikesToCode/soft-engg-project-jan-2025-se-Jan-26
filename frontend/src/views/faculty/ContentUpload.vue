@@ -4,9 +4,17 @@
     <div class="flex-1 overflow-y-auto p-6">
       <div class="max-w-7xl mx-auto">
         <!-- Header -->
-        <div class="mb-8">
-          <h1 class="text-2xl font-bold text-gray-900">Course Content Management</h1>
-          <p class="text-gray-800 mt-2">Create and manage your course materials</p>
+        <div class="mb-8 flex justify-between items-center">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900">Course Content Management</h1>
+            <p class="text-gray-800 mt-2">Create and manage your course materials</p>
+          </div>
+          <p
+            @click="openAddCourseModal"
+            class="bg-maroon-500 hover:bg-gra-600 px-4 py-2 text-gray-100 rounded cursor-pointer"
+          >
+            Add New Course +
+          </p>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -95,10 +103,16 @@
 
                 <!-- Document Upload -->
                 <div v-if="contentForm.type === 'document'">
-                  <FileUploader
-                    :content-type="'document'"
-                    @file-selected="handleFileSelected"
-                    @file-removed="handleFileRemoved"
+                  <label for="driveLink" class="block text-sm font-medium text-gray-900 mb-1"
+                    >Google Drive Link for Document:</label
+                  >
+                  <input
+                    :disabled="!previewMode"
+                    id="driveLink"
+                    v-model="driveLink"
+                    type="url"
+                    placeholder="Enter Google Drive link"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-maroon-500 pr-12"
                   />
                 </div>
 
@@ -177,6 +191,19 @@
       @confirm="confirmAction"
       @cancel="showConfirmDialog = false"
     />
+    <!-- Add Course Modal -->
+    <div
+      v-if="showAddCourseModal"
+      class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 overflow-y-auto"
+    >
+      <div class="bg-white py-4 rounded-lg shadow-lg relative">
+        <addCourse
+          @close="closeAddCourseModal"
+          @course-submitted="handleNewCourseDataSubmit"
+          @course-code-error="handleCourseCodeError"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -194,6 +221,8 @@ import { useContentStore } from '@/stores/contentStore'
 import { useCourseStore } from '@/stores/courseStore'
 import { useQuizStore } from '@/stores/quizStore'
 import { useAssignmentStore } from '@/stores/assignmentStore'
+import addCourse from './components/addCourse.vue'
+import api from '@/utils/api'
 
 export default {
   name: 'ContentUpload',
@@ -205,6 +234,7 @@ export default {
     FileUploader,
     QuizBuilder,
     AssignmentBuilder,
+    addCourse,
   },
   setup() {
     const toast = useToast()
@@ -214,6 +244,7 @@ export default {
     const assignmentStore = useAssignmentStore()
 
     // State Management
+    const showAddCourseModal = ref(false)
     const isSavingData = ref(false)
     const isLoading = ref(false)
     const showConfirmDialog = ref(false)
@@ -223,12 +254,12 @@ export default {
     const selectedModule = ref(null)
     const previewMode = ref(false)
     const courses = ref([])
-
     const selectedCourseId = ref(null)
     const selectedWeek_ = ref(null)
     const selectedModuleId = ref(null)
     const selectedLectureId = ref(null)
     const isExistingData = ref(false)
+    const driveLink = ref('')
 
     // Form State
     const contentForm = ref({
@@ -257,7 +288,7 @@ export default {
         case 'lecture':
           return isValidVideoUrl(contentForm.value.videoUrl)
         case 'document':
-          return !!contentForm.value.file
+          return true //!!contentForm.value.file
         case 'quiz':
           return contentForm.value.questions?.length > 0
         case 'assignment':
@@ -291,6 +322,48 @@ export default {
       }
     }
 
+    //New Course Data addition methods
+    const openAddCourseModal = () => {
+      showAddCourseModal.value = true
+    }
+    const closeAddCourseModal = () => {
+      showAddCourseModal.value = false
+    }
+
+    const handleNewCourseDataSubmit = async (newCourseData) => {
+      isSavingData.value = true
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+
+        const response = await api.post(
+          '/courses',
+          {
+            ...newCourseData,
+          },
+          headers,
+        )
+        if (response.status === 200) {
+          toast.success('Course has been added successfully...')
+        }
+      } catch (err) {
+        console.log(err)
+        toast.error('Failed to add the course...')
+      } finally {
+        isSavingData.value = false
+      }
+    }
+
+    const handleCourseCodeError = (msg) => {
+      toast.error(msg)
+    }
+
     const handleLectureContentData = (data) => {
       selectedLectureId.value = data.id
       isExistingData.value = data.isExistingData
@@ -300,6 +373,12 @@ export default {
       contentForm.value.description = data.content_desc
 
       contentForm.value.type = 'lecture' //when user has selected some other type
+      if (data.file_type) {
+        contentForm.value.type = data.file_type
+      }
+      if (data.driveLink) {
+        driveLink.value = data.driveLink
+      }
     }
     const handleCourseSelected = (courseId) => {
       contentForm.value.courseId = courseId
@@ -385,17 +464,22 @@ export default {
         const contentData = {
           ...contentForm.value,
           moduleId: selectedModuleId.value,
+          courseId: selectedCourseId.value,
         }
         if (contentForm.value.type === 'quiz') {
           await quizStore.createQuiz(contentData)
         } else if (contentForm.value.type === 'assignment') {
           await assignmentStore.createAssignment(contentData)
+        } else if (contentForm.value.type === 'document') {
+          const url = '/courses/module/doc_content/lecture'
+          await saveDocumentContent(contentData, url)
         } else {
           const url = '/courses/module/content/lecture' //for content type = video/lecture
           await contentStore.createContent(contentData, url)
         }
       } catch (error) {
         isLoading.value = false
+        throw error
       } finally {
         isLoading.value = false
       }
@@ -412,7 +496,12 @@ export default {
           contentForm.value.status = 'updated'
           showConfirmDialog.value = false
           isSavingData.value = true
-          await updateContent()
+          console.log('type = ' + contentForm.value.type)
+          if (contentForm.value.type === 'lecture') await updateContent()
+          else if (contentForm.value.type === 'document') {
+            console.log('Updating document')
+            await updateDocumentContent()
+          }
           toast.success('Content Updated successfully')
           isSavingData.value = false
           resetForm()
@@ -439,10 +528,66 @@ export default {
         await contentStore.updateContent(contentData, url)
       } catch (error) {
         isLoading.value = false
+        throw error
       } finally {
         isLoading.value = false
       }
     }
+
+    const saveDocumentContent = async (contentData, url) => {
+      console.log('Uploading Document...')
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+        const data = {
+          ...contentData,
+          driveDocLink: driveLink.value,
+        }
+        console.log(data)
+        const response = await api.post(url, data, headers)
+        console.log('Upload successful:', response.data)
+        return response.data
+      } catch (error) {
+        console.error('Error uploading document:', error)
+        throw error
+      }
+    }
+
+    const updateDocumentContent = async () => {
+      console.log('updating doc content')
+      isLoading.value = true
+      try {
+        const token = localStorage.getItem('token')
+        if (!token) throw new Error('No authentication token found')
+
+        const headers = {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token to Authorization header
+          },
+        }
+        contentForm.value.moduleId = '0'
+        const contentData = {
+          ...contentForm.value,
+          driveDocLink: driveLink.value,
+          lectureId: selectedLectureId.value,
+        }
+        console.log({ ...contentData })
+        const url = '/courses/module/doc_content/lecture' //for content type = video/lecture
+        const response = await api.put(url, contentData, headers)
+      } catch (error) {
+        isLoading.value = false
+        throw error
+      } finally {
+        isLoading.value = false
+      }
+    }
+
     // Utility Functions
     const isValidVideoUrl = (url) => {
       return url?.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/)
@@ -534,6 +679,14 @@ export default {
       isExistingData,
       updatePublishedContent,
       selectedLectureId,
+      driveLink,
+      updateDocumentContent,
+      //New Course Data addition
+      showAddCourseModal,
+      openAddCourseModal,
+      closeAddCourseModal,
+      handleNewCourseDataSubmit,
+      handleCourseCodeError,
     }
   },
 }

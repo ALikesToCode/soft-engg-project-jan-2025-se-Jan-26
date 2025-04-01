@@ -21,6 +21,7 @@
     "axios": "^1.7.9",
     "chart.js": "^4.4.7",
     "date-fns": "^4.1.0",
+    "dayjs": "^1.11.13",
     "dompurify": "^3.2.4",
     "esbuild": "^0.25.0",
     "frontend": "file:",
@@ -40,14 +41,15 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.20.1",
     "eslint-plugin-vue": "^9.32.0",
-    "postcss": "^8.4.35",
+    "postcss": "^8.5.3",
     "prettier": "^3.5.1",
-    "tailwindcss": "^3.4.1",
-    "vite": "^6.1.0"
+    "tailwindcss": "^3.4.17",
+    "vite": "^6.2.0"
   },
   "resolutions": {
     "@humanwhocodes/config-array": "^0.11.11",
     "@humanwhocodes/object-schema": "^2.0.1",
+    "esbuild": "^0.25.0",
     "glob": "^10.3.10",
     "inflight": "^2.0.0",
     "rimraf": "^5.0.5"
@@ -55,6 +57,7 @@
   "overrides": {
     "@humanwhocodes/config-array": "^0.11.11",
     "@humanwhocodes/object-schema": "^2.0.1",
+    "esbuild": "^0.25.0",
     "glob": "^10.3.10",
     "inflight": "^2.0.0",
     "rimraf": "^5.0.5"

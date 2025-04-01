@@ -43,6 +43,23 @@
                 </span>
               </router-link>
             </li>
+            <!-- Student Navigation Items -->
+            <div v-if="userRole === 'student'" class="space-y-1">
+              <router-link
+                v-for="link in studentLinks"
+                :key="link.to"
+                :to="link.to"
+                class="flex items-center px-4 py-2 rounded-lg transition-colors"
+                :class="[
+                  isActive(link.to)
+                    ? 'bg-maroon-900 text-white'
+                    : 'text-gray-300 hover:bg-maroon-800 hover:text-white',
+                ]"
+              >
+                <span class="material-icons text-lg mr-3">{{ link.icon }}</span>
+                {{ link.label }}
+              </router-link>
+            </div>
           </ul>
         </div>
       </div>
@@ -102,7 +119,7 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   studentDashboardUrls,
   facultyDashboardUrls,
@@ -117,6 +134,7 @@ const isDevelopment = computed(() => import.meta.env.VITE_NODE_ENV === 'developm
 
 // Get the current route for active link detection
 const route = useRoute()
+const router = useRouter()
 
 // State management
 const isHovered = ref(null)
@@ -178,6 +196,19 @@ onUnmounted(() => {
     clearTimeout(collapseTimeout)
   }
 })
+
+// New student links
+const studentLinks = [
+  { to: '/user/dashboard', label: 'Dashboard', icon: 'dashboard' },
+  { to: '/user/courses', label: 'Courses', icon: 'school' },
+  { to: '/user/notifications', label: 'Notifications', icon: 'notifications' },
+  { to: '/user/profile', label: 'Profile', icon: 'person' },
+]
+
+const logout = () => {
+  userStore.logout()
+  router.push('/')
+}
 </script>
 
 <style>

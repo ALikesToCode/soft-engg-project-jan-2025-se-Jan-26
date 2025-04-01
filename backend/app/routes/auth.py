@@ -13,41 +13,88 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 from starlette.responses import RedirectResponse
 import jwt
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+import os
+from urllib.parse import urlparse
 
-router = APIRouter()
+router = APIRouter(tags=["Authentication"])
 logger = logging.getLogger(__name__)
+
+# Check if we're in a serverless environment
+SERVERLESS_ENV = os.environ.get("VERCEL") == "1"
 
 # Use settings for Redis configuration if available, otherwise use defaults
 redis_host = getattr(settings, 'REDIS_HOST', '127.0.0.1')
 redis_port = getattr(settings, 'REDIS_PORT', 6379)
 redis_db = getattr(settings, 'REDIS_DB', 0)
+redis_url = os.environ.get("REDIS_URL", getattr(settings, 'REDIS_URL', None))
+redis_username = getattr(settings, 'REDIS_USERNAME', 'default')
+redis_password = getattr(settings, 'REDIS_PASSWORD', None)
+
+# Create a mock Redis client for fallback
+class MockRedis:
+    def __init__(self):
+        self.blacklist = {}
+        logger.info("Using in-memory blacklist as Redis fallback")
+        
+    def exists(self, key):
+        return key in self.blacklist
+        
+    def set(self, key, value, **kwargs):
+        self.blacklist[key] = value
+        return True
+        
+    def ping(self):
+        return True
 
 # Initialize Redis client with error handling
-try:
-    redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
-    # Test connection
-    redis_client.ping()
-    logger.info("Redis connection established successfully")
-except redis.ConnectionError as e:
-    logger.warning(f"Redis connection failed: {str(e)}. Using fallback mode.")
-    # Create a mock Redis client for fallback
-    class MockRedis:
-        def __init__(self):
-            self.blacklist = set()
-            logger.info("Using in-memory blacklist as Redis fallback")
+if SERVERLESS_ENV:
+    # In serverless environments, default to using the mock Redis
+    # unless a valid REDIS_URL environment variable is provided
+    if redis_url:
+        try:
+            # If we have a URL but no explicit password in it, try to add it
+            if redis_password and "://:@" not in redis_url and "@" not in redis_url:
+                # Parse the URL to insert password
+                parsed = urlparse(redis_url)
+                if redis_username != 'default':
+                    redis_url = f"{parsed.scheme}://{redis_username}:{redis_password}@{parsed.netloc}{parsed.path}"
+                else:
+                    redis_url = f"{parsed.scheme}://:{redis_password}@{parsed.netloc}{parsed.path}"
             
-        def exists(self, key):
-            return key in self.blacklist
+            redis_client = redis.from_url(redis_url, decode_responses=True)
+            redis_client.ping()
+            logger.info("Redis connection established successfully using REDIS_URL")
+        except (redis.ConnectionError, redis.exceptions.ResponseError, redis.exceptions.RedisError) as e:
+            logger.warning(f"Redis connection failed: {str(e)}. Using fallback mode.")
+            redis_client = MockRedis()
+    else:
+        logger.warning("No REDIS_URL provided in serverless environment. Using in-memory fallback.")
+        redis_client = MockRedis()
+else:
+    # In non-serverless environments, try to connect to Redis using host/port
+    try:
+        # Include password if available
+        connection_kwargs = {
+            "host": redis_host,
+            "port": redis_port,
+            "db": redis_db,
+            "decode_responses": True
+        }
+        
+        if redis_username != 'default':
+            connection_kwargs["username"] = redis_username
             
-        def set(self, key, value):
-            self.blacklist.add(key)
-            return True
+        if redis_password:
+            connection_kwargs["password"] = redis_password
             
-        def ping(self):
-            return True
-    
-    redis_client = MockRedis()
+        redis_client = redis.Redis(**connection_kwargs)
+        # Test connection
+        redis_client.ping()
+        logger.info("Redis connection established successfully")
+    except (redis.ConnectionError, redis.exceptions.ResponseError, redis.exceptions.RedisError) as e:
+        logger.warning(f"Redis connection failed: {str(e)}. Using fallback mode.")
+        redis_client = MockRedis()
 
 def is_token_blacklisted(token: str):
     logger = logging.getLogger(__name__)
@@ -58,7 +105,8 @@ def is_token_blacklisted(token: str):
         return is_blacklisted
     except Exception as e:
         logger.error(f"Error checking token blacklist: {str(e)}")
-        # If Redis is down, assume token is not blacklisted
+        # If there's an error checking the blacklist, assume token is not blacklisted
+        # This is a fallback to prevent users from being locked out
         return False
 
 def is_token_valid(token: str):
@@ -95,7 +143,7 @@ oauth.register(
     access_token_url="https://oauth2.googleapis.com/token",
     access_token_params=None,
     refresh_token_url=None,
-    redirect_uri=f"http://localhost:8000{settings.API_PREFIX}/auth/callback",
+    redirect_uri="http://localhost:8000/auth/callback",
     userinfo_url="https://www.googleapis.com/oauth2/v3/userinfo",
     client_kwargs={"scope": "openid email profile"},
     jwks_uri = "https://www.googleapis.com/oauth2/v3/certs"
@@ -104,7 +152,7 @@ oauth.register(
 # Step 1: Redirect to Login
 # noraml email/password login
 # such users can only be added by support
-@router.post("/auth/login", 
+@router.post("/login", 
     summary="Login with email and password",
     description="Authenticate a user with email and password credentials",
     response_description="Authentication token and user information",
@@ -178,7 +226,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSessi
     }
 
 # google login
-@router.get("/auth/login/google", 
+@router.get("/login/google", 
     summary="Login with Google",
     description="Initiates the Google OAuth2 authentication flow",
     response_description="Redirects to Google for authentication",
@@ -212,12 +260,12 @@ async def login_with_google(request: Request):
     """
     logger.info("Starting Google login process")
     # Use the same redirect URI as configured in the OAuth client
-    redirect_uri = f"http://localhost:8000{settings.API_PREFIX}/auth/callback"
+    redirect_uri = "http://localhost:8000/auth/callback"
     logger.info(f"Using redirect URI: {redirect_uri}")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 # Step 2: Google Callback
-@router.get("/auth/callback", 
+@router.get("/callback", 
     summary="Google OAuth callback",
     description="Handles the callback from Google OAuth2 authentication",
     response_description="Redirects to frontend with authentication token",
@@ -269,6 +317,10 @@ async def auth_callback(request: Request, db=Depends(get_db)):
         user_data = await oauth.google.parse_id_token(token, None)
         logger.info(f"Parsed user data: {user_data.get('email')}")
         
+        # Log complete user data for debugging
+        logger.info(f"Google user data: {user_data}")
+        logger.info(f"Google profile picture: {user_data.get('picture')}")
+        
         request.session["user"] = user_data
 
         # Check if user is already stored in db
@@ -287,9 +339,9 @@ async def auth_callback(request: Request, db=Depends(get_db)):
         has_password = bool(user.hashed_password)
         password_notification = "" if has_password else "&password_needed=true"
         
-        # Redirect to frontend with token
-        frontend_callback_url = f"{settings.FRONTEND_URL}/auth/callback?access_token={access_token}{password_notification}"
-        logger.info(f"Redirecting to frontend callback")
+        # Redirect to frontend with token and user role
+        frontend_callback_url = f"{settings.FRONTEND_URL}/auth/callback?access_token={access_token}&user_role={user.role}{password_notification}"
+        logger.info(f"Redirecting to frontend callback with role: {user.role}")
         return RedirectResponse(url=frontend_callback_url)
     except Exception as e:
         logger.error(f"Error in auth callback: {str(e)}")
@@ -299,7 +351,7 @@ async def auth_callback(request: Request, db=Depends(get_db)):
         return RedirectResponse(url=error_url)
 
 # Step 3: Get Current User (Frontend Calls This)
-@router.get("/auth/me", 
+@router.get("/me", 
     summary="Get current user information",
     description="Retrieves information about the currently authenticated user",
     response_description="User information from the JWT token",
@@ -376,7 +428,7 @@ async def get_user(token: str = Depends(oauth2_scheme)):
     return payload
 
 # Step 4: Logout
-@router.get("/auth/logout", 
+@router.get("/logout", 
     summary="Logout user",
     description="Invalidates the current authentication token",
     response_description="Confirmation of successful logout",
@@ -447,7 +499,7 @@ async def logout(token: str = Depends(oauth2_scheme)):
         return {"message": "Invalid token, no action taken"}
 
 # Step 5: Refresh Token
-@router.post("/auth/refresh", 
+@router.post("/refresh", 
     summary="Refresh authentication token",
     description="Issues a new JWT token to extend the user's session",
     response_description="New authentication token",
@@ -552,8 +604,8 @@ async def get_user(request: Request):
 
 # Role based access control
 def require_role(role: str):
-    def role_checker(token: str = Depends(oauth2_scheme)):
-        user = get_current_user(token)
+    async def role_checker(token: str = Depends(oauth2_scheme)):
+        user = await get_current_user(token)
         if not user:
             raise HTTPException(status_code=401, detail="Invalid token")
         if user["role"] != role:
@@ -577,14 +629,15 @@ class PasswordUpdate(BaseModel):
     """
     password: str
     
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "password": "securePassword123"
             }
         }
+    )
 
-@router.post("/auth/set-password", 
+@router.post("/set-password", 
     summary="Set or update user password",
     description="Allows users to set a password for their account, particularly useful for users who initially logged in with Google",
     response_description="Confirmation message upon successful password update",

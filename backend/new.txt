@@ -1,0 +1,1421 @@
+Running tests...
+============================= test session starts ==============================
+platform linux -- Python 3.13.2, pytest-8.3.5, pluggy-1.5.0 -- /home/mysterious/storage/github/soft-engg-project-jan-2025-se-Jan-26/backend/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/mysterious/storage/github/soft-engg-project-jan-2025-se-Jan-26
+configfile: pytest.ini
+plugins: anyio-4.8.0, asyncio-0.25.3, langsmith-0.3.11
+asyncio: mode=Mode.AUTO, asyncio_default_fixture_loop_scope=function
+collecting ... collected 74 items
+
+tests/test_analytics_service.py::test_course_analytics_data PASSED       [  1%]
+tests/test_analytics_service.py::test_student_progress_calculation PASSED [  2%]
+tests/test_analytics_service.py::test_resource_usage_tracking PASSED     [  4%]
+tests/test_analytics_service.py::test_assignment_analytics PASSED        [  5%]
+tests/test_analytics_service.py::test_data_aggregation PASSED            [  6%]
+tests/test_analytics_service.py::test_performance_metrics_generation PASSED [  8%]
+tests/test_analytics_service.py::test_data_visualization_preparation PASSED [  9%]
+tests/test_analytics_service.py::test_comparative_analytics PASSED       [ 10%]
+tests/test_analytics_service.py::test_predictive_analytics PASSED        [ 12%]
+tests/test_api_endpoints.py::test_login_valid_credentials FAILED         [ 13%]
+tests/test_api_endpoints.py::test_login_invalid_credentials FAILED       [ 14%]
+tests/test_api_endpoints.py::test_get_current_user FAILED                [ 16%]
+tests/test_api_endpoints.py::test_get_users_as_admin FAILED              [ 17%]
+tests/test_api_endpoints.py::test_get_users_as_student FAILED            [ 18%]
+tests/test_api_endpoints.py::test_create_assignment FAILED               [ 20%]
+tests/test_api_endpoints.py::test_create_assignment_as_student FAILED    [ 21%]
+tests/test_api_endpoints.py::test_create_course FAILED                   [ 22%]
+tests/test_api_endpoints.py::test_get_courses FAILED                     [ 24%]
+tests/test_api_endpoints.py::test_get_faqs FAILED                        [ 25%]
+tests/test_api_endpoints.py::test_get_system_settings_as_admin FAILED    [ 27%]
+tests/test_api_endpoints.py::test_get_system_settings_as_student FAILED  [ 28%]
+tests/test_assignment_api.py::test_create_assignment FAILED              [ 29%]
+tests/test_assignment_api.py::test_get_assignments FAILED                [ 31%]
+tests/test_assignment_api.py::test_get_assignment FAILED                 [ 32%]
+tests/test_assignment_api.py::test_update_assignment FAILED              [ 33%]
+tests/test_assignment_api.py::test_submit_assignment FAILED              [ 35%]
+tests/test_assignment_api.py::test_get_my_submission FAILED              [ 36%]
+tests/test_assignment_api.py::test_grade_submission FAILED               [ 37%]
+tests/test_assignment_api.py::test_delete_assignment FAILED              [ 39%]
+tests/test_assignment_basic.py::test_assignment_model_creation PASSED    [ 40%]
+tests/test_assignment_models.py::test_assignment_model FAILED            [ 41%]
+tests/test_assignment_models.py::test_submission_model FAILED            [ 43%]
+tests/test_assignment_models.py::test_late_submission_calculation PASSED [ 44%]
+tests/test_assignment_models.py::test_assignment_status_transitions PASSED [ 45%]
+tests/test_assignment_routes.py::test_create_assignment_endpoint FAILED  [ 47%]
+tests/test_assignment_routes.py::test_get_assignments_endpoint FAILED    [ 48%]
+tests/test_assignment_routes.py::test_get_assignment_details_endpoint FAILED [ 50%]
+tests/test_assignment_routes.py::test_update_assignment_endpoint FAILED  [ 51%]
+tests/test_assignment_routes.py::test_delete_assignment_endpoint Cleaning up test uploads...
+
+
+=================================== FAILURES ===================================
+_________________________ test_login_valid_credentials _________________________
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:394: in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:256: in handle_async_request
+    raise exc from None
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:236: in handle_async_request
+    response = await connection.handle_async_request(
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:101: in handle_async_request
+    raise exc
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:78: in handle_async_request
+    stream = await self._connect(request)
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:124: in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+venv/lib/python3.13/site-packages/httpcore/_backends/auto.py:31: in connect_tcp
+    return await self._backend.connect_tcp(
+venv/lib/python3.13/site-packages/httpcore/_backends/anyio.py:113: in connect_tcp
+    with map_exceptions(exc_map):
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+map = {<class 'TimeoutError'>: <class 'httpcore.ConnectTimeout'>, <class 'OSError'>: <class 'httpcore.ConnectError'>, <class 'anyio.BrokenResourceError'>: <class 'httpcore.ConnectError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> typing.Iterator[None]:
+        try:
+            yield
+        except Exception as exc:  # noqa: PIE786
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpcore/_exceptions.py:14: ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+async_client = <httpx.AsyncClient object at 0x7505aa6dc440>
+
+    @pytest.mark.asyncio
+    async def test_login_valid_credentials(async_client: AsyncClient):
+        """Test login with valid credentials"""
+>       response = await async_client.post(
+            "/api/v1/auth/login",
+            data={"username": "faculty@test.com", "password": "password"}
+        )
+
+tests/test_api_endpoints.py:11: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_client.py:1859: in post
+    return await self.request(
+venv/lib/python3.13/site-packages/httpx/_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+venv/lib/python3.13/site-packages/httpx/_client.py:1629: in send
+    response = await self._send_handling_auth(
+venv/lib/python3.13/site-packages/httpx/_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+venv/lib/python3.13/site-packages/httpx/_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+venv/lib/python3.13/site-packages/httpx/_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:393: in handle_async_request
+    with map_httpcore_exceptions():
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore.ReadTimeout`, we want to map to
+                # `httpx.ReadTimeout`, not just `httpx.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:118: ConnectTimeout
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+________________________ test_login_invalid_credentials ________________________
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:394: in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:256: in handle_async_request
+    raise exc from None
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:236: in handle_async_request
+    response = await connection.handle_async_request(
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:101: in handle_async_request
+    raise exc
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:78: in handle_async_request
+    stream = await self._connect(request)
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:124: in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+venv/lib/python3.13/site-packages/httpcore/_backends/auto.py:31: in connect_tcp
+    return await self._backend.connect_tcp(
+venv/lib/python3.13/site-packages/httpcore/_backends/anyio.py:113: in connect_tcp
+    with map_exceptions(exc_map):
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+map = {<class 'TimeoutError'>: <class 'httpcore.ConnectTimeout'>, <class 'OSError'>: <class 'httpcore.ConnectError'>, <class 'anyio.BrokenResourceError'>: <class 'httpcore.ConnectError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> typing.Iterator[None]:
+        try:
+            yield
+        except Exception as exc:  # noqa: PIE786
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpcore/_exceptions.py:14: ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+async_client = <httpx.AsyncClient object at 0x7505aa6820d0>
+
+    @pytest.mark.asyncio
+    async def test_login_invalid_credentials(async_client: AsyncClient):
+        """Test login with invalid credentials"""
+>       response = await async_client.post(
+            "/api/v1/auth/login",
+            data={"username": "faculty@test.com", "password": "wrong_password"}
+        )
+
+tests/test_api_endpoints.py:24: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_client.py:1859: in post
+    return await self.request(
+venv/lib/python3.13/site-packages/httpx/_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+venv/lib/python3.13/site-packages/httpx/_client.py:1629: in send
+    response = await self._send_handling_auth(
+venv/lib/python3.13/site-packages/httpx/_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+venv/lib/python3.13/site-packages/httpx/_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+venv/lib/python3.13/site-packages/httpx/_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:393: in handle_async_request
+    with map_httpcore_exceptions():
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore.ReadTimeout`, we want to map to
+                # `httpx.ReadTimeout`, not just `httpx.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:118: ConnectTimeout
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+____________________________ test_get_current_user _____________________________
+
+async_client = <httpx.AsyncClient object at 0x7505aa680b90>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...gxNzMwMzY4LTQ0MWYtNGNiZC05ZjFkLWYxZWZiN2MxZjY0ZCIsImV4cCI6MTc0MTQ0MjIzM30.nLyekznv5IfHPbtKZe_5dHGl_iRdPbWJTFuzavbUPCk'}
+
+    @pytest.mark.asyncio
+    async def test_get_current_user(async_client: AsyncClient, tokens):
+        """Test getting current user information"""
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_api_endpoints.py:33: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:13,687 - app.utils.jwt_utils - INFO - Creating token for user ID: 5f162879-3383-4e30-8e86-679cc27468fb with expiry: 2025-03-08 13:57:13.687562+00:00
+2025-03-08 18:27:13,687 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:13,688 - app.utils.jwt_utils - INFO - Creating token for user ID: 81730368-441f-4cbd-9f1d-f1efb7c1f64d with expiry: 2025-03-08 13:57:13.688088+00:00
+2025-03-08 18:27:13,688 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 5f162879-3383-4e30-8e86-679cc27468fb with expiry: 2025-03-08 13:57:13.687562+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 81730368-441f-4cbd-9f1d-f1efb7c1f64d with expiry: 2025-03-08 13:57:13.688088+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+___________________________ test_get_users_as_admin ____________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a9d7a060>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...EwMTkyODhiLWMzZGItNDI4MC1hNTJlLWYxYzY3NDg4ZTdmYSIsImV4cCI6MTc0MTQ0MjIzM30.CV3RCZdCVrftdDh38y6q7Xo6RYkH30_GgRCtUfYHfaE'}
+
+    @pytest.mark.asyncio
+    async def test_get_users_as_admin(async_client: AsyncClient, tokens):
+        """Test getting all users as admin"""
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_api_endpoints.py:51: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:13,852 - app.utils.jwt_utils - INFO - Creating token for user ID: e98e063e-bb9b-40d2-98bd-7c7746d9e103 with expiry: 2025-03-08 13:57:13.852325+00:00
+2025-03-08 18:27:13,852 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:13,852 - app.utils.jwt_utils - INFO - Creating token for user ID: 1019288b-c3db-4280-a52e-f1c67488e7fa with expiry: 2025-03-08 13:57:13.852915+00:00
+2025-03-08 18:27:13,853 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: e98e063e-bb9b-40d2-98bd-7c7746d9e103 with expiry: 2025-03-08 13:57:13.852325+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 1019288b-c3db-4280-a52e-f1c67488e7fa with expiry: 2025-03-08 13:57:13.852915+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+__________________________ test_get_users_as_student ___________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a9d79940>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...BmN2NlOWU0LWU3ZjAtNDQ2My1iOWIwLWQ2NTQ4MDRmMGIyOCIsImV4cCI6MTc0MTQ0MjIzNH0.xPdbeAuScK19JGGyaL4aB3HhaIvqSU4UHtTVjuR6gyE'}
+
+    @pytest.mark.asyncio
+    async def test_get_users_as_student(async_client: AsyncClient, tokens):
+        """Test getting all users as student (should be forbidden)"""
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_api_endpoints.py:66: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:14,507 - app.utils.jwt_utils - INFO - Creating token for user ID: 0854dbaa-1ba3-41ee-bcb3-3ef10ac3884e with expiry: 2025-03-08 13:57:14.507740+00:00
+2025-03-08 18:27:14,508 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:14,508 - app.utils.jwt_utils - INFO - Creating token for user ID: 0f7ce9e4-e7f0-4463-b9b0-d654804f0b28 with expiry: 2025-03-08 13:57:14.508281+00:00
+2025-03-08 18:27:14,508 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 0854dbaa-1ba3-41ee-bcb3-3ef10ac3884e with expiry: 2025-03-08 13:57:14.507740+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 0f7ce9e4-e7f0-4463-b9b0-d654804f0b28 with expiry: 2025-03-08 13:57:14.508281+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+____________________________ test_create_assignment ____________________________
+
+async_client = <httpx.AsyncClient object at 0x7505aa6ac950>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...dmNTUxNDE0LTdhMjgtNGVlOS1hNWY5LTAwNzFmNjM5ZDVmZCIsImV4cCI6MTc0MTQ0MjIzNH0.gueGcMWcqxF0yWxVos1Gs2L24CV-UPwpcLnZ2T1HFSY'}
+
+    @pytest.mark.asyncio
+    async def test_create_assignment(async_client: AsyncClient, tokens):
+        """Test creating an assignment as faculty"""
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_api_endpoints.py:79: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:14,673 - app.utils.jwt_utils - INFO - Creating token for user ID: bfeb4d1f-a608-4dfc-83c0-f0c387ae8bf6 with expiry: 2025-03-08 13:57:14.673106+00:00
+2025-03-08 18:27:14,673 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:14,673 - app.utils.jwt_utils - INFO - Creating token for user ID: 7f551414-7a28-4ee9-a5f9-0071f639d5fd with expiry: 2025-03-08 13:57:14.673796+00:00
+2025-03-08 18:27:14,673 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: bfeb4d1f-a608-4dfc-83c0-f0c387ae8bf6 with expiry: 2025-03-08 13:57:14.673106+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 7f551414-7a28-4ee9-a5f9-0071f639d5fd with expiry: 2025-03-08 13:57:14.673796+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+______________________ test_create_assignment_as_student _______________________
+
+async_client = <httpx.AsyncClient object at 0x7505a9201370>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...BiNTQwMjRiLTdiOWMtNDQ0NS05M2M1LTk2ZGRiNDNmNGE5OCIsImV4cCI6MTc0MTQ0MjIzNX0.jZl22Aa7eWs99GdJ6_OULGbrczDYvNnPEzDZNx9qmtM'}
+
+    @pytest.mark.asyncio
+    async def test_create_assignment_as_student(async_client: AsyncClient, tokens):
+        """Test creating an assignment as student (should be forbidden)"""
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_api_endpoints.py:114: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:14,857 - app.utils.jwt_utils - INFO - Creating token for user ID: c2bddcb6-3163-4ab0-94e6-9fd842f6b9ce with expiry: 2025-03-08 13:57:14.857488+00:00
+2025-03-08 18:27:14,857 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:15,357 - app.utils.jwt_utils - INFO - Creating token for user ID: 0b54024b-7b9c-4445-93c5-96ddb43f4a98 with expiry: 2025-03-08 13:57:15.357071+00:00
+2025-03-08 18:27:15,357 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: c2bddcb6-3163-4ab0-94e6-9fd842f6b9ce with expiry: 2025-03-08 13:57:14.857488+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 0b54024b-7b9c-4445-93c5-96ddb43f4a98 with expiry: 2025-03-08 13:57:15.357071+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+______________________________ test_create_course ______________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a9201f20>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...IxZDBhZThmLTUyZmItNDQ5NC04NmM2LWJiMTc1OWNiMTNmYSIsImV4cCI6MTc0MTQ0MjIzNX0.Wor_MMOf8M5X8LUZtEkfZDtXpq6MvesgZvV0IIKP3mU'}
+
+    @pytest.mark.asyncio
+    async def test_create_course(async_client: AsyncClient, tokens):
+        """Test creating a course as faculty"""
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_api_endpoints.py:145: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:15,532 - app.utils.jwt_utils - INFO - Creating token for user ID: 65d97b5a-0cb6-48ba-b6e9-42ea424c4c20 with expiry: 2025-03-08 13:57:15.532659+00:00
+2025-03-08 18:27:15,533 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:15,533 - app.utils.jwt_utils - INFO - Creating token for user ID: b1d0ae8f-52fb-4494-86c6-bb1759cb13fa with expiry: 2025-03-08 13:57:15.533231+00:00
+2025-03-08 18:27:15,533 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 65d97b5a-0cb6-48ba-b6e9-42ea424c4c20 with expiry: 2025-03-08 13:57:15.532659+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: b1d0ae8f-52fb-4494-86c6-bb1759cb13fa with expiry: 2025-03-08 13:57:15.533231+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+_______________________________ test_get_courses _______________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a91b6450>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...EzNWVjMTg2LTBiYTktNGQwYy1hNTg5LTI5MDU0ZjcyY2EzZCIsImV4cCI6MTc0MTQ0MjIzNX0.kbejesV1sbj3-zegnUIuRD7pUdhNQ088bC3hKndkX3w'}
+
+    @pytest.mark.asyncio
+    async def test_get_courses(async_client: AsyncClient, tokens):
+        """Test getting courses as faculty"""
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_api_endpoints.py:174: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:15,707 - app.utils.jwt_utils - INFO - Creating token for user ID: a44f55e0-8b4a-4649-ac11-4770aded8ca8 with expiry: 2025-03-08 13:57:15.707462+00:00
+2025-03-08 18:27:15,707 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:15,708 - app.utils.jwt_utils - INFO - Creating token for user ID: a35ec186-0ba9-4d0c-a589-29054f72ca3d with expiry: 2025-03-08 13:57:15.707985+00:00
+2025-03-08 18:27:15,708 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: a44f55e0-8b4a-4649-ac11-4770aded8ca8 with expiry: 2025-03-08 13:57:15.707462+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: a35ec186-0ba9-4d0c-a589-29054f72ca3d with expiry: 2025-03-08 13:57:15.707985+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+________________________________ test_get_faqs _________________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a91b6950>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...RmNTc0OGRhLTgzM2UtNDQ2MS04NDhjLTQ1MWMyNmMxOGU2YyIsImV4cCI6MTc0MTQ0MjIzNn0.lPsdppJAWIQwC90Ex4OmTKk-fe_OOFgSi_fYl6i1CHY'}
+
+    @pytest.mark.asyncio
+    async def test_get_faqs(async_client: AsyncClient, tokens):
+        """Test getting FAQs"""
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_api_endpoints.py:199: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:16,388 - app.utils.jwt_utils - INFO - Creating token for user ID: 93ea1ff1-e135-4386-ae17-086a5603062d with expiry: 2025-03-08 13:57:16.388063+00:00
+2025-03-08 18:27:16,388 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:16,388 - app.utils.jwt_utils - INFO - Creating token for user ID: 4f5748da-833e-4461-848c-451c26c18e6c with expiry: 2025-03-08 13:57:16.388727+00:00
+2025-03-08 18:27:16,388 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 93ea1ff1-e135-4386-ae17-086a5603062d with expiry: 2025-03-08 13:57:16.388063+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 4f5748da-833e-4461-848c-451c26c18e6c with expiry: 2025-03-08 13:57:16.388727+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+______________________ test_get_system_settings_as_admin _______________________
+
+async_client = <httpx.AsyncClient object at 0x7505a91b09b0>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...E5NGI3MzUxLWFiNjEtNDk5Yi1hZTA2LTYzMmU4NDgzNDAyMiIsImV4cCI6MTc0MTQ0MjIzNn0.JcD0hkM0EBqSEJhbD5DFAUql_51cEaayTBK_8Imhn4Y'}
+
+    @pytest.mark.asyncio
+    async def test_get_system_settings_as_admin(async_client: AsyncClient, tokens):
+        """Test getting system settings as admin"""
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_api_endpoints.py:215: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:16,571 - app.utils.jwt_utils - INFO - Creating token for user ID: f13e3418-88f7-43f5-b5de-bced41c87c0d with expiry: 2025-03-08 13:57:16.571455+00:00
+2025-03-08 18:27:16,571 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:16,571 - app.utils.jwt_utils - INFO - Creating token for user ID: 194b7351-ab61-499b-ae06-632e84834022 with expiry: 2025-03-08 13:57:16.571980+00:00
+2025-03-08 18:27:16,572 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: f13e3418-88f7-43f5-b5de-bced41c87c0d with expiry: 2025-03-08 13:57:16.571455+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 194b7351-ab61-499b-ae06-632e84834022 with expiry: 2025-03-08 13:57:16.571980+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+_____________________ test_get_system_settings_as_student ______________________
+
+async_client = <httpx.AsyncClient object at 0x7505a91cfb60>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...EwMjNlZmIzLTI1MzktNDY0Ny04ZWFkLTBhZTExYjJkYmViYSIsImV4cCI6MTc0MTQ0MjIzN30.AJsNFpok7sYwok_G-AhCJ0D68kKBQjar3ISQiIFj9IQ'}
+
+    @pytest.mark.asyncio
+    async def test_get_system_settings_as_student(async_client: AsyncClient, tokens):
+        """Test getting system settings as student (should be forbidden)"""
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_api_endpoints.py:230: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:16,789 - app.utils.jwt_utils - INFO - Creating token for user ID: c380bfb3-205b-4a67-a666-66984881aa83 with expiry: 2025-03-08 13:57:16.789696+00:00
+2025-03-08 18:27:16,790 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:17,267 - app.utils.jwt_utils - INFO - Creating token for user ID: a023efb3-2539-4647-8ead-0ae11b2dbeba with expiry: 2025-03-08 13:57:17.267702+00:00
+2025-03-08 18:27:17,267 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: c380bfb3-205b-4a67-a666-66984881aa83 with expiry: 2025-03-08 13:57:16.789696+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: a023efb3-2539-4647-8ead-0ae11b2dbeba with expiry: 2025-03-08 13:57:17.267702+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+____________________________ test_create_assignment ____________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a9dd2cf0>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...U2ZTEzODUxLWE1MDQtNDE1YS05MWQ3LTkxYzk2NzRkNGI3YSIsImV4cCI6MTc0MTQ0MjIzN30.CDiLKRbT-JniBT6p11zKOlh2du6Nyw8klm5bW62qX04'}
+
+    @pytest.mark.asyncio
+    async def test_create_assignment(async_client: AsyncClient, tokens):
+        # Login as faculty
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_assignment_api.py:12: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:17,656 - app.utils.jwt_utils - INFO - Creating token for user ID: b62c88dc-9028-4dcf-a64f-b6c5499ca690 with expiry: 2025-03-08 13:57:17.656025+00:00
+2025-03-08 18:27:17,656 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:17,656 - app.utils.jwt_utils - INFO - Creating token for user ID: 56e13851-a504-415a-91d7-91c9674d4b7a with expiry: 2025-03-08 13:57:17.656517+00:00
+2025-03-08 18:27:17,656 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: b62c88dc-9028-4dcf-a64f-b6c5499ca690 with expiry: 2025-03-08 13:57:17.656025+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 56e13851-a504-415a-91d7-91c9674d4b7a with expiry: 2025-03-08 13:57:17.656517+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+_____________________________ test_get_assignments _____________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a9232f90>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...RlNjhjNzk5LWRkZjgtNDU5Yy1iNGNlLTYxMGU0NTYyMDUxNiIsImV4cCI6MTc0MTQ0MjIzN30.8fw_uRzp9aACfA_tJktLJYWCmCGC23zcXrcxCi492Ys'}
+
+    @pytest.mark.asyncio
+    async def test_get_assignments(async_client: AsyncClient, tokens):
+        # Login as faculty
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_assignment_api.py:51: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+Error sending logs to Logflare: HTTPSConnectionPool(host='api.logflare.app', port=443): Read timed out. (read timeout=5)
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:17,819 - app.utils.jwt_utils - INFO - Creating token for user ID: 38f9c8b5-193b-4573-a84e-ea63a711ff99 with expiry: 2025-03-08 13:57:17.819897+00:00
+2025-03-08 18:27:17,820 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:17,820 - app.utils.jwt_utils - INFO - Creating token for user ID: 4e68c799-ddf8-459c-b4ce-610e45620516 with expiry: 2025-03-08 13:57:17.820491+00:00
+2025-03-08 18:27:17,820 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 38f9c8b5-193b-4573-a84e-ea63a711ff99 with expiry: 2025-03-08 13:57:17.819897+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 4e68c799-ddf8-459c-b4ce-610e45620516 with expiry: 2025-03-08 13:57:17.820491+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+_____________________________ test_get_assignment ______________________________
+
+async_client = <httpx.AsyncClient object at 0x7505aa7d3ba0>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...U5NzcxZTIyLTRlMWYtNDZhMi05ZDY1LTRjMWY2MDg0YzExMyIsImV4cCI6MTc0MTQ0MjI0M30.TU4BgPAUbikqv0-MshpyxHifCkhf7-WqFnldww0bQyI'}
+
+    @pytest.mark.asyncio
+    async def test_get_assignment(async_client: AsyncClient, tokens):
+        # Login as faculty
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_assignment_api.py:86: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:23,057 - app.utils.jwt_utils - INFO - Creating token for user ID: c291b045-9783-4f6a-be2f-0c7607270b11 with expiry: 2025-03-08 13:57:23.057944+00:00
+2025-03-08 18:27:23,688 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:23,688 - app.utils.jwt_utils - INFO - Creating token for user ID: e9771e22-4e1f-46a2-9d65-4c1f6084c113 with expiry: 2025-03-08 13:57:23.688593+00:00
+2025-03-08 18:27:23,689 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: c291b045-9783-4f6a-be2f-0c7607270b11 with expiry: 2025-03-08 13:57:23.057944+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: e9771e22-4e1f-46a2-9d65-4c1f6084c113 with expiry: 2025-03-08 13:57:23.688593+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+____________________________ test_update_assignment ____________________________
+
+async_client = <httpx.AsyncClient object at 0x7505aa810050>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...ZhODFjOTJmLWI0MWEtNDYwYy1iNjdmLWE0ZjFlZjg0Njk0ZCIsImV4cCI6MTc0MTQ0MjI0M30.sGJzvWSi0xg8AkBbVftGZcgWt6R-gklMvB82DMv2EDI'}
+
+    @pytest.mark.asyncio
+    async def test_update_assignment(async_client: AsyncClient, tokens):
+        # Login as faculty
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_assignment_api.py:108: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:23,916 - app.utils.jwt_utils - INFO - Creating token for user ID: 432fdd40-8a93-443f-936b-b6f94d8140ac with expiry: 2025-03-08 13:57:23.916743+00:00
+2025-03-08 18:27:23,917 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:23,917 - app.utils.jwt_utils - INFO - Creating token for user ID: 6a81c92f-b41a-460c-b67f-a4f1ef84694d with expiry: 2025-03-08 13:57:23.917565+00:00
+2025-03-08 18:27:23,917 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 432fdd40-8a93-443f-936b-b6f94d8140ac with expiry: 2025-03-08 13:57:23.916743+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 6a81c92f-b41a-460c-b67f-a4f1ef84694d with expiry: 2025-03-08 13:57:23.917565+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+____________________________ test_submit_assignment ____________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a9187ad0>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...AxMWJjNjJlLTYxYTItNDcxZi05MjQzLTUyY2VhNTU4OTI3OSIsImV4cCI6MTc0MTQ0MjI0NH0.WkpPUE_ouvQMlZuloJLm3WmWWa_vFK5OHq4b8yRhgQo'}
+
+    @pytest.mark.asyncio
+    async def test_submit_assignment(async_client: AsyncClient, tokens):
+        # Login as faculty to create assignment
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_assignment_api.py:147: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:24,188 - app.utils.jwt_utils - INFO - Creating token for user ID: e541988f-98c6-46d9-a10e-c2aa83d16b46 with expiry: 2025-03-08 13:57:24.188779+00:00
+2025-03-08 18:27:24,189 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:24,189 - app.utils.jwt_utils - INFO - Creating token for user ID: 011bc62e-61a2-471f-9243-52cea5589279 with expiry: 2025-03-08 13:57:24.189369+00:00
+2025-03-08 18:27:24,730 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: e541988f-98c6-46d9-a10e-c2aa83d16b46 with expiry: 2025-03-08 13:57:24.188779+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 011bc62e-61a2-471f-9243-52cea5589279 with expiry: 2025-03-08 13:57:24.189369+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+____________________________ test_get_my_submission ____________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a923e0d0>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...gyOTNhN2Q4LWFhNjctNGVjNi1hNjlkLTE3N2Q3ZWM4MzhlZCIsImV4cCI6MTc0MTQ0MjI0NH0.70uCKMZXtDYbH1-sbefzqtg_3Ver7R8j-RKD2rsZpzM'}
+
+    @pytest.mark.asyncio
+    async def test_get_my_submission(async_client: AsyncClient, tokens):
+        # Login as faculty to create assignment
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_assignment_api.py:182: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:24,915 - app.utils.jwt_utils - INFO - Creating token for user ID: 2b702b74-9964-4c3f-8229-90df20b3b753 with expiry: 2025-03-08 13:57:24.915058+00:00
+2025-03-08 18:27:24,915 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:24,915 - app.utils.jwt_utils - INFO - Creating token for user ID: 8293a7d8-aa67-4ec6-a69d-177d7ec838ed with expiry: 2025-03-08 13:57:24.915630+00:00
+2025-03-08 18:27:24,915 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 2b702b74-9964-4c3f-8229-90df20b3b753 with expiry: 2025-03-08 13:57:24.915058+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 8293a7d8-aa67-4ec6-a69d-177d7ec838ed with expiry: 2025-03-08 13:57:24.915630+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+____________________________ test_grade_submission _____________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a9184ae0>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...ZmMDVjNTZhLTA5YjEtNDk5NS1iZTdjLWE1MjYxNGQ1YzQxMyIsImV4cCI6MTc0MTQ0MjI0NX0.kjy-RU9DbYuT7nH76M8LrhO6oW55Oa3CiVZxuQVqBNA'}
+
+    @pytest.mark.asyncio
+    async def test_grade_submission(async_client: AsyncClient, tokens):
+        # Login as faculty
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_assignment_api.py:211: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:25,097 - app.utils.jwt_utils - INFO - Creating token for user ID: 040fe862-68cf-4bf2-94f8-2a664045f3a5 with expiry: 2025-03-08 13:57:25.097268+00:00
+2025-03-08 18:27:25,097 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:25,097 - app.utils.jwt_utils - INFO - Creating token for user ID: ff05c56a-09b1-4995-be7c-a52614d5c413 with expiry: 2025-03-08 13:57:25.097795+00:00
+2025-03-08 18:27:25,097 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 040fe862-68cf-4bf2-94f8-2a664045f3a5 with expiry: 2025-03-08 13:57:25.097268+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: ff05c56a-09b1-4995-be7c-a52614d5c413 with expiry: 2025-03-08 13:57:25.097795+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+____________________________ test_delete_assignment ____________________________
+
+async_client = <httpx.AsyncClient object at 0x7505a923f5f0>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...YwYzU5OGJjLThhOTUtNDQyMi04ODE2LWJkNDFiOTlkMDhiMiIsImV4cCI6MTc0MTQ0MjI0NX0.J9gd7bfnYVyODz6bLVLNz-5W-YL6aME6gAf3JwJklpQ'}
+
+    @pytest.mark.asyncio
+    async def test_delete_assignment(async_client: AsyncClient, tokens):
+        # Login as faculty
+>       tokens_dict = await tokens
+E       TypeError: object dict can't be used in 'await' expression
+
+tests/test_assignment_api.py:254: TypeError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:25,268 - app.utils.jwt_utils - INFO - Creating token for user ID: 6d21d085-7be8-49df-8928-dd12b5f823a1 with expiry: 2025-03-08 13:57:25.268018+00:00
+2025-03-08 18:27:25,742 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:25,742 - app.utils.jwt_utils - INFO - Creating token for user ID: f0c598bc-8a95-4422-8816-bd41b99d08b2 with expiry: 2025-03-08 13:57:25.742331+00:00
+2025-03-08 18:27:25,742 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 6d21d085-7be8-49df-8928-dd12b5f823a1 with expiry: 2025-03-08 13:57:25.268018+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: f0c598bc-8a95-4422-8816-bd41b99d08b2 with expiry: 2025-03-08 13:57:25.742331+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+____________________________ test_assignment_model _____________________________
+
+db_session = <sqlalchemy.orm.session.AsyncSession object at 0x7505a9321230>
+test_users = {'faculty': <app.models.user.User object at 0x7505a924df90>, 'student': <app.models.user.User object at 0x7505a924d270>}
+
+    @pytest.mark.asyncio
+    async def test_assignment_model(db_session, test_users):
+        # Create test data
+        assignment_data = AssignmentCreate(
+            title="Test Assignment Model",
+            description="This is a test assignment for model testing",
+            course_id=str(uuid.uuid4()),
+            due_date=datetime.now(UTC) + timedelta(days=7),
+            points=100,
+            status="draft",
+            submission_type="text",
+            allow_late_submissions=True,
+            late_penalty=10,
+            plagiarism_detection=True,
+            file_types="pdf,doc,docx",
+            max_file_size=5
+        )
+    
+        # Create assignment
+        faculty_id = test_users["faculty"].id
+        assignment = await AssignmentService.create_assignment(db_session, assignment_data.model_dump(), faculty_id)
+    
+        # Verify assignment attributes
+        assert assignment.id is not None
+        assert assignment.title == assignment_data.title
+        assert assignment.description == assignment_data.description
+        assert str(assignment.course_id) == assignment_data.course_id
+        assert assignment.created_by == faculty_id
+        assert assignment.points == assignment_data.points
+        assert assignment.status == assignment_data.status
+        assert assignment.submission_type == assignment_data.submission_type
+        assert assignment.allow_late_submissions == assignment_data.allow_late_submissions
+        assert assignment.late_penalty == assignment_data.late_penalty
+        assert assignment.plagiarism_detection == assignment_data.plagiarism_detection
+        assert assignment.file_types == assignment_data.file_types
+        assert assignment.max_file_size == assignment_data.max_file_size
+    
+        # Test direct model creation
+        new_assignment = Assignment(
+            title="Direct Model Creation",
+            description="Created directly through the model",
+            course_id=uuid.uuid4(),
+            created_by=faculty_id,
+            due_date=datetime.now(UTC) + timedelta(days=10),
+            points=150,
+            status="published",
+            submission_type="file",
+            allow_late_submissions=False,
+            late_penalty=0,
+            plagiarism_detection=False,
+            file_types="pdf",
+            max_file_size=10
+        )
+    
+        # Add to session and commit
+        db_session.add(new_assignment)
+        await db_session.commit()
+        await db_session.refresh(new_assignment)
+    
+        # Verify direct model creation
+        assert new_assignment.id is not None
+        assert new_assignment.title == "Direct Model Creation"
+        assert new_assignment.status == "published"
+    
+        # Test model relationships
+        # Query the assignment from the database
+        db_assignment = await db_session.get(Assignment, assignment.id)
+    
+        # Verify the assignment exists
+        assert db_assignment is not None
+        assert db_assignment.id == assignment.id
+    
+        # Test model string representation
+>       assert str(assignment) == f"Assignment(id={assignment.id}, title={assignment.title})"
+E       AssertionError: assert '<app.models....7505aa6811d0>' == 'Assignment(i...gnment Model)'
+E         
+E         - Assignment(id=c0461adc-40df-4e4c-9efc-70fadc94a2b4, title=Test Assignment Model)
+E         + <app.models.assignment.Assignment object at 0x7505aa6811d0>
+
+tests/test_assignment_models.py:84: AssertionError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+____________________________ test_submission_model _____________________________
+
+db_session = <sqlalchemy.orm.session.AsyncSession object at 0x7505a924c4b0>
+test_assignment = <app.models.assignment.Assignment object at 0x7505a91f3230>
+test_users = {'faculty': <app.models.user.User object at 0x7505a924e210>, 'student': <app.models.user.User object at 0x7505a92a9770>}
+
+    @pytest.mark.asyncio
+    async def test_submission_model(db_session, test_assignment, test_users):
+        # Create test data
+        submission_data = SubmissionCreate(
+            content="This is a test submission content",
+            status="draft"
+        )
+    
+        # Create submission
+        student_id = test_users["student"].id
+        submission = await AssignmentService.create_submission(
+            db_session,
+            test_assignment.id,
+            student_id,
+            submission_data.model_dump()
+        )
+    
+        # Verify submission attributes
+        assert submission.id is not None
+        assert submission.assignment_id == test_assignment.id
+        assert submission.student_id == student_id
+        assert submission.content == submission_data.content
+        assert submission.status == submission_data.status
+        assert submission.grade is None
+        assert submission.feedback is None
+        assert submission.plagiarism_score is None
+>       assert submission.submitted_at is not None
+E       assert None is not None
+E        +  where None = <app.models.assignment.Submission object at 0x7505aa95fb60>.submitted_at
+
+tests/test_assignment_models.py:113: AssertionError
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+_______________________ test_create_assignment_endpoint ________________________
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:394: in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:256: in handle_async_request
+    raise exc from None
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:236: in handle_async_request
+    response = await connection.handle_async_request(
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:101: in handle_async_request
+    raise exc
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:78: in handle_async_request
+    stream = await self._connect(request)
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:124: in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+venv/lib/python3.13/site-packages/httpcore/_backends/auto.py:31: in connect_tcp
+    return await self._backend.connect_tcp(
+venv/lib/python3.13/site-packages/httpcore/_backends/anyio.py:113: in connect_tcp
+    with map_exceptions(exc_map):
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+map = {<class 'TimeoutError'>: <class 'httpcore.ConnectTimeout'>, <class 'OSError'>: <class 'httpcore.ConnectError'>, <class 'anyio.BrokenResourceError'>: <class 'httpcore.ConnectError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> typing.Iterator[None]:
+        try:
+            yield
+        except Exception as exc:  # noqa: PIE786
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpcore/_exceptions.py:14: ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+async_client = <httpx.AsyncClient object at 0x7505a92631e0>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...JjMmM4ZmMyLWRkMWUtNGYyMy05OTFmLTI4YjMzNDc4NzU0ZSIsImV4cCI6MTc0MTQ0MjI0Nn0.iPC_FvROLWEPwmw_g7Tj4EwWxbKEeJ8rvVe8_IrB2Po'}
+test_users = {'faculty': <app.models.user.User object at 0x7505a930d6d0>, 'student': <app.models.user.User object at 0x7505a930e170>}
+
+    @pytest.mark.asyncio
+    async def test_create_assignment_endpoint(async_client, tokens, test_users):
+        # Prepare test data
+        assignment_data = {
+            "title": "API Test Assignment",
+            "description": "This is a test assignment created via API",
+            "course_id": str(uuid.uuid4()),
+            "due_date": (datetime.now(UTC) + timedelta(days=7)).isoformat(),
+            "points": 100,
+            "status": "draft",
+            "submission_type": "file",
+            "allow_late_submissions": True,
+            "late_penalty": 10,
+            "plagiarism_detection": True,
+            "file_types": "pdf,doc,docx,txt",
+            "max_file_size": 10
+        }
+    
+        # Test with faculty token (should succeed)
+>       response = await async_client.post(
+            "/api/v1/assignments",
+            json=assignment_data,
+            headers={"Authorization": f"Bearer {tokens['faculty']}"}
+        )
+
+tests/test_assignment_routes.py:28: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_client.py:1859: in post
+    return await self.request(
+venv/lib/python3.13/site-packages/httpx/_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+venv/lib/python3.13/site-packages/httpx/_client.py:1629: in send
+    response = await self._send_handling_auth(
+venv/lib/python3.13/site-packages/httpx/_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+venv/lib/python3.13/site-packages/httpx/_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+venv/lib/python3.13/site-packages/httpx/_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:393: in handle_async_request
+    with map_httpcore_exceptions():
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore.ReadTimeout`, we want to map to
+                # `httpx.ReadTimeout`, not just `httpx.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:118: ConnectTimeout
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:26,854 - app.utils.jwt_utils - INFO - Creating token for user ID: 291814b1-2c4b-417a-8e22-ee0e6a6c51c4 with expiry: 2025-03-08 13:57:26.854348+00:00
+2025-03-08 18:27:26,854 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:26,855 - app.utils.jwt_utils - INFO - Creating token for user ID: bc2c8fc2-dd1e-4f23-991f-28b33478754e with expiry: 2025-03-08 13:57:26.855010+00:00
+2025-03-08 18:27:26,855 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 291814b1-2c4b-417a-8e22-ee0e6a6c51c4 with expiry: 2025-03-08 13:57:26.854348+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: bc2c8fc2-dd1e-4f23-991f-28b33478754e with expiry: 2025-03-08 13:57:26.855010+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+________________________ test_get_assignments_endpoint _________________________
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:394: in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:256: in handle_async_request
+    raise exc from None
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:236: in handle_async_request
+    response = await connection.handle_async_request(
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:101: in handle_async_request
+    raise exc
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:78: in handle_async_request
+    stream = await self._connect(request)
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:124: in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+venv/lib/python3.13/site-packages/httpcore/_backends/auto.py:31: in connect_tcp
+    return await self._backend.connect_tcp(
+venv/lib/python3.13/site-packages/httpcore/_backends/anyio.py:113: in connect_tcp
+    with map_exceptions(exc_map):
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+map = {<class 'TimeoutError'>: <class 'httpcore.ConnectTimeout'>, <class 'OSError'>: <class 'httpcore.ConnectError'>, <class 'anyio.BrokenResourceError'>: <class 'httpcore.ConnectError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> typing.Iterator[None]:
+        try:
+            yield
+        except Exception as exc:  # noqa: PIE786
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpcore/_exceptions.py:14: ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+async_client = <httpx.AsyncClient object at 0x7505a8fa31e0>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...cyNTEzMjliLTRmNGMtNDMwNy04YWU1LWZjMGY3YzBmOGE1NyIsImV4cCI6MTc0MTQ0MjI1Mn0.erjipo3Nc6vXnqAOQTGDGOCMbt1XjAGLVG8711WPUi8'}
+test_assignment = <app.models.assignment.Assignment object at 0x7505aa76dfd0>
+
+    @pytest.mark.asyncio
+    async def test_get_assignments_endpoint(async_client, tokens, test_assignment):
+        # Test with valid course_id
+>       response = await async_client.get(
+            f"/api/v1/assignments?course_id={test_assignment.course_id}",
+            headers={"Authorization": f"Bearer {tokens['faculty']}"}
+        )
+
+tests/test_assignment_routes.py:55: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_client.py:1768: in get
+    return await self.request(
+venv/lib/python3.13/site-packages/httpx/_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+venv/lib/python3.13/site-packages/httpx/_client.py:1629: in send
+    response = await self._send_handling_auth(
+venv/lib/python3.13/site-packages/httpx/_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+venv/lib/python3.13/site-packages/httpx/_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+venv/lib/python3.13/site-packages/httpx/_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:393: in handle_async_request
+    with map_httpcore_exceptions():
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore.ReadTimeout`, we want to map to
+                # `httpx.ReadTimeout`, not just `httpx.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:118: ConnectTimeout
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:32,181 - app.utils.jwt_utils - INFO - Creating token for user ID: 206df4f3-f403-4f27-8a55-bc47a6aa42d6 with expiry: 2025-03-08 13:57:32.181577+00:00
+2025-03-08 18:27:32,182 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:32,182 - app.utils.jwt_utils - INFO - Creating token for user ID: 7251329b-4f4c-4307-8ae5-fc0f7c0f8a57 with expiry: 2025-03-08 13:57:32.182326+00:00
+2025-03-08 18:27:32,663 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 206df4f3-f403-4f27-8a55-bc47a6aa42d6 with expiry: 2025-03-08 13:57:32.181577+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 7251329b-4f4c-4307-8ae5-fc0f7c0f8a57 with expiry: 2025-03-08 13:57:32.182326+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+_____________________ test_get_assignment_details_endpoint _____________________
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:394: in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:256: in handle_async_request
+    raise exc from None
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:236: in handle_async_request
+    response = await connection.handle_async_request(
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:101: in handle_async_request
+    raise exc
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:78: in handle_async_request
+    stream = await self._connect(request)
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:124: in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+venv/lib/python3.13/site-packages/httpcore/_backends/auto.py:31: in connect_tcp
+    return await self._backend.connect_tcp(
+venv/lib/python3.13/site-packages/httpcore/_backends/anyio.py:113: in connect_tcp
+    with map_exceptions(exc_map):
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+map = {<class 'TimeoutError'>: <class 'httpcore.ConnectTimeout'>, <class 'OSError'>: <class 'httpcore.ConnectError'>, <class 'anyio.BrokenResourceError'>: <class 'httpcore.ConnectError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> typing.Iterator[None]:
+        try:
+            yield
+        except Exception as exc:  # noqa: PIE786
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpcore/_exceptions.py:14: ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+async_client = <httpx.AsyncClient object at 0x7505a94c3ba0>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...g1ZWFmMGRiLTJkZjQtNDZmNy1hYTU1LTI1ZjY5NGE4MTNmYyIsImV4cCI6MTc0MTQ0MjI1N30.dCD0QLxBw51sxKZWN5zo6fk1b_D6TgoA9ibjkErMtjE'}
+test_assignment = <app.models.assignment.Assignment object at 0x7505a9238290>
+
+    @pytest.mark.asyncio
+    async def test_get_assignment_details_endpoint(async_client, tokens, test_assignment):
+        # Test with valid assignment_id
+>       response = await async_client.get(
+            f"/api/v1/assignments/{test_assignment.id}",
+            headers={"Authorization": f"Bearer {tokens['faculty']}"}
+        )
+
+tests/test_assignment_routes.py:83: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_client.py:1768: in get
+    return await self.request(
+venv/lib/python3.13/site-packages/httpx/_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+venv/lib/python3.13/site-packages/httpx/_client.py:1629: in send
+    response = await self._send_handling_auth(
+venv/lib/python3.13/site-packages/httpx/_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+venv/lib/python3.13/site-packages/httpx/_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+venv/lib/python3.13/site-packages/httpx/_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:393: in handle_async_request
+    with map_httpcore_exceptions():
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore.ReadTimeout`, we want to map to
+                # `httpx.ReadTimeout`, not just `httpx.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:118: ConnectTimeout
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:37,969 - app.utils.jwt_utils - INFO - Creating token for user ID: 6e19967e-d72b-4f45-b209-5cfe56a4bb3b with expiry: 2025-03-08 13:57:37.969661+00:00
+2025-03-08 18:27:37,970 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:37,970 - app.utils.jwt_utils - INFO - Creating token for user ID: 85eaf0db-2df4-46f7-aa55-25f694a813fc with expiry: 2025-03-08 13:57:37.970108+00:00
+2025-03-08 18:27:37,970 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 6e19967e-d72b-4f45-b209-5cfe56a4bb3b with expiry: 2025-03-08 13:57:37.969661+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 85eaf0db-2df4-46f7-aa55-25f694a813fc with expiry: 2025-03-08 13:57:37.970108+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+_______________________ test_update_assignment_endpoint ________________________
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+>           yield
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:394: in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:256: in handle_async_request
+    raise exc from None
+venv/lib/python3.13/site-packages/httpcore/_async/connection_pool.py:236: in handle_async_request
+    response = await connection.handle_async_request(
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:101: in handle_async_request
+    raise exc
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:78: in handle_async_request
+    stream = await self._connect(request)
+venv/lib/python3.13/site-packages/httpcore/_async/connection.py:124: in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+venv/lib/python3.13/site-packages/httpcore/_backends/auto.py:31: in connect_tcp
+    return await self._backend.connect_tcp(
+venv/lib/python3.13/site-packages/httpcore/_backends/anyio.py:113: in connect_tcp
+    with map_exceptions(exc_map):
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+map = {<class 'TimeoutError'>: <class 'httpcore.ConnectTimeout'>, <class 'OSError'>: <class 'httpcore.ConnectError'>, <class 'anyio.BrokenResourceError'>: <class 'httpcore.ConnectError'>}
+
+    @contextlib.contextmanager
+    def map_exceptions(map: ExceptionMapping) -> typing.Iterator[None]:
+        try:
+            yield
+        except Exception as exc:  # noqa: PIE786
+            for from_exc, to_exc in map.items():
+                if isinstance(exc, from_exc):
+>                   raise to_exc(exc) from exc
+E                   httpcore.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpcore/_exceptions.py:14: ConnectTimeout
+
+The above exception was the direct cause of the following exception:
+
+async_client = <httpx.AsyncClient object at 0x7505a8f8ed00>
+tokens = {'faculty': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImZhY3VsdHlAdGVzdC5jb20iLCJyb2xlIjoiZmFjdWx0eSIsInN1YiI6...EyNjA1ZGFmLTMzOWEtNDAwYS1iM2IwLTA5ODY4Mjg5M2E0YSIsImV4cCI6MTc0MTQ0MjI2M30.HIH1x4FYfYg09A5y6UbkZcC6dtUGhbxmvI9ACe9ubo0'}
+test_assignment = <app.models.assignment.Assignment object at 0x75060c6ca9f0>
+
+    @pytest.mark.asyncio
+    async def test_update_assignment_endpoint(async_client, tokens, test_assignment):
+        # Prepare update data
+        update_data = {
+            "title": "Updated API Assignment",
+            "description": "This assignment was updated via API",
+            "points": 150
+        }
+    
+        # Test with faculty token (should succeed)
+>       response = await async_client.put(
+            f"/api/v1/assignments/{test_assignment.id}",
+            json=update_data,
+            headers={"Authorization": f"Bearer {tokens['faculty']}"}
+        )
+
+tests/test_assignment_routes.py:115: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+venv/lib/python3.13/site-packages/httpx/_client.py:1896: in put
+    return await self.request(
+venv/lib/python3.13/site-packages/httpx/_client.py:1540: in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+venv/lib/python3.13/site-packages/httpx/_client.py:1629: in send
+    response = await self._send_handling_auth(
+venv/lib/python3.13/site-packages/httpx/_client.py:1657: in _send_handling_auth
+    response = await self._send_handling_redirects(
+venv/lib/python3.13/site-packages/httpx/_client.py:1694: in _send_handling_redirects
+    response = await self._send_single_request(request)
+venv/lib/python3.13/site-packages/httpx/_client.py:1730: in _send_single_request
+    response = await transport.handle_async_request(request)
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:393: in handle_async_request
+    with map_httpcore_exceptions():
+/usr/lib/python3.13/contextlib.py:162: in __exit__
+    self.gen.throw(value)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    @contextlib.contextmanager
+    def map_httpcore_exceptions() -> typing.Iterator[None]:
+        global HTTPCORE_EXC_MAP
+        if len(HTTPCORE_EXC_MAP) == 0:
+            HTTPCORE_EXC_MAP = _load_httpcore_exceptions()
+        try:
+            yield
+        except Exception as exc:
+            mapped_exc = None
+    
+            for from_exc, to_exc in HTTPCORE_EXC_MAP.items():
+                if not isinstance(exc, from_exc):
+                    continue
+                # We want to map to the most specific exception we can find.
+                # Eg if `exc` is an `httpcore.ReadTimeout`, we want to map to
+                # `httpx.ReadTimeout`, not just `httpx.TimeoutException`.
+                if mapped_exc is None or issubclass(to_exc, mapped_exc):
+                    mapped_exc = to_exc
+    
+            if mapped_exc is None:  # pragma: no cover
+                raise
+    
+            message = str(exc)
+>           raise mapped_exc(message) from exc
+E           httpx.ConnectTimeout
+
+venv/lib/python3.13/site-packages/httpx/_transports/default.py:118: ConnectTimeout
+---------------------------- Captured stdout setup -----------------------------
+Created tables: ['assignments', 'course_enrollments', 'courses', 'faqs', 'integrations', 'lecture', 'lecture_content', 'lecture_content_doc', 'module', 'roles', 'submissions', 'system_settings', 'user_courses', 'user_roles', 'users']
+---------------------------- Captured stderr setup -----------------------------
+2025-03-08 18:27:43,271 - app.utils.jwt_utils - INFO - Creating token for user ID: 63c9a23d-cdde-498a-937e-9b165f9a002b with expiry: 2025-03-08 13:57:43.271295+00:00
+2025-03-08 18:27:43,271 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+2025-03-08 18:27:43,271 - app.utils.jwt_utils - INFO - Creating token for user ID: a2605daf-339a-400a-b3b0-098682893a4a with expiry: 2025-03-08 13:57:43.271887+00:00
+2025-03-08 18:27:43,272 - app.utils.jwt_utils - INFO - Token created successfully: eyJhbGciOi...
+------------------------------ Captured log setup ------------------------------
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: 63c9a23d-cdde-498a-937e-9b165f9a002b with expiry: 2025-03-08 13:57:43.271295+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+INFO     app.utils.jwt_utils:jwt_utils.py:26 Creating token for user ID: a2605daf-339a-400a-b3b0-098682893a4a with expiry: 2025-03-08 13:57:43.271887+00:00
+INFO     app.utils.jwt_utils:jwt_utils.py:32 Token created successfully: eyJhbGciOi...
+--------------------------- Captured stdout teardown ---------------------------
+Cleaning up test uploads...
+=============================== warnings summary ===============================
+venv/lib/python3.13/site-packages/pydantic/v1/typing.py:68
+venv/lib/python3.13/site-packages/pydantic/v1/typing.py:68
+venv/lib/python3.13/site-packages/pydantic/v1/typing.py:68
+venv/lib/python3.13/site-packages/pydantic/v1/typing.py:68
+venv/lib/python3.13/site-packages/pydantic/v1/typing.py:68
+venv/lib/python3.13/site-packages/pydantic/v1/typing.py:68
+venv/lib/python3.13/site-packages/pydantic/v1/typing.py:68
+  /home/mysterious/storage/github/soft-engg-project-jan-2025-se-Jan-26/backend/venv/lib/python3.13/site-packages/pydantic/v1/typing.py:68: DeprecationWarning: Failing to pass a value to the 'type_params' parameter of 'typing.ForwardRef._evaluate' is deprecated, as it leads to incorrect behaviour when calling typing.ForwardRef._evaluate on a stringified annotation that references a PEP 695 type parameter. It will be disallowed in Python 3.15.
+    return cast(Any, type_)._evaluate(globalns, localns, recursive_guard=set())
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_api_endpoints.py::test_login_valid_credentials - httpx.Conn...
+FAILED tests/test_api_endpoints.py::test_login_invalid_credentials - httpx.Co...
+FAILED tests/test_api_endpoints.py::test_get_current_user - TypeError: object...
+FAILED tests/test_api_endpoints.py::test_get_users_as_admin - TypeError: obje...
+FAILED tests/test_api_endpoints.py::test_get_users_as_student - TypeError: ob...
+FAILED tests/test_api_endpoints.py::test_create_assignment - TypeError: objec...
+FAILED tests/test_api_endpoints.py::test_create_assignment_as_student - TypeE...
+FAILED tests/test_api_endpoints.py::test_create_course - TypeError: object di...
+FAILED tests/test_api_endpoints.py::test_get_courses - TypeError: object dict...
+FAILED tests/test_api_endpoints.py::test_get_faqs - TypeError: object dict ca...
+FAILED tests/test_api_endpoints.py::test_get_system_settings_as_admin - TypeE...
+FAILED tests/test_api_endpoints.py::test_get_system_settings_as_student - Typ...
+FAILED tests/test_assignment_api.py::test_create_assignment - TypeError: obje...
+FAILED tests/test_assignment_api.py::test_get_assignments - TypeError: object...
+FAILED tests/test_assignment_api.py::test_get_assignment - TypeError: object ...
+FAILED tests/test_assignment_api.py::test_update_assignment - TypeError: obje...
+FAILED tests/test_assignment_api.py::test_submit_assignment - TypeError: obje...
+FAILED tests/test_assignment_api.py::test_get_my_submission - TypeError: obje...
+FAILED tests/test_assignment_api.py::test_grade_submission - TypeError: objec...
+FAILED tests/test_assignment_api.py::test_delete_assignment - TypeError: obje...
+FAILED tests/test_assignment_models.py::test_assignment_model - AssertionErro...
+FAILED tests/test_assignment_models.py::test_submission_model - assert None i...
+FAILED tests/test_assignment_routes.py::test_create_assignment_endpoint - htt...
+FAILED tests/test_assignment_routes.py::test_get_assignments_endpoint - httpx...
+FAILED tests/test_assignment_routes.py::test_get_assignment_details_endpoint
+FAILED tests/test_assignment_routes.py::test_update_assignment_endpoint - htt...
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/usr/lib/python3.13/selectors.py:452: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+================== 26 failed, 12 passed, 7 warnings in 55.60s ==================

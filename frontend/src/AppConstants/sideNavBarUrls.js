@@ -10,6 +10,11 @@ const studentDashboardUrls = [
         label: 'Courses'
     },
     {
+        path: '/user/notifications',
+        icon: 'notifications',
+        label: 'Notifications'
+    },
+    {
         path: '/user/course-history',
         icon: 'history',
         label: 'History'
@@ -37,7 +42,7 @@ const facultyDashboardUrls = [
         label: 'Academic Integrity'
     },
     {
-        path: '/faculty/course/1/enrollment',
+        path: '/faculty/course/enrollment',
         icon: 'group',
         label: 'Course Enrollment'
     }

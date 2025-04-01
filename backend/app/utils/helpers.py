@@ -1,6 +1,7 @@
 #AddCourseContent Request schema
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 from typing import List, Optional
+import uuid
 
 class LectureContentCreate(BaseModel):
     title: str
@@ -13,19 +14,13 @@ class LectureCreate(BaseModel):
     contents: List[LectureContentCreate] = []
 
 class ModuleCreate(BaseModel):
+    course_id: str
     title: str
     position: int
-    lectures: List[LectureCreate] = []
 
 class AddCourseContent(BaseModel):
     course_id: int
     modules: List[ModuleCreate] = []
-
-
-class ModuleCreate(BaseModel):
-    course_id: str
-    title: str
-    position: int
 
 
 class Metadata(BaseModel):
@@ -38,7 +33,6 @@ class Metadata(BaseModel):
 class LectureContentData(BaseModel):
     courseId: str
     moduleId: str
-    lectureId: str
     title: str
     description: str
     type: str
@@ -58,28 +52,29 @@ class UpdateLectureContentData(BaseModel):
     order: int
     metadata: Metadata
 
-"""
-{
-    "course_id": 1,
-    "modules": [
-        {
-            "title": "Week 3: Object-Oriented Programming",
-            "position": 3,
-            "lectures": [
-                {
-                    "position": 1,
-                    "contents": [
-                        {
-                            "title": "Introduction to OOP",
-                            "content_url": "https://youtube.com/oop_intro",
-                            "content_type": "video",
-                            "content_desc": "A detailed explanation of Object-Oriented Programming."
-                        }
-                    ]
-                }
-            ]
-        }
-    ]
-}
 
-"""
+class DocumentLinkCreate(BaseModel):
+    courseId: uuid.UUID
+    moduleId: str
+    title: str
+    description: Optional[str] = None
+    order: int
+    status: str
+    type: str
+    videoUrl: Optional[str] = None
+    metadata: Metadata
+    driveDocLink: HttpUrl
+
+
+class UpdateDocumentLinkCreate(BaseModel):
+    courseId: uuid.UUID
+    moduleId: str
+    lectureId: str
+    title: str
+    description: Optional[str] = None
+    order: int
+    status: str
+    type: str
+    videoUrl: Optional[str] = None
+    metadata: Metadata
+    driveDocLink: HttpUrl

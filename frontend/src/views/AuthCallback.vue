@@ -1,189 +1,148 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50">
-    <div class="max-w-md w-full p-6">
-      <div v-if="showPasswordForm" class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">Set Your Password</h2>
-        <p class="text-gray-600 mb-6">
-          You've logged in with Google, but you need to set a password to enable email login in the future.
-        </p>
-        
-        <div v-if="passwordError" class="bg-red-50 text-red-700 p-3 rounded mb-4">
-          {{ passwordError }}
-        </div>
-        
-        <form @submit.prevent="setPassword">
-          <div class="mb-4">
-            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-            <input 
-              type="password" 
-              id="password" 
-              v-model="password"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-maroon-500"
-              placeholder="Enter a secure password"
-              required
-            />
-          </div>
-          
-          <div class="mb-6">
-            <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-            <input 
-              type="password" 
-              id="confirmPassword" 
-              v-model="confirmPassword"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-maroon-500"
-              placeholder="Confirm your password"
-              required
-            />
-          </div>
-          
-          <div class="flex items-center justify-between">
-            <button
-              type="submit"
-              class="w-full bg-maroon-600 text-white py-2 px-4 rounded-md hover:bg-maroon-700 focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:ring-offset-2"
-              :disabled="isSubmitting"
-            >
-              <span v-if="isSubmitting" class="inline-block animate-spin mr-2">⟳</span>
-              {{ isSubmitting ? 'Setting Password...' : 'Set Password' }}
-            </button>
-          </div>
-          
-          <div class="mt-4 text-center">
-            <button 
-              @click="skipPasswordSetup" 
-              type="button"
-              class="text-sm text-gray-600 hover:text-maroon-600"
-            >
-              Skip for now (You can set it later in your profile)
-            </button>
-          </div>
-        </form>
-      </div>
-      
-      <div v-else class="text-center">
-        <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-maroon-600 mx-auto mb-4"></div>
-        <h2 class="text-xl font-semibold text-gray-800 mb-2">{{ message }}</h2>
-        <p class="text-gray-600">{{ subMessage }}</p>
-      </div>
+  <div class="min-h-screen flex items-center justify-center bg-gray-100">
+    <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center">
+      <span class="material-icons text-5xl text-maroon-600 animate-spin mb-4">refresh</span>
+      <h1 class="text-2xl font-bold text-gray-800 mb-2">Authentication in progress...</h1>
+      <p class="text-gray-600">{{ status }}</p>
     </div>
   </div>
 </template>
 
 <script>
-import useAuthStore from '@/stores/useAuthStore';
-import { useRoute, useRouter } from 'vue-router';
-import { onMounted, ref } from 'vue';
-import { authService } from '@/api/authService';
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { authService } from '@/api/authService'
+import useAuthStore from '@/stores/useAuthStore'
+import { ROLE } from '@/AppConstants/globalConstants'
+import rolePaths from '@/AppConstants/rolePaths'
 
 export default {
   name: 'AuthCallback',
   setup() {
-    const message = ref('Processing your login...');
-    const subMessage = ref('Please wait while we authenticate you');
-    const route = useRoute();
-    const router = useRouter();
-    const authStore = useAuthStore();
-    
-    // Password form state
-    const showPasswordForm = ref(false);
-    const password = ref('');
-    const confirmPassword = ref('');
-    const passwordError = ref('');
-    const isSubmitting = ref(false);
+    const status = ref('Please wait while we complete your login.')
+    const router = useRouter()
 
-    const setPassword = async () => {
-      // Validate passwords
-      if (password.value.length < 8) {
-        passwordError.value = 'Password must be at least 8 characters long';
-        return;
-      }
+    // Helper function to convert backend role to frontend role format
+    const mapBackendRoleToFrontend = (backendRole) => {
+      if (!backendRole) return ROLE.STUDENT;
       
-      if (password.value !== confirmPassword.value) {
-        passwordError.value = 'Passwords do not match';
-        return;
-      }
+      // Log the original role from backend for debugging
+      console.log(`Mapping backend role: ${backendRole}`);
       
-      try {
-        isSubmitting.value = true;
-        passwordError.value = '';
-        
-        // Call API to set password using the authStore method
-        const result = await authStore.setPassword(password.value);
-        
-        if (result.success) {
-          message.value = 'Password set successfully!';
-          subMessage.value = 'Redirecting you to the dashboard...';
-          showPasswordForm.value = false;
-          
-          // Redirect to the appropriate dashboard based on user role
-          setTimeout(() => authStore.navigateToRoleDashboard(), 1500);
-        } else {
-          passwordError.value = result.message;
-        }
-      } catch (error) {
-        console.error('Error setting password:', error);
-        passwordError.value = 'Failed to set password. Please try again.';
-      } finally {
-        isSubmitting.value = false;
+      switch(backendRole.toLowerCase()) {
+        case 'faculty':
+          return ROLE.FACULTY;
+        case 'support':
+        case 'admin':
+          return ROLE.SUPPORT;
+        case 'student':
+        default:
+          return ROLE.STUDENT;
       }
-    };
-    
-    const skipPasswordSetup = () => {
-      showPasswordForm.value = false;
-      message.value = 'Continuing to dashboard...';
-      subMessage.value = 'You can set your password later in your profile';
-      
-      // Redirect to the appropriate dashboard based on user role
-      setTimeout(() => authStore.navigateToRoleDashboard(), 1500);
-    };
+    }
 
     onMounted(async () => {
       try {
-        // Get the token from the URL query parameters
-        const accessToken = route.query.access_token;
-        const passwordNeeded = route.query.password_needed === 'true';
+        // Get auth store
+        const authStore = useAuthStore();
         
-        if (!accessToken) {
-          message.value = 'Authentication failed';
-          subMessage.value = 'No access token received. Please try again.';
-          setTimeout(() => router.push('/login'), 3000);
+        // Process auth callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const access_token = urlParams.get('access_token');
+        const user_role = urlParams.get('user_role');
+        const password_needed = urlParams.get('password_needed') === 'true';
+        
+        console.log("Received callback params:", { 
+          token: access_token ? "provided" : "missing", 
+          role: user_role || "not provided",
+          password_needed
+        });
+        
+        if (!access_token) {
+          console.error("No access token provided in callback URL");
+          status.value = "Authentication failed. Redirecting to login...";
+          setTimeout(() => router.push('/login?error=no_token'), 2000);
           return;
         }
-
-        // Store the token in localStorage
-        localStorage.setItem('token', accessToken);
         
-        // Update the auth store
-        authStore.token = accessToken;
+        // Save auth data
+        localStorage.setItem('token', access_token);
+        status.value = "Token received. Setting up your account...";
         
-        // Check if password setup is needed
-        if (passwordNeeded) {
-          showPasswordForm.value = true;
-        } else {
-          message.value = 'Authentication successful!';
-          subMessage.value = 'Redirecting you to the dashboard...';
+        // Save user role if available
+        if (user_role) {
+          const frontendRole = mapBackendRoleToFrontend(user_role);
+          authStore.setUserRole(frontendRole);
+          console.log(`User role set to: ${frontendRole} from backend role: ${user_role}`);
+        }
+        
+        // Handle password_needed first if applicable
+        if (password_needed) {
+          console.log("User needs to set a password, redirecting to password setup");
+          setTimeout(() => router.push('/set-password'), 1000);
+          return;
+        }
+        
+        status.value = "Getting user information...";
+        
+        // Validate token by getting user info
+        try {
+          const userData = await authService.getCurrentUser();
+          if (!userData) {
+            throw new Error("Failed to get user data");
+          }
           
-          // Redirect to the appropriate dashboard based on user role
-          setTimeout(() => authStore.navigateToRoleDashboard(), 1500);
+          // Update role from user data (most accurate source)
+          if (userData.role) {
+            const updatedRole = mapBackendRoleToFrontend(userData.role);
+            authStore.setUserRole(updatedRole);
+            console.log(`Role updated from user data: ${updatedRole}`);
+          }
+          
+          // Check for redirect path from localStorage
+          const redirectPath = localStorage.getItem('loginRedirectPath');
+          let targetPath;
+          
+          if (redirectPath && redirectPath.includes('/monitoring') && authStore.userRole === ROLE.SUPPORT) {
+            // If there's a redirect path to monitoring and user has support role, go there
+            targetPath = redirectPath;
+          } else {
+            // Use rolePaths for consistent redirects based on role
+            switch(authStore.userRole) {
+              case ROLE.SUPPORT:
+                targetPath = rolePaths.SUPPORT.dashboard;
+                break;
+              case ROLE.FACULTY:
+                targetPath = rolePaths.FACULTY.dashboard;
+                break;
+              default:
+                targetPath = rolePaths.STUDENT.dashboard;
+            }
+          }
+          
+          // Clear stored redirect path
+          localStorage.removeItem('loginRedirectPath');
+          
+          status.value = "Authentication successful! Redirecting...";
+          console.log(`Redirecting to ${targetPath} based on role: ${authStore.userRole}`);
+          
+          // Give a small delay to show success message
+          setTimeout(() => router.push(targetPath), 1000);
+        } catch (userError) {
+          console.error("Error getting user data:", userError);
+          status.value = "Error loading user data. Redirecting to login...";
+          setTimeout(() => router.push('/login?error=user_data_error'), 2000);
         }
       } catch (error) {
-        console.error('Error in auth callback:', error);
-        message.value = 'Authentication error';
-        subMessage.value = 'An error occurred during authentication. Please try again.';
-        setTimeout(() => router.push('/login'), 3000);
+        console.error('Auth callback error:', error);
+        status.value = "Authentication error. Redirecting to login...";
+        setTimeout(() => router.push('/login?error=callback_error'), 2000);
       }
-    });
+    })
 
     return {
-      message,
-      subMessage,
-      showPasswordForm,
-      password,
-      confirmPassword,
-      passwordError,
-      isSubmitting,
-      setPassword,
-      skipPasswordSetup
-    };
+      status
+    }
   }
 }
 </script> 

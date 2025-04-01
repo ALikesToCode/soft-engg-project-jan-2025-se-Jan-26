@@ -1,10 +1,9 @@
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from app.config import settings
 import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Get logger for this module
 logger = logging.getLogger(__name__)
 
 SECRET_KEY = settings.JWT_SECRET
@@ -19,7 +18,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 def create_access_token(data: dict):
     try:
         to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         to_encode["exp"] = expire
         
         # Log token creation details

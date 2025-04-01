@@ -1,45 +1,296 @@
 from app.models.user import User
 from app.models.course import Course
 from app.database import init_db
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException, Request, status
 from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, Response
 from app.services.auth_service import create_default_users
 from app.database import get_db, async_session
-from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html
+from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
 from fastapi.security import OAuth2PasswordBearer
 from app.services.auth_service import oauth2_scheme
 from starlette.requests import Request
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from app.routes.auth import router as auth_router
 from app.routes.user import router as user_router
+from app.routes.user_routes import router as user_routers
 from app.routes.llm import router as chat
+from app.routes.chat import router as chat_history_router
 from app.routes.assignment import router as assignment_router
 from app.routes.faq import router as faq_router
 from app.routes.system_settings import router as system_settings_router
-from app.routes.courses import router as courses_router
+from app.routes.course_routes import course_router
+from app.routes.academic_integrity import router as academic_integrity_router
+from app.services.api_functions import *  # Import all API function declarations
+from app.routes import monitoring
+from app.services.monitoring_service import monitoring_service
+from app.services.cache_service import start_cleanup_task
+import logging
+from app.utils.logging_config import configure_logging
+from app.middleware import LoggingMiddleware
+from contextlib import asynccontextmanager
+from app.routes.notification import router as notification
+import os
+from psycopg_pool import AsyncConnectionPool
+import subprocess
+import json
+import asyncio
 
+# Import the modules individually instead of from app.routes
+from app.routes.auth import router as auth
+from app.routes.user import router as users  # Change this to use the existing user_router
+from app.routes.healthcheck import router as healthcheck  
+from app.routes.courses import router as courses
+from app.routes.module import router as module
+from app.routes.assignment import router as assignments
+from app.routes.faq import router as faqs
+from app.routes.lectures import router as lectures
+from app.routes.academic_integrity import router as academic_integrity
+from app.routes.vector_search import router as vector_search
+from app.routes.upload import router as upload
+from app.routes.llm import router as llm
+from app.routes.roadmap import router as roadmap
+from app.routes.enrollments import router as enrollments  # Import new enrollments router
+from app.routes.faculty_assignments import router as faculty_assignments  # Import new faculty assignments router
+
+# Apply Pydantic v1 patch for Python 3.13 compatibility
+from app.utils.pydantic_patch import apply_patch
+apply_patch()
+
+# Apply passlib bcrypt patch for newer bcrypt versions
+from app.utils.passlib_patch import apply_patch as apply_passlib_patch
+apply_passlib_patch()
+
+# Configure logging
+logger = configure_logging()
+logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+
+# Get the absolute path to the static directory
+STATIC_DIR = Path(__file__).parent / "static"
+
+# Function to verify and create required database schemas
+async def verify_and_create_schemas(pool):
+    logger.info("Verifying database schemas...")
+    
+    try:
+        # Skip langchain-related schema verification since we're not using it anymore
+        logger.info("Skipping LangChain schema verification")
+        
+        # Make sure we have the default tables with timeout
+        async with asyncio.timeout(5.0):  # Add timeout to prevent hanging
+            async with pool.connection() as conn:
+                async with conn.cursor() as cursor:
+                    # Check if core tables exist
+                    await cursor.execute("""
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.tables 
+                            WHERE table_schema = 'public' 
+                            AND table_name = 'users'
+                        );
+                    """)
+                    users_table_exists = await cursor.fetchone()
+                    
+                    # If users table doesn't exist, we need to run init_db
+                    if not users_table_exists or not users_table_exists[0]:
+                        logger.info("Core tables not found. Running database initialization...")
+                        # Run async initialization
+                        await init_db()
+                        logger.info("Database initialization completed.")
+                    else:
+                        logger.info("Core tables already exist, skipping initialization.")
+        
+        # Verify DB initialization flag exists
+        if not Path("db_initialized.flag").exists():
+            with open("db_initialized.flag", 'w') as f:
+                f.write('')
+            logger.info("Created database initialization flag file")
+        
+        # Create default users
+        if not Path("users_initialized.flag").exists():
+            logger.info("Creating default users...")
+            async with asyncio.timeout(5.0):  # Add timeout
+                async with async_session() as session:
+                    await create_default_users(session)
+            with open("users_initialized.flag", 'w') as f:
+                f.write('')
+            logger.info("Default users created and flag file updated.")
+        else:
+            logger.info("Default users already created, skipping.")
+            
+    except asyncio.TimeoutError:
+        logger.error("Timeout verifying database schemas, but continuing startup")
+    except Exception as e:
+        logger.error(f"Error verifying database schemas: {str(e)}")
+        # Don't raise - allow startup to continue with limited functionality
+        logger.warning("Continuing with application startup despite schema verification issues")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for application startup and shutdown"""
+    # Initialize database on startup
+    logger.info("Initializing database...")
+    # Check if we've already run a full initialization before
+    db_initialized_flag = Path("db_initialized.flag")
+    if not db_initialized_flag.exists():
+        logger.info("First time initialization - creating all database objects")
+        try:
+            # Add timeout for database initialization
+            async with asyncio.timeout(10.0):
+                await init_db()
+            # Create the flag file to indicate we've completed a full initialization
+            db_initialized_flag.touch()
+            logger.info("Database initialization completed and flag file created")
+        except asyncio.TimeoutError:
+            logger.warning("Database initialization timed out, continuing with limited functionality")
+        except Exception as e:
+            logger.error(f"Error initializing database: {str(e)} - continuing with limited functionality")
+    else:
+        logger.info("Database previously initialized, skipping full initialization")
+    
+    # Create default users
+    logger.info("Creating default users...")
+    # Only create default users if we're doing the first initialization 
+    # or if users_initialized.flag doesn't exist
+    users_initialized_flag = Path("users_initialized.flag")
+    if not db_initialized_flag.exists() or not users_initialized_flag.exists():
+        try:
+            async with asyncio.timeout(5.0):  # Add timeout
+                async with async_session() as session:
+                    await create_default_users(session)
+                # Create flag to indicate users have been set up
+                users_initialized_flag.touch()
+        except asyncio.TimeoutError:
+            logger.warning("Default user creation timed out, continuing startup")
+        except Exception as e:
+            logger.error(f"Error creating default users: {e}")
+    else:
+        logger.info("Default users already initialized, skipping")
+    
+    # Start monitoring service background tasks with timeout
+    logger.info("Starting monitoring service...")
+    monitoring_started = False
+    try:
+        # Add a timeout to prevent hanging on monitoring startup
+        monitoring_task = asyncio.create_task(monitoring_service.start_background_tasks())
+        await asyncio.wait_for(monitoring_task, timeout=3.0)
+        monitoring_started = True
+        logger.info("Monitoring service started successfully")
+    except asyncio.TimeoutError:
+        logger.warning("Monitoring service startup timed out - continuing anyway")
+    except Exception as e:
+        logger.error(f"Error starting monitoring service: {str(e)} - continuing anyway")
+
+    # Set up database connection
+    logger.info("Setting up database connection...")
+    connection_string = os.getenv("DATABASE_URL")
+    
+    # Simplified connection string check and preparation
+    if connection_string:
+        if "sslmode=require" not in connection_string:
+            if "?" in connection_string:
+                connection_string = connection_string + "&sslmode=require"
+            else:
+                connection_string = connection_string + "?sslmode=require"
+                
+        # Convert SQLAlchemy URL format to psycopg format
+        psycopg_connection_string = connection_string.replace("postgresql+asyncpg://", "postgresql://")
+        
+        logger.info(f"Using psycopg connection string format: {psycopg_connection_string}")
+        
+        # Create connection pool with reduced values for faster startup
+        connection_kwargs = {
+            "min_size": 1,      # Reduced from 2
+            "max_size": 5,      # Reduced from 10
+            "max_idle": 60.0,   # Reduced from 300
+            "timeout": 10.0     # Reduced from 30
+        }
+        
+        try:
+            # Create the connection pool with psycopg
+            logger.info("Creating psycopg connection pool...")
+            pool = AsyncConnectionPool(psycopg_connection_string, **connection_kwargs)
+            
+            # Open the pool with proper async handling and timeout
+            try:
+                await asyncio.wait_for(pool.open(wait=True), timeout=10.0)
+                logger.info("Successfully connected to database pool")
+                
+                # Store the pool in the app state
+                app.state.pool = pool
+                
+                # Set autocommit on connections
+                async def setup_connection(conn):
+                    await conn.set_autocommit(True)
+                pool.configure_connection = setup_connection
+                
+                # Verify and create schemas with a timeout
+                await verify_and_create_schemas(pool)
+            except asyncio.TimeoutError:
+                logger.error("Timeout opening database pool - continuing with limited functionality")
+            
+        except Exception as e:
+            logger.error(f"Database connection error: {str(e)}")
+            logger.error("Failed to create connection pool or initialize schemas")
+            # Don't raise the exception, allow the application to start with limited functionality
+    else:
+        logger.error("DATABASE_URL not set, starting with limited functionality")
+    
+    # Start cleanup task for redis cache with timeout
+    try:
+        # Add a timeout to prevent hanging on cache startup
+        cleanup_task = asyncio.create_task(start_cleanup_task())
+        # Wait for the task to complete with a reduced timeout
+        await asyncio.wait_for(cleanup_task, timeout=3.0)
+        logger.info("Redis cache cleanup task started")
+    except asyncio.TimeoutError:
+        logger.warning("Redis cache cleanup task startup timed out - continuing anyway")
+    except Exception as e:
+        logger.warning(f"Failed to start Redis cache cleanup task: {str(e)} - continuing anyway")
+    
+    logger.info("Application startup completed - ready to serve requests")
+    
+    # Application is now ready - yield control back to FastAPI
+    yield
+    
+    # Shutdown tasks
+    logger.info("Shutting down application...")
+    
+    # Close the connection pool
+    if hasattr(app.state, "pool"):
+        logger.info("Closing database connection pool...")
+        try:
+            await asyncio.wait_for(app.state.pool.close(), timeout=5.0)
+            logger.info("Database connection pool closed")
+        except asyncio.TimeoutError:
+            logger.warning("Timeout closing database pool - forcing shutdown")
+        except Exception as e:
+            logger.error(f"Error closing database pool: {str(e)}")
+        
+    # Stop monitoring service only if it was started
+    if monitoring_started:
+        logger.info("Stopping monitoring service...")
+        try:
+            await asyncio.wait_for(monitoring_service.stop_background_tasks(), timeout=3.0)
+        except asyncio.TimeoutError:
+            logger.warning("Timeout stopping monitoring service - forcing shutdown")
+        except Exception as e:
+            logger.error(f"Error stopping monitoring service: {str(e)}")
+    
+    logger.info("Application shutdown complete")
+
+# Create FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
     description=settings.APP_DESCRIPTION,
     version=settings.APP_VERSION,
-    # Disable default docs to use custom endpoints
-    docs_url=None,
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
-    swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect"
+    lifespan=lifespan
 )
 
-# Secret key for session middleware
-if not settings.SESSION_SECRET:
-    raise ValueError("SESSION_SECRET environment variable is not set")
-
-# Configure CORS
-if not settings.ALLOWED_ORIGINS:
-    raise ValueError("ALLOWED_ORIGINS environment variable is not set")
-
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
@@ -48,234 +299,61 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add Session Middleware
-app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET)
+# Add session middleware
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.SESSION_SECRET
+)
 
-@app.get("/")
+# Add logging middleware
+app.add_middleware(LoggingMiddleware)
+
+# Mount static files
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    logger.info(f"Mounted static files from {STATIC_DIR}")
+
+# Include routers
+app.include_router(auth, prefix="/api/v1", tags=["auth"])
+app.include_router(users, prefix="/api/v1/users", tags=["users"])
+app.include_router(user_router, prefix="/api/v1", tags=["user"])  # Add user router for /user/profile endpoints
+app.include_router(healthcheck, prefix="/api/v1", tags=["system"])
+app.include_router(courses,prefix="/api/v1", tags=["courses"])
+app.include_router(course_router,prefix="/api/v1", tags=["faculty-courses"])
+app.include_router(module, prefix="/api/v1/modules", tags=["modules"])
+app.include_router(assignments, prefix="/api/v1/assignments", tags=["assignments"])
+app.include_router(academic_integrity, prefix="/api/v1/academic-integrity", tags=["academic-integrity"])
+app.include_router(faqs, prefix="/api/v1/faqs", tags=["faqs"])
+app.include_router(lectures, prefix="/api/v1/lectures", tags=["lectures"])
+app.include_router(vector_search, prefix="/api/v1/vector", tags=["search"])
+app.include_router(upload, prefix="/api/v1/upload", tags=["files"])
+app.include_router(llm, prefix="/api/v1/llm", tags=["llm"])
+app.include_router(chat_history_router, prefix="/api/v1/chat", tags=["chat"])
+app.include_router(roadmap, prefix="/api/v1/roadmap", tags=["roadmap"])
+app.include_router(notification, prefix="/api/v1/notifications", tags=["notifications"])
+app.include_router(enrollments, prefix="/api/v1", tags=["enrollments"])  # Update prefix structure
+app.include_router(faculty_assignments, prefix="/api/v1", tags=["faculty_assignments"])  # Add faculty assignments router
+
+# Special case: Mount the auth callback directly at the root path to match the Google OAuth redirect
+from app.routes.auth import auth_callback
+app.add_api_route("/auth/callback", auth_callback, methods=["GET"], include_in_schema=True,
+                 summary="Google OAuth callback",
+                 description="Handles the callback from Google OAuth2 authentication")
+
+# Monitoring endpoints
+app.include_router(monitoring.router, prefix="/api/v1/monitoring", tags=["monitoring"])
+
+# Root endpoint - optimized for faster response
+@app.get("/", include_in_schema=False)
 async def root():
-    return JSONResponse({
-        "message": "Welcome to SE Team 26 API",
-        "version": settings.APP_VERSION,
-        "docs": "/docs",
-        "redoc": "/redoc",
-        "openapi_json": "/openapi.json",
-        "openapi_yaml": "/openapi.yaml",
-        "status": "operational",
-        "environment": settings.ENV,
-        "api_prefix": settings.API_PREFIX
-    })
+    # Simplified response for faster performance
+    return JSONResponse(content={"status": "ok", "version": settings.APP_VERSION})
 
-# Custom Swagger UI with OAuth2 support
-@app.get("/docs", include_in_schema=False)
-async def custom_swagger_ui_html():
-    return get_swagger_ui_html(
-        openapi_url=app.openapi_url,
-        title=f"{app.title} - Swagger UI",
-        oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
-        swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
-        swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
-        swagger_favicon_url="https://fastapi.tiangolo.com/img/favicon.png",
-        init_oauth={
-            "clientId": settings.GOOGLE_CLIENT_ID,
-            "clientSecret": settings.GOOGLE_CLIENT_SECRET,
-            "appName": settings.APP_NAME,
-            "usePkceWithAuthorizationCodeGrant": True,
-            "scopes": ["openid", "email", "profile"],
-            "useBasicAuthenticationWithAccessCodeGrant": True
-        },
-        swagger_ui_parameters={
-            "persistAuthorization": True,
-            "displayRequestDuration": True,
-            "filter": True,
-            "tryItOutEnabled": True,
-            "syntaxHighlight": {
-                "activate": True,
-                "theme": "agate"
-            },
-            "oauth2RedirectUrl": f"{settings.FRONTEND_URL}/docs/oauth2-redirect"
-        }
-    )
-
-# OAuth2 redirect endpoint for Swagger UI
-@app.get("/docs/oauth2-redirect", include_in_schema=False)
-async def swagger_ui_redirect():
-    return get_swagger_ui_oauth2_redirect_html()
-
-# Endpoint to download OpenAPI spec as YAML
-@app.get("/openapi.yaml", include_in_schema=False)
-async def get_openapi_yaml(request: Request):
-    import yaml
-    from fastapi.responses import Response
-    
-    openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description,
-        routes=app.routes,
-    )
-    yaml_content = yaml.dump(openapi_schema)
-    
-    # Check if the request wants a direct download
-    download = request.query_params.get("download")
-    
-    if download:
-        return Response(
-            content=yaml_content,
-            media_type="text/yaml",
-            headers={"Content-Disposition": "attachment; filename=openapi.yaml"}
-        )
-    
-    # Otherwise return HTML page with download link
-    return HTMLResponse(
-        f"""
-        <html>
-        <head>
-            <title>OpenAPI YAML</title>
-            <style>
-                body {{ 
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                    line-height: 1.6;
-                    padding: 20px;
-                    max-width: 1200px;
-                    margin: 0 auto;
-                }}
-                pre {{ 
-                    background-color: #f5f5f5;
-                    padding: 15px;
-                    border-radius: 5px;
-                    overflow-x: auto;
-                    white-space: pre-wrap;
-                }}
-                .download-btn {{
-                    display: inline-block;
-                    background-color: #4CAF50;
-                    color: white;
-                    padding: 10px 20px;
-                    text-decoration: none;
-                    border-radius: 5px;
-                    margin: 20px 0;
-                    font-weight: bold;
-                }}
-                .download-btn:hover {{
-                    background-color: #45a049;
-                }}
-                h1 {{
-                    color: #333;
-                }}
-                .links {{
-                    margin-bottom: 20px;
-                }}
-                .links a {{
-                    margin-right: 15px;
-                    color: #0066cc;
-                    text-decoration: none;
-                }}
-                .links a:hover {{
-                    text-decoration: underline;
-                }}
-            </style>
-        </head>
-        <body>
-            <h1>OpenAPI Specification - YAML Format</h1>
-            <div class="links">
-                <a href="/docs">Swagger UI</a>
-                <a href="/redoc">ReDoc</a>
-                <a href="/openapi.json">OpenAPI JSON</a>
-            </div>
-            <a href="/openapi.yaml?download=true" class="download-btn">Download YAML</a>
-            <pre>{yaml_content}</pre>
-        </body>
-        </html>
-        """
-    )
-
-# Custom OpenAPI schema with security definitions
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    
-    openapi_schema = get_openapi(
-        title=app.title,
-        version=app.version,
-        description=app.description + """
-        
-        ## Authentication
-        
-        This API supports two authentication methods:
-        
-        1. **JWT Bearer Token**: Obtain a token via `/api/v1/auth/login` endpoint
-        2. **Google OAuth2**: Use the Google login button in the Swagger UI or [login directly](/api/v1/auth/login/google)
-        
-        ### JWT Authentication
-        
-        1. Use the `/api/v1/auth/login` endpoint with your email and password
-        2. Copy the returned access token
-        3. Click the "Authorize" button and enter the token in the format: `Bearer your_token`
-        
-        ### Google OAuth Authentication
-        
-        1. Click the "Authorize" button
-        2. Select "Google OAuth2" and click "Authorize"
-        3. Complete the Google authentication flow
-        
-        Alternatively, you can [login with Google directly](/api/v1/auth/login/google) and then return to this page.
-        """,
-        routes=app.routes,
-    )
-    
-    # Add JWT Bearer security scheme
-    openapi_schema["components"] = openapi_schema.get("components", {})
-    openapi_schema["components"]["securitySchemes"] = {
-        "bearerAuth": {
-            "type": "http",
-            "scheme": "bearer",
-            "bearerFormat": "JWT",
-            "description": "Enter your JWT token in the format: **Bearer your_token**"
-        },
-        "googleOAuth2": {
-            "type": "oauth2",
-            "flows": {
-                "authorizationCode": {
-                    "authorizationUrl": f"https://accounts.google.com/o/oauth2/auth",
-                    "tokenUrl": f"https://oauth2.googleapis.com/token",
-                    "scopes": {
-                        "openid": "OpenID Connect",
-                        "email": "Email address",
-                        "profile": "User profile"
-                    }
-                }
-            },
-            "description": "Google OAuth2 authentication"
-        }
-    }
-    
-    # Apply security globally to all endpoints
-    openapi_schema["security"] = [
-        {"bearerAuth": []},
-        {"googleOAuth2": ["openid", "email", "profile"]}
-    ]
-    
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
-
-app.openapi = custom_openapi
-
-# Add routers with API prefix
-app.include_router(auth_router, prefix=settings.API_PREFIX, tags=["Authentication"])
-app.include_router(user_router, prefix=settings.API_PREFIX, tags=["User"])
-app.include_router(chat, prefix=settings.API_PREFIX, tags=["Chat"])
-app.include_router(assignment_router, prefix=settings.API_PREFIX, tags=["Assignments"])
-app.include_router(faq_router, tags=["FAQs"])
-app.include_router(system_settings_router, prefix=settings.API_PREFIX, tags=["System Settings"])
-app.include_router(courses_router, prefix=settings.API_PREFIX, tags=["Courses"])
-
-@app.on_event("startup")
-async def startup():
-    await init_db()
-    
-    # Create default users
-    async with async_session() as session:
-        await create_default_users(session)
+# Health check for API root - optimized
+@app.get("/health", include_in_schema=False)
+async def health_check():
+    # Simple response that avoids any database calls
+    return JSONResponse(status_code=200, content={"status": "ok"})
 
 if __name__ == "__main__":
     import uvicorn

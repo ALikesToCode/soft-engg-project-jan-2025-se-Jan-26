@@ -13,3 +13,6 @@ backend/app/models/__pycache__/
 backend/app/routes/__pycache__/
 backend/app/services/__pycache__/
 
+# Ignore test plan
+test_plan.md
+
