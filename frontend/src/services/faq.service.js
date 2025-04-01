@@ -1,4 +1,5 @@
 import axios from 'axios';
+import api from '@/utils/api';
 
 // Mock data for development or fallback
 const mockFaqs = [
@@ -67,7 +68,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 class FAQService {
   async getAllFaqs() {
     try {
-      const response = await axios.get(`${API_URL}/api/v1/faqs`);
+      const response = await api.get('/faqs/faqs/');
       return response.data;
     } catch (error) {
       console.error('Error fetching FAQs:', error);
@@ -79,10 +80,10 @@ class FAQService {
   async getFaqsByCategory(category) {
     try {
       const url = category === 'all' 
-        ? `${API_URL}/api/v1/faqs` 
-        : `${API_URL}/api/v1/faqs?category_id=${category}`;
+        ? '/faqs/faqs/' 
+        : `/faqs/faqs/?category_id=${category}`;
       
-      const response = await axios.get(url);
+      const response = await api.get(url);
       return response.data;
     } catch (error) {
       console.error('Error fetching FAQs by category:', error);
@@ -96,7 +97,7 @@ class FAQService {
 
   async createFaq(faqData) {
     try {
-      const response = await axios.post(`${API_URL}/api/v1/faqs`, faqData);
+      const response = await api.post('/faqs/faqs/', faqData);
       return response.data;
     } catch (error) {
       console.error('Error creating FAQ:', error);
@@ -106,7 +107,7 @@ class FAQService {
 
   async updateFaq(faqId, faqData) {
     try {
-      const response = await axios.put(`${API_URL}/api/v1/faqs/${faqId}`, faqData);
+      const response = await api.put(`/faqs/faqs/${faqId}`, faqData);
       return response.data;
     } catch (error) {
       console.error('Error updating FAQ:', error);
@@ -116,7 +117,7 @@ class FAQService {
 
   async deleteFaq(faqId) {
     try {
-      await axios.delete(`${API_URL}/api/v1/faqs/${faqId}`);
+      await api.delete(`/faqs/faqs/${faqId}`);
       return true;
     } catch (error) {
       console.error('Error deleting FAQ:', error);
@@ -126,7 +127,7 @@ class FAQService {
 
   async rateFaq(faqId, isHelpful) {
     try {
-      const response = await axios.post(`${API_URL}/api/v1/faqs/${faqId}/rate`, { isHelpful });
+      const response = await api.post(`/faqs/faqs/${faqId}/rate`, { isHelpful });
       return response.data;
     } catch (error) {
       console.error('Error rating FAQ:', error);
@@ -136,7 +137,7 @@ class FAQService {
 
   async searchFaqs(query) {
     try {
-      const response = await axios.post(`${API_URL}/api/v1/faqs/search`, { query });
+      const response = await api.post('/faqs/faqs/search', { query });
       return response.data;
     } catch (error) {
       console.error('Error searching FAQs:', error);

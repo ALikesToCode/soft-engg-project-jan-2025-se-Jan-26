@@ -35,11 +35,11 @@ async def read_faqs(
     category_id: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Retrieve all FAQs with optional filtering by category.
+    This endpoint is public and does not require authentication.
     """
     return await faq_service.get_faqs(db, category_id, skip, limit)
 
@@ -59,11 +59,11 @@ async def create_faq(
 @router.get("/{faq_id}", response_model=FAQResponse)
 async def read_faq(
     faq_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Get a specific FAQ by ID.
+    This endpoint is public and does not require authentication.
     """
     faq = await faq_service.get_faq(db, faq_id)
     if not faq:
@@ -113,11 +113,11 @@ async def delete_faq(
 @router.post("/search", response_model=List[FAQResponse])
 async def search_for_faqs(
     query: FAQSearchQuery,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """
     Search for FAQs based on a query string.
+    This endpoint is public and does not require authentication.
     
     This endpoint uses a combination of vector search (for semantic matching)
     and keyword search to find the most relevant FAQs.
