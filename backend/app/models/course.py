@@ -49,11 +49,13 @@ class Course(Base):
     end_date = Column(DateTime(timezone=True), nullable=True)
     enrollment_limit = Column(Integer, nullable=True)
     waitlist_limit = Column(Integer, nullable=True)
+    capacity = Column(Integer, nullable=True, default=50)  # Maximum number of students allowed
+    enrolled_count = Column(Integer, nullable=False, default=0)  # Current number of enrolled students
     image = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.now(UTC))
     updated_at = Column(DateTime(timezone=True), default=datetime.now(UTC), onupdate=datetime.now(UTC))
     created_by = Column(UUID, ForeignKey("users.id"), nullable=False)
-    faculty_id = Column(UUID, ForeignKey("users.id"), nullable=False)
+    faculty_id = Column(UUID, ForeignKey("users.id"), nullable=True)  # Making this nullable since faculty may not be assigned initially
 
     # Relationships
     faculty = relationship("User", foreign_keys=[faculty_id], back_populates="courses_taught")
@@ -80,10 +82,13 @@ class Course(Base):
             "end_date": self.end_date.isoformat() if self.end_date else None,
             "enrollment_limit": self.enrollment_limit,
             "waitlist_limit": self.waitlist_limit,
+            "capacity": self.capacity,
+            "enrolled_count": self.enrolled_count,
             "image": self.image,
             "level": self.level,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "faculty_id": str(self.faculty_id) if self.faculty_id else None
         }
 
 class CourseEnrollment(Base):

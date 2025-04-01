@@ -55,6 +55,7 @@ from app.routes.upload import router as upload
 from app.routes.llm import router as llm
 from app.routes.roadmap import router as roadmap
 from app.routes.enrollments import router as enrollments  # Import new enrollments router
+from app.routes.faculty_assignments import router as faculty_assignments  # Import new faculty assignments router
 
 # Apply Pydantic v1 patch for Python 3.13 compatibility
 from app.utils.pydantic_patch import apply_patch
@@ -331,6 +332,7 @@ app.include_router(chat_history_router, prefix="/api/v1/chat", tags=["chat"])
 app.include_router(roadmap, prefix="/api/v1/roadmap", tags=["roadmap"])
 app.include_router(notification, prefix="/api/v1/notifications", tags=["notifications"])
 app.include_router(enrollments, prefix="/api/v1", tags=["enrollments"])  # Update prefix structure
+app.include_router(faculty_assignments, prefix="/api/v1", tags=["faculty_assignments"])  # Add faculty assignments router
 
 # Special case: Mount the auth callback directly at the root path to match the Google OAuth redirect
 from app.routes.auth import auth_callback

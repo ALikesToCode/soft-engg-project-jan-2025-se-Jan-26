@@ -3,7 +3,7 @@ import { API_ROUTES } from '@/config/api.routes'
 import api from '@/utils/api'
 
 // Fixing API paths by removing duplicate /api/v1/
-const API_PATH_NOTIFICATIONS = '/api/v1/notifications';
+const API_PATH_NOTIFICATIONS = '/notifications';
 
 export const FacultyNotificationService = {
   // Get faculty notifications

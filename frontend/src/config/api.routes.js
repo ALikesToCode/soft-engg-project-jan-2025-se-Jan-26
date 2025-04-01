@@ -8,6 +8,7 @@ export const API_ROUTES = {
   LLM: '/llm',
   CHAT: '/chat',
   NOTIFICATIONS: '/notifications',
+  FACULTY: '/faculty'
 }
 
 // Export a default config for ease of use

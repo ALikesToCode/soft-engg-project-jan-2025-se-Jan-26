@@ -50,7 +50,7 @@ export const useCourseStore = defineStore('course', () => {
         },
       }
       loading.value = true
-      const response = await api.get("/api/v1/courses", headers)
+      const response = await api.get("/courses", headers)
       console.log(response.data)
       courses.value = response.data
       return response
@@ -65,7 +65,7 @@ export const useCourseStore = defineStore('course', () => {
   async function createCourse(courseData) {
     try {
       loading.value = true
-      const response = await api.post('/api/v1/courses', courseData)
+      const response = await api.post('/courses', courseData)
       courses.value.push(response.data)
       return response
     } catch (err) {
@@ -79,7 +79,7 @@ export const useCourseStore = defineStore('course', () => {
   async function updateCourse(courseId, courseData) {
     try {
       loading.value = true
-      const response = await api.put(`/api/v1/courses/${courseId}`, courseData)
+      const response = await api.put(`/courses/${courseId}`, courseData)
       const index = courses.value.findIndex(c => c.id === courseId)
       if (index !== -1) {
         courses.value[index] = response.data
@@ -96,7 +96,7 @@ export const useCourseStore = defineStore('course', () => {
   async function deleteCourse(courseId) {
     try {
       loading.value = true
-      await api.delete(`/api/v1/courses/${courseId}`)
+      await api.delete(`/courses/${courseId}`)
       courses.value = courses.value.filter(c => c.id !== courseId)
     } catch (err) {
       error.value = err.message

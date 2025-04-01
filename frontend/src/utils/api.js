@@ -1,6 +1,6 @@
 import axios from 'axios'
 import router from '@/router'
-import { API_URL } from '@/config/constants'
+import { API_URL } from '@/config'
 
 // Create custom axios instance with the base URL
 const api = axios.create({

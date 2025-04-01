@@ -19,7 +19,7 @@ const generateId = () => {
 
 // API paths without prefixes since they're already added in the axios instance
 const API_PATHS = {
-  CHAT: '/api/v1/chat'
+  CHAT: '/chat'
 };
 
 // Local fallback implementations

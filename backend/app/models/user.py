@@ -63,7 +63,7 @@ class User(Base):
     bookmarks = relationship("BookmarkedMaterials", back_populates="user")  # One-to-Many with BookmarkedMaterials
     recommended_courses = relationship("UserRecommendedCourses", back_populates="user")  # One-to-Many with UserRecommendedCourses
     
-    # Chat relationships
+    # Chat relationship
     chat_sessions = relationship("ChatSession", back_populates="user")  # One-to-Many with ChatSession
 
 # Create the table in the database
