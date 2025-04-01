@@ -290,7 +290,7 @@ export default {
       try {
         const type = notification.notification_type
         const id = notification.notification_id
-        const response = await api.delete(`/api/v1/notifications/delete/${type}/${id}`, headers)
+        const response = await api.delete(`/notifications/delete/${type}/${id}`, headers)
         this.notifications = this.notifications.filter(
           (n) => n.notification_id !== notification.notification_id,
         )
@@ -331,7 +331,7 @@ export default {
         },
       }
       try {
-        const response = await api.get('/api/v1/notifications', headers)
+        const response = await api.get('/notifications', headers)
         response.data.forEach((notif) => {
           this.notifications.push(notif)
         })
@@ -353,7 +353,7 @@ export default {
       try {
         const type = notification.notification_type
         const id = notification.notification_id
-        const response = await api.put(`/api/v1/notifications/${type}/${id}`, {}, headers)
+        const response = await api.put(`/notifications/${type}/${id}`, {}, headers)
         notification.read = true
         this.$emit('update:unread-count', this.unreadCount)
         return response.data
@@ -388,7 +388,7 @@ export default {
         const payload = {
           notifications: notificationsToUpdate,
         }
-        await api.put('/api/v1/notifications/mark-all', payload, headers)
+        await api.put('/notifications/mark-all', payload, headers)
         this.notifications.forEach((n) => {
           n.read = true
         })
