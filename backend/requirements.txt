@@ -78,8 +78,7 @@ propcache==0.3.1
 proto-plus==1.26.1
 protobuf==5.29.3
 psutil==7.0.0
-psycopg==3.2.6
-psycopg-pool==3.2.6
+psycopg2-binary>=2.9.6
 pyasn1==0.4.8
 pyasn1_modules==0.4.1
 pycparser==2.22
@@ -125,4 +124,3 @@ websockets==15.0.1
 xxhash==3.5.0
 yarl==1.18.3
 zstandard==0.23.0
-psycopg2
