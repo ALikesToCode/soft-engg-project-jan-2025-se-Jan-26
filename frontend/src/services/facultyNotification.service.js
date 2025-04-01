@@ -8,24 +8,33 @@ const API_PATH_NOTIFICATIONS = '/notifications';
 export const FacultyNotificationService = {
   // Get faculty notifications
   async getNotifications(filters = {}) {
-    return api.get(`${API_PATH_NOTIFICATIONS}/faculty`, { params: filters })
+    // Add timestamp to prevent caching
+    const params = {
+      ...filters,
+      _t: Date.now()
+    };
+    return api.get(`${API_PATH_NOTIFICATIONS}/faculty`, { params });
   },
 
-  async getRecentNotifications(headers) {
-    console.log(`Inside notificationService.getRecentNotifications to send request at ${API_PATH_NOTIFICATIONS}/recent-notifications`)
+  async getRecentNotifications() {
+    console.log(`Inside notificationService.getRecentNotifications to send request at ${API_PATH_NOTIFICATIONS}/recent-notifications`);
     try {
+      // Use params instead of headers to ensure cache-busting works
       const response = await api.get(
         `${API_PATH_NOTIFICATIONS}/recent-notifications`,
-        headers
+        { 
+          params: { _t: Date.now() } 
+        }
       );
       return response;
     } catch (error) {
+      console.error("Error fetching recent notifications:", error);
       throw error;
     }
   },
 
   // Create a new notification
-  async createNotification(notificationData, headers) {
+  async createNotification(notificationData) {
     console.log(`Inside notificationService.createNotification to send request at ${API_PATH_NOTIFICATIONS}/course/send`)
     try {
       // Ensure the notification has a timestamp
@@ -37,8 +46,7 @@ export const FacultyNotificationService = {
       console.log(dataWithTimestamp);
       const response = await api.post(
         `${API_PATH_NOTIFICATIONS}/course/send`,
-        dataWithTimestamp,
-        headers
+        dataWithTimestamp
       );
       console.log("Notification Sent, Response:", response);
       return response;
@@ -49,7 +57,7 @@ export const FacultyNotificationService = {
   },
 
   //Support System Notification
-  async createSystemNotification(notificationData, headers) {
+  async createSystemNotification(notificationData) {
     try {
       // Ensure the notification has a timestamp
       const dataWithTimestamp = {
@@ -60,8 +68,7 @@ export const FacultyNotificationService = {
       console.log(dataWithTimestamp);
       const response = await api.post(
         `${API_PATH_NOTIFICATIONS}/system/send`,
-        dataWithTimestamp,
-        headers
+        dataWithTimestamp
       );
       return response;
     } catch (error) {
@@ -77,7 +84,9 @@ export const FacultyNotificationService = {
 
   // Get notification preferences
   async getPreferences() {
-    return api.get(`${API_PATH_NOTIFICATIONS}/faculty/preferences`)
+    return api.get(`${API_PATH_NOTIFICATIONS}/faculty/preferences`, {
+      params: { _t: Date.now() }
+    });
   },
 
   // Update notification preferences
@@ -87,24 +96,33 @@ export const FacultyNotificationService = {
 
   // Get notification statistics
   async getStatistics(courseId) {
-    return api.get(`${API_PATH_NOTIFICATIONS}/faculty/statistics/${courseId}`)
+    return api.get(`${API_PATH_NOTIFICATIONS}/faculty/statistics/${courseId}`, {
+      params: { _t: Date.now() }
+    });
   },
 
   // Mark notification as read
-  async markAsRead(notificationId, type, headers) {
+  async markAsRead(notificationId, type) {
     console.log(`Marking notification ${notificationId} as read`)
-    return api.put(`${API_PATH_NOTIFICATIONS}/${type}/${notificationId}`, {}, headers)
+    return api.put(`${API_PATH_NOTIFICATIONS}/${type}/${notificationId}`, {});
   },
 
   // Mark all notifications as read
-  async markAllAsRead(notifications, headers) {
+  async markAllAsRead(notifications) {
     console.log(`Marking multiple notifications as read: ${JSON.stringify(notifications)}`)
-    return api.put(`${API_PATH_NOTIFICATIONS}/mark-all`, { notifications }, headers)
+    return api.put(`${API_PATH_NOTIFICATIONS}/mark-all`, { notifications });
   },
 
   // Delete notification
-  async deleteNotification(notificationId, type, headers) {
+  async deleteNotification(notificationId, type) {
     console.log(`Deleting notification ${notificationId} of type ${type}`)
-    return api.delete(`${API_PATH_NOTIFICATIONS}/delete/${type}/${notificationId}`, headers)
+    return api.delete(`${API_PATH_NOTIFICATIONS}/delete/${type}/${notificationId}`);
+  },
+  
+  // Get courses for faculty
+  async getCourses() {
+    return api.get('/courses', {
+      params: { _t: Date.now() }
+    });
   }
 } 

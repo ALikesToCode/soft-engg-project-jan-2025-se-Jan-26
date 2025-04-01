@@ -150,16 +150,9 @@ export default {
       }
     },
     async getRecentNotifications() {
-      const token = localStorage.getItem('token')
-      if (!token) throw new Error('No authentication token found')
-
-      const headers = {
-        headers: {
-          Authorization: `Bearer ${token}`, // Add token to Authorization header
-        },
-      }
       try {
-        const response = await FacultyNotificationService.getRecentNotifications(headers)
+        // Don't pass custom headers, let the API interceptor handle authorization
+        const response = await FacultyNotificationService.getRecentNotifications()
         if (!response || response.status !== 200) {
           throw new Error('Unexpected response format')
         }
@@ -176,7 +169,7 @@ export default {
           }
         })
       } catch (error) {
-        console.error('errpr')
+        console.error('Error fetching notifications:', error)
       }
     },
   },

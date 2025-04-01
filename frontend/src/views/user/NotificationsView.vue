@@ -169,20 +169,23 @@ export default {
     const loadNotifications = async () => {
       isLoading.value = true
       try {
-        const token = localStorage.getItem('token')
-        if (!token) throw new Error('No authentication token found')
+        const response = await FacultyNotificationService.getRecentNotifications()
+        notifications.value = response.data
+          .map((notification) => {
+            const isRead = notifications.value.some(n => n.notification_id === notification.notification_id && n.read)
+            return {
+              ...notification,
+              read: isRead,
+            }
+          })
+          .sort((a, b) => {
+            if (a.read !== b.read) {
+              return a.read ? 1 : -1
+            }
+            return new Date(b.timestamp) - new Date(a.timestamp)
+          })
 
-        const headers = {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-        
-        const response = await FacultyNotificationService.getRecentNotifications(headers)
-        if (response && response.data) {
-          notifications.value = response.data
-          console.log('Loaded notifications:', notifications.value)
-        }
+        console.log('Loaded notifications:', notifications.value)
       } catch (error) {
         console.error('Failed to load notifications:', error)
         toast.error('Failed to load notifications')
@@ -204,23 +207,12 @@ export default {
     
     const markAsRead = async (notification) => {
       try {
-        const token = localStorage.getItem('token')
-        if (!token) throw new Error('No authentication token found')
-
-        const headers = {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-        
-        await FacultyNotificationService.markAsRead(notification.notification_id, headers)
+        await FacultyNotificationService.markAsRead(notification.notification_id, notification.type)
         
         // Update local state
-        const index = notifications.value.findIndex(
-          n => n.notification_id === notification.notification_id
-        )
-        if (index !== -1) {
-          notifications.value[index].read = true
+        notification.read = true
+        if (!notifications.value.some(n => n.notification_id === notification.notification_id && n.read)) {
+          notifications.value.push({ ...notification, read: true })
         }
         
         toast.success('Notification marked as read')
@@ -232,22 +224,16 @@ export default {
     
     const markAllAsRead = async () => {
       try {
-        const token = localStorage.getItem('token')
-        if (!token) throw new Error('No authentication token found')
-
-        const headers = {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-        
         const unreadNotifications = notifications.value
           .filter(n => !n.read)
-          .map(n => ({ id: n.notification_id, type: n.notification_type }))
-        
+          .map(n => ({ 
+            id: n.notification_id, 
+            type: n.notification_type 
+          }))
+          
         if (unreadNotifications.length === 0) return
         
-        await FacultyNotificationService.markAllAsRead(unreadNotifications, headers)
+        await FacultyNotificationService.markAllAsRead(unreadNotifications)
         
         // Update local state
         notifications.value.forEach(n => {
@@ -263,19 +249,9 @@ export default {
     
     const deleteNotification = async (notification) => {
       try {
-        const token = localStorage.getItem('token')
-        if (!token) throw new Error('No authentication token found')
-
-        const headers = {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-        
         await FacultyNotificationService.deleteNotification(
           notification.notification_id,
-          notification.notification_type,
-          headers
+          notification.notification_type
         )
         
         // Update local state

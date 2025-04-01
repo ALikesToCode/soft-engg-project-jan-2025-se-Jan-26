@@ -41,21 +41,20 @@ export const useCourseStore = defineStore('course', () => {
 
   async function getFacultyCourses() {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) throw new Error('No authentication token found')
-
-      const headers = {
-        headers: {
-          Authorization: `Bearer ${token}`, // Add token to Authorization header
-        },
-      }
       loading.value = true
-      const response = await api.get("/courses", headers)
-      console.log(response.data)
+      // Don't add custom headers, let the api interceptor handle the authorization
+      // This was causing an issue with the cache busting timestamp
+      const response = await api.get('/courses', { 
+        params: { 
+          _t: Date.now() // Explicitly add timestamp to prevent caching
+        }
+      })
+      console.log('Faculty courses response:', response.data)
       courses.value = response.data
       return response
     } catch (err) {
       error.value = err.message
+      console.error('Error fetching faculty courses:', err)
       throw err
     } finally {
       loading.value = false

@@ -15,15 +15,26 @@ const api = axios.create({
 // Request interceptor - add auth token to requests
 api.interceptors.request.use(
   config => {
+    // Add authorization token if available
     const token = localStorage.getItem('token')
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
     
-    // Add a timestamp to prevent caching issues
+    // Add a timestamp to prevent caching issues for GET requests
     if (config.method === 'get') {
+      // Initialize params object if it doesn't exist
       config.params = config.params || {}
-      config.params['_t'] = Date.now()
+      
+      // Only add timestamp if it hasn't been added manually
+      if (!config.params['_t']) {
+        config.params['_t'] = Date.now()
+      }
+      
+      // Ensure Cache-Control header is set to prevent browser caching
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+      config.headers['Pragma'] = 'no-cache'
+      config.headers['Expires'] = '0'
     }
     
     return config

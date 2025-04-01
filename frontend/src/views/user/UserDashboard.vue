@@ -80,6 +80,9 @@ export default {
     },
     chatStore() {
       return useChatStore()
+    },
+    authStore() {
+      return useAuthStore()
     }
   },
   methods: {
@@ -212,22 +215,25 @@ export default {
         this.isDataLoading = false
       }
     },
-    async getNotifications() {
+    getNotifications() {
+      if (!this.authStore.isLoggedIn) {
+        console.log('User not logged in, skipping notifications')
+        return
+      }
+      
+      console.log('Getting notifications')
       try {
-        const token = localStorage.getItem('token')
-        if (!token) return
-
-        const headers = {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-
-        const response = await FacultyNotificationService.getRecentNotifications(headers)
-        if (response && response.data) {
-          this.notifications = response.data.slice(0, 5) // Get only the first 5 notifications
-          console.log('Loaded notifications:', this.notifications)
-        }
+        // Don't pass custom headers, let the API interceptor handle authorization
+        FacultyNotificationService.getRecentNotifications()
+          .then(response => {
+            if (response && response.data) {
+              this.notifications = response.data.slice(0, 5) // Get only the first 5 notifications
+              console.log('Loaded notifications:', this.notifications)
+            }
+          })
+          .catch(error => {
+            console.error('Failed to load notifications:', error)
+          })
       } catch (error) {
         console.error('Failed to load notifications:', error)
       }
@@ -274,16 +280,8 @@ export default {
 
     const loadNotifications = async () => {
       try {
-        const token = localStorage.getItem('token')
-        if (!token) return
-
-        const headers = {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-
-        const response = await FacultyNotificationService.getRecentNotifications(headers)
+        // Don't pass custom headers, let the API interceptor handle authorization
+        const response = await FacultyNotificationService.getRecentNotifications()
         if (response && response.data) {
           notifications.value = response.data
         }
