@@ -3,7 +3,10 @@
     "builds": [
         {
             "src": "main.py",
-            "use": "@vercel/python"
+            "use": "@vercel/python",
+            "config": {
+                "buildCommand": "./build.sh"
+            }
         }
     ],
     "routes": [
@@ -16,5 +19,11 @@
         "PYTHONPATH": ".",
         "MAX_WORKERS": "1",
         "VERCEL": "1"
+    },
+    "functions": {
+        "main.py": {
+            "memory": 1024,
+            "maxDuration": 10
+        }
     }
 } 
