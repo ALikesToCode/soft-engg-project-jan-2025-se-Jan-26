@@ -1,22 +1,43 @@
+# Core dependencies
 fastapi==0.115.11
 uvicorn==0.34.0
 pydantic==2.10.6
 pydantic-settings==2.8.1
+starlette==0.46.1
+
+# Database
 sqlalchemy==2.0.38
 alembic==1.15.1
 psycopg2-binary==2.9.9
-python-jose==3.4.0
-python-multipart==0.0.20
-python-dotenv==1.0.1
-email_validator==2.2.0
-bcrypt==4.3.0
-passlib==1.7.4
-aiohttp==3.11.14
-httpx==0.28.1
 asyncpg==0.30.0
 pgvector==0.3.6
-requests==2.32.3
-starlette==0.46.1
-pytz==2025.1
-jinja2==3.1.6
+
+# Authentication
+python-jose==3.4.0
+python-multipart==0.0.20
+bcrypt==4.3.0
+passlib==1.7.4
 pyjwt==2.10.1
+
+# HTTP and networking
+aiohttp==3.11.14
+httpx==0.28.1
+requests==2.32.3
+
+# Utilities
+python-dotenv==1.0.1
+email_validator==2.2.0
+jinja2==3.1.6
+pytz==2025.1
+
+# AI and LLM
+langchain-core==0.1.12
+langchain-google-genai==0.0.11
+langchain-postgres==0.0.1
+
+# Monitoring
+psutil==5.9.5
+redis==5.0.1
+
+# Optional - remove for smaller deployment
+# pymupdf==1.23.8  # Only needed for PDF processing

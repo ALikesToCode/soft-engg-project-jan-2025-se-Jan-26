@@ -135,3 +135,79 @@ If you need to manually reinitialize the vector store, you can:
 2. Restart the server, or run `python initialize_vector_store.py` directly
 
 For more detailed information, see the [VECTOR_STORE_SETUP.md](VECTOR_STORE_SETUP.md) file.
+
+# Backend Deployment on Vercel
+
+This document provides instructions for deploying the SE Team 26 backend API on Vercel.
+
+## Deployment Setup
+
+The backend is optimized for deployment on Vercel with the following features:
+
+- Optimized package size to stay within Vercel's 250MB limit
+- Custom build script to clean up unnecessary files
+- Memory and duration settings for optimal performance
+- Environment variable configuration
+
+## Deployment Steps
+
+1. **Fork or Clone the Repository**
+
+   Ensure you have access to the repository.
+
+2. **Set Up Environment Variables**
+
+   In your Vercel project, configure all required environment variables:
+
+   ```
+   DATABASE_URL=your_postgresql_url
+   JWT_SECRET=your_jwt_secret
+   SESSION_SECRET=your_session_secret
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   GOOGLE_API_KEY=your_google_api_key
+   LANGSMITH_API_KEY=your_langsmith_api_key (optional)
+   LANGSMITH_PROJECT=your_langsmith_project (optional)
+   LANGSMITH_ENDPOINT=your_langsmith_endpoint (optional)
+   LANGSMITH_TRACING=true_or_false (optional)
+   ```
+
+3. **Deploy to Vercel**
+
+   Connect your repository to Vercel and:
+   
+   - Set the Framework Preset to "Other"
+   - Set the Root Directory to "/backend"
+   - Set the Build Command to "./build.sh"
+   - Set the Output Directory to "."
+   - Set the Install Command to "pip install -r requirements.txt"
+
+4. **Deploy!**
+
+   Click "Deploy" and Vercel will automatically use our optimized build settings.
+
+## Troubleshooting
+
+If you encounter deployment issues:
+
+- **Size Limits**: Check Vercel logs for size warnings. The `slim_deployment.py` script should keep the deployment under 250MB.
+- **Build Errors**: Review build logs for any package installation issues.
+- **Environment Variables**: Verify all required environment variables are set correctly.
+- **Runtime Errors**: Check function logs for runtime errors.
+
+## Additional Resources
+
+- [Vercel Python Documentation](https://vercel.com/docs/concepts/functions/serverless-functions/runtimes/python)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/deployment/environments/)
+
+## Local Development
+
+To develop locally:
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the development server
+uvicorn main:app --reload
+```
