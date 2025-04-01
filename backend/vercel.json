@@ -5,19 +5,8 @@
             "runtime": "@vercel/python",
             "memory": 1024,
             "maxDuration": 30,
-            "includeFiles": [
-                "app/**/*",
-                "main.py",
-                "requirements.txt"
-            ],
-            "excludeFiles": [
-                "**/tests/**",
-                "**/__pycache__/**",
-                "*.md",
-                "initialize_vector_store.py",
-                "debug_vector_store.py",
-                "generate_mock_data.py"
-            ]
+            "includeFiles": "app/**,main.py,requirements.txt",
+            "excludeFiles": "**/tests/**,**/__pycache__/**,*.md,initialize_vector_store.py,debug_vector_store.py,generate_mock_data.py"
         }
     },
     "routes": [
