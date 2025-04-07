@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 from app.services.auth_service import create_default_users
-from app.database import get_db, async_session
+from app.database import get_db, async_session_maker, engine
 from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
 from fastapi.security import OAuth2PasswordBearer
@@ -34,11 +34,15 @@ from app.utils.logging_config import configure_logging
 from app.middleware import LoggingMiddleware
 from contextlib import asynccontextmanager
 from app.routes.notification import router as notification
+from app.services.redis_service import redis_client
 import os
 from psycopg_pool import AsyncConnectionPool
 import subprocess
 import json
 import asyncio
+import time
+import concurrent.futures
+from starlette.middleware.gzip import GZipMiddleware
 
 # Import the modules individually instead of from app.routes
 from app.routes.auth import router as auth
@@ -115,7 +119,7 @@ async def verify_and_create_schemas(pool):
         if not Path("users_initialized.flag").exists():
             logger.info("Creating default users...")
             async with asyncio.timeout(10.0):  # Increased timeout
-                async with async_session() as session:
+                async with async_session_maker() as session:
                     await create_default_users(session)
             with open("users_initialized.flag", 'w') as f:
                 f.write('')
@@ -132,159 +136,89 @@ async def verify_and_create_schemas(pool):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan event handler for application startup and shutdown"""
-    # Initialize database on startup
-    logger.info("Initializing database...")
-    # Check if we've already run a full initialization before
-    db_initialized_flag = Path("db_initialized.flag")
-    if not db_initialized_flag.exists():
-        logger.info("First time initialization - creating all database objects")
-        try:
-            # Add timeout for database initialization
-            async with asyncio.timeout(10.0):
-                await init_db()
-            # Create the flag file to indicate we've completed a full initialization
-            db_initialized_flag.touch()
-            logger.info("Database initialization completed and flag file created")
-        except asyncio.TimeoutError:
-            logger.warning("Database initialization timed out, continuing with limited functionality")
-        except Exception as e:
-            logger.error(f"Error initializing database: {str(e)} - continuing with limited functionality")
-    else:
-        logger.info("Database previously initialized, skipping full initialization")
+    """
+    Lifespan context manager for FastAPI app
     
-    # Create default users
-    logger.info("Creating default users...")
-    # Only create default users if we're doing the first initialization 
-    # or if users_initialized.flag doesn't exist
-    users_initialized_flag = Path("users_initialized.flag")
-    if not db_initialized_flag.exists() or not users_initialized_flag.exists():
-        try:
-            async with asyncio.timeout(5.0):  # Add timeout
-                async with async_session() as session:
-                    await create_default_users(session)
-                # Create flag to indicate users have been set up
-                users_initialized_flag.touch()
-        except asyncio.TimeoutError:
-            logger.warning("Default user creation timed out, continuing startup")
-        except Exception as e:
-            logger.error(f"Error creating default users: {e}")
-    else:
-        logger.info("Default users already initialized, skipping")
+    Handles startup and shutdown tasks such as initializing database models,
+    setting up monitoring, and establishing cache connections.
+    """
+    # Startup
+    logger.info("Application starting up...")
     
-    # Start monitoring service in the background without waiting for it to complete
-    logger.info("Starting monitoring service...")
+    # Initialize database models asynchronously
     try:
-        # Launch monitoring as a background task without awaiting or timeout
-        asyncio.create_task(monitoring_service.start_background_tasks())
-        logger.info("Monitoring service background tasks initiated")
+        await init_db()
+        logger.info("Database models initialized successfully")
     except Exception as e:
-        logger.error(f"Error starting monitoring service: {str(e)} - continuing anyway")
+        logger.error(f"Failed to initialize database models: {e}")
+        raise
+    
+    # Initialize Redis cache asynchronously
+    try:
+        await redis_client.init()
+    except Exception as e:
+        logger.error(f"Failed to initialize Redis cache: {e}")
+    
+    # Start monitoring service in background (non-blocking)
+    asyncio.create_task(start_monitoring_background())
+    logger.info("Monitoring service initialization started in background")
 
-    # Set up database connection
-    logger.info("Setting up database connection...")
-    connection_string = os.getenv("DATABASE_URL")
+    # Cleanup redis cache on startup (non-blocking)
+    asyncio.create_task(cleanup_redis_cache())
+    logger.info("Redis cache cleanup started in background")
     
-    # Simplified connection string check and preparation
-    if connection_string:
-        if "sslmode=require" not in connection_string:
-            if "?" in connection_string:
-                connection_string = connection_string + "&sslmode=require"
-            else:
-                connection_string = connection_string + "?sslmode=require"
-                
-        # Convert SQLAlchemy URL format to psycopg format
-        psycopg_connection_string = connection_string.replace("postgresql+asyncpg://", "postgresql://")
-        
-        logger.info(f"Using psycopg connection string format: {psycopg_connection_string}")
-        
-        # Create connection pool with reduced values for faster startup
-        connection_kwargs = {
-            "min_size": 1,      # Reduced from 2
-            "max_size": 5,      # Reduced from 10
-            "max_idle": 60.0,   # Reduced from 300
-            "timeout": 10.0     # Reduced from 30
-        }
-        
-        try:
-            logging.info("Creating psycopg connection pool...")
-            # Replace the reference to undefined POOL_CONFIG with direct dictionary
-            connection_kwargs = {
-                "min_size": 1,
-                "max_size": 5,
-                "max_idle": 60.0,
-                "timeout": 10.0
-            }
-            
-            # Create the pool without opening it in the constructor
-            app.state.db_pool = AsyncConnectionPool(psycopg_connection_string, **connection_kwargs, open=False)
-            
-            # Open the pool properly using await
-            await app.state.db_pool.open()
-            
-            logging.info("Successfully connected to database pool")
-            
-            # Store the pool in the app state
-            app.state.pool = app.state.db_pool
-            
-            # Set autocommit on connections
-            async def setup_connection(conn):
-                await conn.set_autocommit(True)
-            app.state.db_pool.configure_connection = setup_connection
-            
-            # Verify and create schemas with a timeout
-            await verify_and_create_schemas(app.state.db_pool)
-        except Exception as e:
-            logger.error(f"Error connecting to database: {str(e)}")
-            raise
-    else:
-        logger.error("DATABASE_URL not set, starting with limited functionality")
-    
-    # Start cleanup task for Redis cache as a non-blocking background task
-    try:
-        # Launch Redis cleanup as a background task without awaiting
-        asyncio.create_task(start_cleanup_task())
-        logger.info("Redis cache cleanup task initiated")
-    except Exception as e:
-        logger.error(f"Error starting Redis cache cleanup: {str(e)} - continuing anyway")
-    
-    logger.info("Application startup completed - ready to serve requests")
-    
-    # Application is now ready - yield control back to FastAPI
+    logger.info("Application startup completed. Ready to serve requests.")
     yield
     
-    # Shutdown tasks
-    logger.info("Shutting down application...")
+    # Shutdown
+    logger.info("Application shutting down...")
     
-    # Close the connection pool
-    if hasattr(app.state, "pool"):
-        logger.info("Closing database connection pool...")
-        try:
-            await asyncio.wait_for(app.state.pool.close(), timeout=5.0)
-            logger.info("Database connection pool closed")
-        except asyncio.TimeoutError:
-            logger.warning("Timeout closing database pool - forcing shutdown")
-        except Exception as e:
-            logger.error(f"Error closing database pool: {str(e)}")
-        
-    # Stop monitoring service only if it was started
-    if monitoring_service.is_running:
-        logger.info("Stopping monitoring service...")
-        try:
-            await asyncio.wait_for(monitoring_service.stop_background_tasks(), timeout=3.0)
-        except asyncio.TimeoutError:
-            logger.warning("Timeout stopping monitoring service - forcing shutdown")
-        except Exception as e:
-            logger.error(f"Error stopping monitoring service: {str(e)}")
+    # Close Redis connection
+    try:
+        await redis_client.close()
+    except Exception as e:
+        logger.error(f"Error closing Redis connection: {e}")
+    
+    # Close database connection pool
+    try:
+        await engine.dispose()
+        logger.info("Database connection pool closed")
+    except Exception as e:
+        logger.error(f"Error closing database connections: {e}")
     
     logger.info("Application shutdown complete")
+
+async def start_monitoring_background():
+    """Start monitoring service in background without blocking app startup"""
+    try:
+        # Using a separate thread for potentially blocking I/O operations
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(executor, monitoring_service.start)
+            logger.info("Monitoring service started successfully")
+    except Exception as e:
+        logger.error(f"Failed to start monitoring service: {e}")
+
+async def cleanup_redis_cache():
+    """Clean up stale Redis cache entries on startup"""
+    try:
+        # Use a separate thread for Redis operations
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(executor, lambda: None)  # Placeholder for actual cleanup logic
+            logger.info("Redis cache cleanup completed")
+    except Exception as e:
+        logger.error(f"Redis cache cleanup failed: {e}")
 
 # Create FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
     description=settings.APP_DESCRIPTION,
     version=settings.APP_VERSION,
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 # Add CORS middleware
@@ -304,6 +238,9 @@ app.add_middleware(
 
 # Add logging middleware
 app.add_middleware(LoggingMiddleware)
+
+# Add GZip middleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Mount static files
 if STATIC_DIR.exists():

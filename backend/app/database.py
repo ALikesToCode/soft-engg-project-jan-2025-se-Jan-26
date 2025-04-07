@@ -1,4 +1,4 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.pool import NullPool
 from .config import settings
@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 import uuid
 import os
 import asyncio
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 from fastapi import Depends
 from datetime import datetime, UTC
 import re
@@ -57,10 +57,10 @@ engine = create_async_engine(
     cleaned_url.replace("postgres://", "postgresql+asyncpg://"),
     future=True,
     echo=settings.DEBUG,  # Only echo in debug mode
-    pool_size=20,
-    max_overflow=40,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
     pool_timeout=30,
-    pool_recycle=1800,
+    pool_recycle=settings.DB_POOL_RECYCLE,
     pool_pre_ping=True,
     connect_args={
         "ssl": ssl_mode == "require",
@@ -74,8 +74,11 @@ engine = create_async_engine(
 )
 
 # Create async session factory
-async_session = sessionmaker(
-    engine, class_=AsyncSession, expire_on_commit=False
+async_session_maker = async_sessionmaker(
+    engine,
+    expire_on_commit=False,
+    autoflush=False,
+    autocommit=False,
 )
 
 # Create base class for declarative models
@@ -83,64 +86,85 @@ Base = declarative_base()
 
 # Dependency to get async DB session
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session() as session:
+    """
+    Dependency function to get a database session
+    
+    Yields:
+        AsyncSession: SQLAlchemy async session
+    """
+    async with async_session_maker() as session:
         try:
             # Set timezone for this session
             await session.execute(text("SET timezone = 'UTC'"))
             yield session
             await session.commit()
-        except Exception:
+        except Exception as e:
             await session.rollback()
+            logger.error(f"Database session error: {str(e)}")
             raise
         finally:
             await session.close()
 
 # Function to initialize the database (create tables, etc.)
 async def init_db():
-    """Initialize the database by creating tables if they don't exist."""
+    """
+    Initialize database models by creating all tables
+    
+    This function creates all tables defined as SQLAlchemy models
+    that inherit from the Base class.
+    """
     async with engine.begin() as conn:
-        # Create schema if it doesn't exist
-        await conn.execute(text("CREATE SCHEMA IF NOT EXISTS public"))
-        await conn.execute(text("SET search_path TO public"))
-    
-    # Check if tables exist before recreating
-    tables_exist = False
-    async with async_session() as session:
-        # Get a list of existing tables using SQLAlchemy select
-        query = select(text("pg_catalog.pg_class.relname")) \
-            .select_from(text("pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_class.relnamespace")) \
-            .where(text("pg_catalog.pg_class.relkind = ANY (ARRAY['r'::VARCHAR, 'p'::VARCHAR])")) \
-            .where(text("pg_catalog.pg_class.relpersistence != 't'::CHAR")) \
-            .where(text("pg_catalog.pg_table_is_visible(pg_catalog.pg_class.oid)")) \
-            .where(text("pg_catalog.pg_namespace.nspname != 'pg_catalog'::VARCHAR"))
+        # Check if tables already exist
+        # Create a function that will run in sync context to inspect the connection
+        async def get_table_names():
+            def _get_tables(sync_conn):
+                sync_inspector = inspect(sync_conn)
+                return sync_inspector.get_table_names()
             
-        result = await session.execute(query)
-        existing_tables = [row[0] for row in result.fetchall()]
-        logger.debug(f"Existing tables: {existing_tables}")
+            return await conn.run_sync(_get_tables)
         
-        # Check if core tables exist (using 'users' as a marker)
-        if 'users' in existing_tables:
-            tables_exist = True
-    
-    # Only create tables if they don't exist
-    if not tables_exist:
-        logger.info("Creating database tables...")
-        async with engine.begin() as conn:
-            # Create the course status enum type if it doesn't exist
-            await conn.execute(text("""
-                DO $$ 
-                BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'coursestatus') THEN
-                        CREATE TYPE coursestatus AS ENUM ('DRAFT', 'ACTIVE', 'ARCHIVED');
-                    END IF;
-                END $$;
-            """))
-                        
-            # Create all tables defined in the models
-            await conn.run_sync(Base.metadata.create_all)
-        logger.info("Tables created successfully")
-    else:
-        logger.info("Database tables already exist, skipping creation")
+        tables = await get_table_names()
+        
+        if not tables:
+            logger.info("No existing tables found, creating all database tables")
+            
+            # Create tables in proper dependency order
+            def create_tables_in_order(sync_conn):
+                # Get metadata
+                metadata = Base.metadata
+                
+                # Create tables in dependency order
+                metadata.create_all(sync_conn, checkfirst=True)
+            
+            await conn.run_sync(create_tables_in_order)
+            logger.info("All database tables created successfully")
+        else:
+            logger.info(f"Found existing tables: {tables}")
+            # Create only missing tables
+            existing_tables = set(tables)
+            model_tables = set(Base.metadata.tables.keys())
+            missing_tables = model_tables - existing_tables
+            
+            if missing_tables:
+                logger.info(f"Creating missing tables: {missing_tables}")
+                # Create all missing tables at once respecting dependencies
+                def create_missing_tables(sync_conn):
+                    metadata = Base.metadata
+                    
+                    # Sort missing tables based on dependencies
+                    sorted_tables = []
+                    for table_name in missing_tables:
+                        if table_name in metadata.tables:
+                            sorted_tables.append(metadata.tables[table_name])
+                    
+                    # Create tables in correct dependency order
+                    # This will handle the proper creation order automatically
+                    metadata.create_all(sync_conn, tables=sorted_tables, checkfirst=True)
+                
+                await conn.run_sync(create_missing_tables)
+                logger.info("Missing tables created successfully")
+            else:
+                logger.info("All tables already exist, skipping table creation")
 
 # Custom UUID type for SQLite compatibility
 class UUID(TypeDecorator):
@@ -180,3 +204,59 @@ class UUID(TypeDecorator):
 # Run database initialization
 if __name__ == "__main__":
     asyncio.run(init_db())
+
+async def verify_db_connection():
+    """
+    Verify database connection is working
+    
+    Returns:
+        bool: True if connection is successful, False otherwise
+    """
+    try:
+        async with engine.connect() as conn:
+            result = await conn.execute(text("SELECT 1"))
+            row = result.scalar()
+            return row == 1
+    except Exception as e:
+        logger.error(f"Database connection verification failed: {str(e)}")
+        return False
+
+async def get_db_health():
+    """
+    Get database health information
+    
+    Returns:
+        dict: Database health information including connection status,
+              pool statistics, and version information
+    """
+    try:
+        # Check connection
+        is_connected = await verify_db_connection()
+        
+        # Get database version
+        version_info = None
+        if is_connected:
+            async with engine.connect() as conn:
+                result = await conn.execute(text("SELECT version()"))
+                version_info = result.scalar()
+        
+        # Get pool statistics
+        pool_status = {
+            "size": engine.pool.size(),
+            "checkedin": engine.pool.checkedin(),
+            "checkedout": engine.pool.checkedout(),
+            "overflow": engine.pool.overflow(),
+        }
+        
+        return {
+            "connected": is_connected,
+            "version": version_info,
+            "pool": pool_status,
+            "url": str(engine.url).replace(engine.url.password or "", "********") if engine.url.password else str(engine.url),
+        }
+    except Exception as e:
+        logger.error(f"Failed to get database health: {str(e)}")
+        return {
+            "connected": False,
+            "error": str(e)
+        }

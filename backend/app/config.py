@@ -1,13 +1,19 @@
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional, Dict, Any
 from datetime import timedelta
 import os
 from pathlib import Path
+import json
+import logging
 
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql://localhost:5432"
+    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "5"))
+    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "10"))
+    DB_POOL_RECYCLE: int = int(os.getenv("DB_POOL_RECYCLE", "3600"))  # 1 hour
+    DB_ECHO: bool = os.getenv("DB_ECHO", "False").lower() == "true"
 
     # Authentication
     SESSION_SECRET: str
@@ -82,6 +88,63 @@ class Settings(BaseSettings):
     LOGFLARE_BATCH_SIZE: int
     LOGFLARE_LOG_LEVEL: str 
 
+    # Environment and base settings
+    DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"
+    APP_HOST: str = os.getenv("APP_HOST", "0.0.0.0")
+    APP_PORT: int = int(os.getenv("APP_PORT", "8000"))
+    API_DEBUG: bool = os.getenv("API_DEBUG", "True").lower() == "true"
+    
+    # CORS settings
+    CORS_ORIGINS: List[str] = json.loads(os.getenv("CORS_ORIGINS", '["*"]'))
+    CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+    CORS_HEADERS: List[str] = ["*"]
+    
+    # Authentication settings
+    PASSWORD_SALT: str = os.getenv("PASSWORD_SALT", "your-password-salt-please-change-in-production")
+    
+    # LLM services
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    OPENAI_API_BASE: Optional[str] = os.getenv("OPENAI_API_BASE")
+    OPENAI_API_TYPE: Optional[str] = os.getenv("OPENAI_API_TYPE")
+    OPENAI_API_VERSION: Optional[str] = os.getenv("OPENAI_API_VERSION")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4")
+    OPENAI_EMBEDDING_MODEL: str = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002")
+    
+    # File uploads
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "./uploads")
+    MAX_UPLOAD_SIZE: int = int(os.getenv("MAX_UPLOAD_SIZE", "52428800"))  # 50MB default
+    ALLOWED_UPLOAD_EXTENSIONS: List[str] = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".txt", ".jpg", ".jpeg", ".png", ".mp4"]
+    
+    # Logging
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+    
+    # Admin user
+    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@example.com")
+    ADMIN_DEFAULT_PASSWORD: str = os.getenv("ADMIN_DEFAULT_PASSWORD", "Admin123!")
+    
+    # Vector database settings
+    VECTOR_DB_TYPE: str = os.getenv("VECTOR_DB_TYPE", "qdrant")
+    QDRANT_HOST: str = os.getenv("QDRANT_HOST", "localhost")
+    QDRANT_PORT: int = int(os.getenv("QDRANT_PORT", "6333"))
+    QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "faq_embeddings")
+    
+    # Redis cache settings
+    REDIS_ENABLED: bool = os.getenv("REDIS_ENABLED", "True").lower() == "true"
+    REDIS_MAX_CONNECTIONS: int = int(os.getenv("REDIS_MAX_CONNECTIONS", "10"))
+    CACHE_EXPIRY_SECONDS: int = int(os.getenv("CACHE_EXPIRY_SECONDS", "300"))  # 5 minutes
+    
+    # Performance settings
+    DEFAULT_PAGINATION_LIMIT: int = int(os.getenv("DEFAULT_PAGINATION_LIMIT", "100"))
+    MAX_PAGINATION_LIMIT: int = int(os.getenv("MAX_PAGINATION_LIMIT", "1000"))
+    REQUEST_TIMEOUT_SECONDS: int = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "60"))
+    
+    # Email settings
+    SMTP_HOST: Optional[str] = os.getenv("SMTP_HOST")
+    SMTP_PORT: Optional[int] = int(os.getenv("SMTP_PORT", "587")) if os.getenv("SMTP_PORT") else None
+    SMTP_USER: Optional[str] = os.getenv("SMTP_USER")
+    SMTP_PASSWORD: Optional[str] = os.getenv("SMTP_PASSWORD")
+    EMAILS_FROM_EMAIL: Optional[str] = os.getenv("EMAILS_FROM_EMAIL")
+
     model_config = ConfigDict(
         env_file=".env",
         case_sensitive=True
@@ -90,10 +153,12 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> List[str]:
         return self.ALLOWED_ORIGINS.split(",")
-        
-    @property
-    def DEBUG(self) -> bool:
-        """Return True if the environment is development."""
-        return self.ENV.lower() == "development"
 
 settings = Settings()
+
+# Configure logging
+logging_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+logging.basicConfig(
+    level=logging_level,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)

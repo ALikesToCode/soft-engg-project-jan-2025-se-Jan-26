@@ -1,70 +1,146 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Boolean, Table, ForeignKey, Integer
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Integer, Index, types
 from sqlalchemy.orm import relationship
 from app.database import Base, engine, UUID
 from app.models.course import Course, user_courses
 from app.models.role import Role, user_roles
 from datetime import datetime, UTC
+import enum
+from sqlalchemy.dialects.postgresql import ENUM
+from typing import Optional, Dict, Any
+
+# Create a custom SQLAlchemy type for case-insensitive enums
+class CaseInsensitiveEnumType(types.TypeDecorator):
+    """
+    Custom SQLAlchemy type that handles case-insensitive enum values.
+    Converts values from the database to the proper enum value regardless of case.
+    """
+    impl = types.String
+    cache_ok = True
+
+    def __init__(self, enum_class):
+        super(CaseInsensitiveEnumType, self).__init__()
+        self.enum_class = enum_class
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        return value.value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        
+        # Handle case-insensitive lookup
+        if isinstance(value, str):
+            upper_value = value.upper()
+            for member in self.enum_class:
+                if member.value.upper() == upper_value:
+                    return member
+        
+        # If not found by case-insensitive lookup, try to get it directly
+        try:
+            return self.enum_class(value)
+        except ValueError:
+            # Return the enum's default value if no match is found
+            return self.enum_class.STUDENT
+
+# Define User Role as String-based Enum for compatibility
+class UserRole(str, enum.Enum):
+    ADMIN = "ADMIN"
+    FACULTY = "FACULTY"
+    STUDENT = "STUDENT"
+    
+    @classmethod
+    def _missing_(cls, value):
+        """Handle case-insensitive lookup of enum values."""
+        if isinstance(value, str):
+            # Convert input to uppercase for matching
+            upper_value = value.upper()
+            for member in cls:
+                if member.value.upper() == upper_value:
+                    return member
+        return None
+
+# Association table for many-to-many relationship between users and courses
+# Removed duplicate definition of user_courses as it's now imported from course.py
 
 class User(Base):
     """
-    User model representing application users.
+    User model representing system users including students, faculty, and administrators.
     
-    This model stores essential user information including authentication details,
-    profile data, and role assignments. It supports both traditional email/password
-    authentication and Google OAuth authentication.
-    
-    The model includes timestamps for creation and updates, allowing for audit trails
-    and data lifecycle management.
+    This model stores authentication information, profile details, and relationships
+    to courses and other entities in the system.
     
     Attributes:
         id: Unique UUID primary key for the user
-        email: User's email address (unique, indexed)
+        email: User's email address (used for login)
         name: User's display name
-        hashed_password: Bcrypt-hashed password (nullable for Google users)
-        is_google_user: Flag indicating if the user authenticated via Google
-        picture: URL to the user's profile picture
+        hashed_password: Securely hashed password
+        role: User role (ADMIN, FACULTY, or STUDENT)
+        is_google_user: Whether the user is a Google user
+        picture: User's profile picture URL
         created_at: Timestamp when the user record was created
         updated_at: Timestamp when the user record was last updated
-        role: User's role in the system (student, faculty, or support)
-        courses_taught: List of courses taught by the user (faculty only)
-        course_enrollments: List of course enrollments (student only)
     """
     __tablename__ = "users"
 
-    id = Column(UUID, primary_key=True, default=uuid.uuid4, 
-                comment="Unique identifier for the user")
-    email = Column(String, unique=True, index=True, 
-                  comment="User's email address, used for authentication and communication")
-    name = Column(String, 
-                 comment="User's display name", default="User Name")
-    hashed_password = Column(String, nullable=True, 
-                            comment="Bcrypt-hashed password, nullable for Google OAuth users")
-    is_google_user = Column(Boolean, default=False, 
-                           comment="Flag indicating if the user authenticated via Google OAuth")
-    picture = Column(String, nullable=True, 
-                    comment="URL to the user's profile picture, typically from Google profile")
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), 
-                       comment="Timestamp when the user record was created")
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), 
-                       comment="Timestamp when the user record was last updated")
-    # three roles are defined: student, faculty, support
-    role = Column(String, default="student", 
-                 comment="User's role in the system: student, faculty, or support")
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
+    email = Column(String, nullable=False, unique=True)
+    name = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    # Use custom type instead of ENUM for case-insensitive handling
+    role = Column(CaseInsensitiveEnumType(UserRole), nullable=False, default=UserRole.STUDENT)
+    is_google_user = Column(Boolean, nullable=False, default=False)
+    picture = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    # Course relationships
-    courses = relationship("Course", secondary=user_courses, back_populates="users")  # Many-to-Many with Course
-    roles = relationship("Role", secondary=user_roles, back_populates="users")  # Many-to-Many with Role
-    courses_taught = relationship("Course", foreign_keys="[Course.faculty_id]", back_populates="faculty")
-    
-    # Updated relationships
-    enrollments = relationship("CourseEnrollment", foreign_keys="[CourseEnrollment.user_id]", back_populates="user")  # One-to-Many with CourseEnrollment
-    course_enrollments = relationship("CourseEnrollment", foreign_keys="[CourseEnrollment.student_id]", back_populates="student")  # One-to-Many with CourseEnrollment
-    bookmarks = relationship("BookmarkedMaterials", back_populates="user")  # One-to-Many with BookmarkedMaterials
-    recommended_courses = relationship("UserRecommendedCourses", back_populates="user")  # One-to-Many with UserRecommendedCourses
-    
-    # Chat relationship
-    chat_sessions = relationship("ChatSession", back_populates="user")  # One-to-Many with ChatSession
+    # Relationships
+    courses = relationship("Course", secondary=user_courses, back_populates="users")
+    courses_taught = relationship("Course", foreign_keys="Course.faculty_id", back_populates="faculty")
+    course_enrollments = relationship("CourseEnrollment", foreign_keys="CourseEnrollment.student_id", back_populates="student")
+    enrollments = relationship("CourseEnrollment", foreign_keys="CourseEnrollment.user_id", back_populates="user")
+    recommended_courses = relationship("UserRecommendedCourses", back_populates="user")
+    bookmarks = relationship("BookmarkedMaterials", back_populates="user")
+    chat_sessions = relationship("ChatSession", back_populates="user")
+    roles = relationship("Role", secondary=user_roles, back_populates="users")
+
+    # Add indexes for frequently queried fields
+    __table_args__ = (
+        Index('idx_user_email', 'email'),
+        Index('idx_user_role', 'role'),
+        Index('idx_user_role_created', 'role', 'created_at'),
+    )
+
+    def to_dict(self, include_sensitive: bool = False) -> Dict[str, Any]:
+        """
+        Convert user model to dictionary representation.
+        
+        Args:
+            include_sensitive: Whether to include sensitive fields like hashed_password
+        
+        Returns:
+            Dictionary representation of the user
+        """
+        data = {
+            "id": str(self.id),
+            "email": self.email,
+            "name": self.name,
+            "role": self.role.value if hasattr(self.role, 'value') else self.role,
+            "is_google_user": self.is_google_user,
+            "picture": self.picture,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+        
+        # Include sensitive fields only when explicitly requested
+        if include_sensitive:
+            data["hashed_password"] = self.hashed_password
+            
+        return data
 
 # Create the table in the database
 async def init_db():
