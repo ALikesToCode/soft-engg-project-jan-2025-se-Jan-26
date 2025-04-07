@@ -410,12 +410,26 @@ export default {
     // Clear chat history
     const clearChat = async () => {
       try {
-        await ChatService.clearChatHistory(props.chatId)
+        // First attempt to clear via the service (which will try API first, then local)
+        const result = await ChatService.clearChatHistory(props.chatId)
+        
+        // Update the store (this should work even if the API call failed)
         await chatStore.clearChatHistory(props.chatId)
-        // TODO: Show success toast
+        
+        // Check if there was an error in the API response
+        if (result && result.error) {
+          console.warn("API error when clearing chat, but local cache was cleared:", result.error)
+        }
       } catch (err) {
         console.error("Failed to clear chat:", err)
-        // TODO: Show error toast
+        
+        // Fallback: Try to at least clear the local store
+        try {
+          await chatStore.clearChatHistory(props.chatId)
+          console.log("Cleared chat locally despite API error")
+        } catch (storeErr) {
+          console.error("Failed to clear chat even locally:", storeErr)
+        }
       }
     }
     

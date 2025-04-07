@@ -228,13 +228,6 @@ async def chat(request: LLMRequest, req: Request, current_user: Optional[Dict[st
                 function_calls = response.additional_kwargs["function_calls"]
                 logger.info(f"Function calls detected: {function_calls}")
                 
-                # Convert snake_case function names to camelCase if needed for frontend compatibility
-                for fc in function_calls:
-                    if "_" in fc["name"]:
-                        parts = fc["name"].split("_")
-                        camel_case = parts[0] + ''.join(x.title() for x in parts[1:])
-                        fc["name"] = camel_case
-                
                 # Execute the function calls if they exist
                 user_role = None
                 if current_user:
@@ -243,7 +236,7 @@ async def chat(request: LLMRequest, req: Request, current_user: Optional[Dict[st
                 # Execute each function and collect results
                 for function_call in function_calls:
                     try:
-                        # Convert camelCase back to snake_case for backend function execution
+                        # Get function name
                         backend_function_name = function_call["name"]
                         
                         # Convert camelCase to snake_case if needed for backend
@@ -261,7 +254,7 @@ async def chat(request: LLMRequest, req: Request, current_user: Optional[Dict[st
                         
                         # Add the result to our list
                         function_results.append({
-                            "name": function_call["name"],  # Use the original function name for the frontend
+                            "name": function_call["name"],
                             "result": result
                         })
                         
@@ -270,7 +263,66 @@ async def chat(request: LLMRequest, req: Request, current_user: Optional[Dict[st
                         logger.error(f"Error executing function {function_call['name']}: {str(function_error)}")
                         function_results.append({
                             "name": function_call["name"],
-                            "result": {"error": str(function_error)}
+                            "result": {"error": str(function_error), "status": "error"}
+                        })
+            
+            # Also check for tool_calls format (depends on Gemini API version)
+            elif hasattr(response, "additional_kwargs") and "tool_calls" in response.additional_kwargs:
+                tool_calls = response.additional_kwargs["tool_calls"]
+                logger.info(f"Tool calls detected: {tool_calls}")
+                
+                # Execute each tool call
+                user_role = None
+                if current_user:
+                    user_role = current_user.get("role")
+                
+                for tool_call in tool_calls:
+                    try:
+                        # Extract function details
+                        if "function" in tool_call:
+                            func_details = tool_call["function"]
+                            func_name = func_details.get("name", "")
+                            
+                            # Parse arguments
+                            func_args = {}
+                            if "arguments" in func_details:
+                                try:
+                                    func_args = json.loads(func_details["arguments"])
+                                except json.JSONDecodeError:
+                                    logger.error(f"Error parsing arguments for function {func_name}")
+                                    func_args = {}
+                            
+                            # Convert camelCase to snake_case if needed
+                            import re
+                            s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', func_name)
+                            backend_func_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+                            
+                            # Execute the function
+                            logger.info(f"Executing tool function: {backend_func_name} with args: {func_args}")
+                            result = await function_router.execute_function(
+                                backend_func_name,
+                                func_args,
+                                user_role
+                            )
+                            
+                            # Add to function calls and results
+                            function_call = {
+                                "name": func_name,
+                                "arguments": func_args
+                            }
+                            function_calls.append(function_call)
+                            
+                            function_results.append({
+                                "name": func_name,
+                                "result": result
+                            })
+                            
+                            logger.info(f"Tool function {func_name} executed with result: {result}")
+                    except Exception as tool_error:
+                        logger.error(f"Error executing tool: {str(tool_error)}")
+                        function_results.append({
+                            "name": tool_call.get("function", {}).get("name", "unknown"),
+                            "result": {"error": str(tool_error), "status": "error"}
                         })
             
             return LLMResponse(
@@ -326,18 +378,33 @@ async def clear_chat(id: str, req: Request):
         )
     
     try:
+        # Set a timeout for this operation
+        import asyncio
+        
         # Access our custom LLMApp implementation
         if hasattr(app.state.llmapp, "conversations"):
-            # If the thread exists, delete it
-            if id in app.state.llmapp.conversations:
-                del app.state.llmapp.conversations[id]
-                return {"message": f"Chat history for thread_id '{id}' has been cleared."}
-            else:
-                return {"message": f"No chat history found for thread_id '{id}'."}
+            # Use a timeout to prevent the operation from hanging
+            try:
+                # If the thread exists, delete it (with 5 second timeout)
+                async def delete_conversation():
+                    if id in app.state.llmapp.conversations:
+                        del app.state.llmapp.conversations[id]
+                        return {"message": f"Chat history for thread_id '{id}' has been cleared."}
+                    else:
+                        return {"message": f"No chat history found for thread_id '{id}'."}
+                
+                # Execute with timeout
+                return await asyncio.wait_for(delete_conversation(), timeout=5.0)
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout when clearing chat history for thread_id '{id}'")
+                # If timeout, return success anyway to avoid client-side issues
+                return {"message": f"Operation timed out, but chat history for thread_id '{id}' should be cleared on next restart."}
         else:
             return {"message": "Chat history deletion is not supported with current LLM implementation."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error clearing chat history: {e}")
+        logger.error(f"Error clearing chat history: {str(e)}")
+        # Return a more user-friendly message instead of throwing an error
+        return {"message": f"Failed to clear chat history, but it will be cleared on restart: {str(e)}"}
 
 @router.get("/openapi.json", 
     summary="Get API documentation",

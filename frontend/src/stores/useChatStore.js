@@ -336,23 +336,24 @@ export const useChatStore = defineStore('chat', () => {
       isLoading.value = true
       error.value = null
       
-      // Clear from backend if authenticated
-      if (authStore.isAuthenticated) {
-        try {
-          await ChatService.clearChatHistory(chatId)
-        } catch (err) {
-          console.error("Error clearing chat history from backend:", err)
-        }
-      }
-      
-      // Clear messages in local state
+      // First clear messages in local state to ensure UI responsiveness
       const chatIndex = chatHistory.value.findIndex(chat => chat.id === chatId)
       if (chatIndex !== -1) {
         chatHistory.value[chatIndex].messages = []
         chatHistory.value[chatIndex].lastUpdated = new Date()
       }
+      
+      // Then try to clear from backend if authenticated
+      if (authStore.isAuthenticated) {
+        try {
+          await ChatService.clearChatHistory(chatId)
+        } catch (err) {
+          console.error("Error clearing chat history from backend:", err)
+          // Don't set error.value since we successfully cleared locally
+        }
+      }
     } catch (err) {
-      console.error("Error clearing chat history:", err)
+      console.error("Error in clearChatHistory:", err)
       error.value = "Failed to clear chat history"
     } finally {
       isLoading.value = false

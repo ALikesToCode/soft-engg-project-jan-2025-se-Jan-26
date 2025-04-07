@@ -12,12 +12,17 @@ logger = logging.getLogger(__name__)
 # Initialize chat model
 def get_llm(functions=None):
     """Get the LLM model instance with function calling enabled"""
+    # Format tools for Gemini API
+    tools = None
+    if functions:
+        tools = [{"function": func} for func in functions]
+    
     return ChatGoogleGenerativeAI(
         model="gemini-2.0-flash",
         google_api_key=os.getenv("GOOGLE_API_KEY"),
         temperature=0,  # Use lower temperature for more deterministic function calling
         convert_system_message_to_human=True,  # Required for function calling
-        tools=functions,  # Pass the function definitions to the model
+        tools=tools,  # Pass the properly formatted function definitions to the model
     )
 
 # System message to help the LLM understand available functions
@@ -26,16 +31,24 @@ def get_system_prompt():
     return """You are a helpful AI assistant for an educational platform. 
 You have access to functions that you can call to retrieve information or perform actions.
 
-When a user asks a question that requires using these functions, you should call the appropriate function.
-Respond directly to simple questions that don't require function calls.
-Always be helpful, concise, and professional."""
+GUIDELINES FOR FUNCTION CALLING:
+1. When a user asks for specific information that requires database access, like courses, FAQs, or user details, always use the appropriate function.
+2. Call functions with all required parameters and appropriate optional parameters when helpful.
+3. Directly respond to simple questions that don't require database access.
+4. Return function execution results in a user-friendly format.
+5. If a function returns an error, explain the issue to the user in simple terms.
+6. When multiple functions might apply, choose the most specific one for the task.
+
+IMPORTANT: Always use function calling instead of making up information about courses, users, assignments, or system data.
+
+Be helpful, concise, and professional in all your responses."""
 
 async def call_llm(messages):
     """Function to call the LLM model with the provided messages and handle function calling"""
     # Get function declarations for the LLM
     functions = function_router.get_function_declarations()
     
-    # Format functions for Gemini
+    # Format functions correctly for Gemini
     formatted_functions = []
     for func in functions:
         formatted_func = {
