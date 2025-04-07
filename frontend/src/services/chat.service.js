@@ -5,6 +5,7 @@ import { API_ROUTES } from '@/config/api.routes';
 import api from '@/utils/api';
 import dayjs from 'dayjs';
 import useAuthStore from '@/stores/useAuthStore';
+import { API_URL } from '@/config';
 
 // Local storage keys for chat data
 const LOCAL_STORAGE_KEYS = {
@@ -19,7 +20,9 @@ const generateId = () => {
 
 // API paths without prefixes since they're already added in the axios instance
 const API_PATHS = {
-  CHAT: '/chat'
+  CHAT: '/chat',
+  LLM_CHAT: '/llm/chat',    // Direct LLM interaction endpoint
+  LLM_CLEAR: '/llm/clear'   // LLM conversation clear endpoint
 };
 
 // Local fallback implementations
@@ -204,12 +207,31 @@ export const ChatService = {
    */
   async sendMessage(params) {
     try {
-      const { id, message, query, context, function_results } = params;
+      const { id, message, query, context, function_results, options } = params;
       
-      // The backend expects 'query' instead of 'message'
+      console.log('Original params received:', JSON.stringify(params, null, 2));
+      
+      // Ensure query exists - prefer query over message for consistency
+      let messageText = query || message;
+      
+      // If neither query nor message is provided, return an error
+      if (!messageText) {
+        console.error('Missing message/query in params:', params);
+        return {
+          content: "I'm sorry, there was an error sending your message. No query was provided."
+        };
+      }
+      
+      // Ensure message is a string
+      if (typeof messageText !== 'string') {
+        console.warn('Message/query is not a string, converting to string');
+        messageText = String(messageText || '');
+      }
+      
+      // Build a clean payload with the required fields
       const payload = {
         id: id || crypto.randomUUID(),
-        query: query || message // Support both 'query' and message for backwards compatibility
+        query: messageText.trim() // Always use the query field and ensure it's trimmed
       };
       
       // Add context if provided
@@ -222,34 +244,97 @@ export const ChatService = {
         payload.function_results = function_results;
       }
       
-      console.log('Sending message to AI:', payload);
-      
-      // Try the API call with proper error handling
-      const response = await api.post(`${API_PATHS.CHAT}`, payload);
-      
-      // Return response.data directly as it should already be formatted correctly
-      return response.data;
-    } catch (error) {
-      console.error('Error sending message to AI:', error);
-      
-      // Give a more specific error message based on the status code
-      if (error.response) {
-        const status = error.response.status;
-        
-        if (status === 404) {
-          return {
-            content: "Sorry, the AI service seems to be unavailable. Please check your connection and try again."
-          };
-        } else if (status === 500) {
-          return {
-            content: "The server encountered an issue while processing your request. The team has been notified."
-          };
-        }
+      // Add model options if provided
+      if (options) {
+        payload.options = options;
       }
       
-      // Generic fallback for network errors or other issues
+      // Double check payload has query field
+      if (!payload.query || typeof payload.query !== 'string' || !payload.query.trim()) {
+        console.error('Invalid query in payload:', payload);
+        return {
+          content: "I'm sorry, there was an error sending your message. The query field was invalid."
+        };
+      }
+      
+      console.log('Sending payload to AI:', payload);
+      
+      // Try making a direct axios call with explicit headers
+      console.log(`Making POST request to: ${API_URL}${API_PATHS.LLM_CHAT}`);
+      
+      // Get auth token if available
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+      
+      // Add authorization header if token exists
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      // Make the API call with explicit format checking and validation
+      try {
+        const response = await axios({
+          method: 'post',
+          url: `${API_URL}${API_PATHS.LLM_CHAT}`,
+          headers: headers,
+          data: payload,
+          timeout: 30000 // 30 second timeout
+        });
+        
+        console.log('Received response:', response.status);
+        
+        // Return response.data directly
+        return response.data;
+      } catch (requestError) {
+        // Handle specific error cases
+        if (requestError.response) {
+          // Server responded with error
+          console.error('Server error response:', requestError.response.status, requestError.response.data);
+          
+          // Log the actual request that was sent
+          console.error('Request that failed:', {
+            url: requestError.config.url,
+            method: requestError.config.method,
+            data: JSON.stringify(requestError.config.data)
+          });
+          
+          if (requestError.response.status === 400) {
+            return {
+              content: "I'm sorry, there was a problem with your request. Please try again with a different question."
+            };
+          } else if (requestError.response.status === 500) {
+            return {
+              content: "The server encountered an issue while processing your request. The team has been notified."
+            };
+          }
+        } else if (requestError.request) {
+          // Request was made but no response
+          console.error('No response received:', requestError.request);
+          return {
+            content: "I'm sorry, but I didn't receive a response from the server. Please check your connection and try again."
+          };
+        } else {
+          // Error in setting up the request
+          console.error('Error setting up request:', requestError.message);
+          return {
+            content: "There was an error preparing your request. Please try again."
+          };
+        }
+        
+        // Generic fallback
+        return {
+          content: "I apologize, but I'm having trouble connecting to the AI service. Please try again in a moment."
+        };
+      }
+    } catch (error) {
+      console.error('General error in sendMessage:', error);
+      
+      // Generic fallback for unexpected errors
       return {
-        content: "I apologize, but I'm having trouble connecting to the AI service. Please try again in a moment."
+        content: "I'm sorry, an unexpected error occurred. Please try again later."
       };
     }
   },
@@ -923,6 +1008,36 @@ export const ChatService = {
         message: 'Chat history cleared locally',
         error: error.message
       }
+    }
+  },
+
+  /**
+   * Clear conversation history for a specific thread
+   * @param {string} id - Thread ID to clear
+   * @returns {Promise<Object>} - Result of clearing the conversation
+   */
+  async clearConversation(id) {
+    try {
+      // Create a payload with the thread ID
+      const payload = {
+        id: id || crypto.randomUUID()
+      };
+      
+      console.log('Clearing conversation:', payload);
+      
+      // Send the request to clear the conversation
+      const response = await api.post(`${API_PATHS.LLM_CLEAR}`, payload);
+      
+      // Return the response data
+      return response.data;
+    } catch (error) {
+      console.error('Error clearing conversation:', error);
+      
+      // Return a standardized error response
+      return {
+        success: false,
+        message: "Failed to clear conversation. Please try again later."
+      };
     }
   },
 }

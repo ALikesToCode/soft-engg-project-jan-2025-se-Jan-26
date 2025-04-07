@@ -1,4 +1,5 @@
 <script>
+import { onMounted, ref } from 'vue'
 import SideNavBar from '@/layouts/SideNavBar.vue'
 import ChatBotWrapper from '@/components/ChatBotWrapper.vue'
 import api from '@/utils/api'
@@ -6,7 +7,6 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import { useToast } from 'vue-toastification'
 import AlertMessage from '@/components/common/AlertMessage.vue'
 import { useChatStore } from '@/stores/useChatStore'
-import { onMounted, ref } from 'vue'
 import formatDateFunc from '@/utils/formatDate'
 import useAuthStore from '@/stores/useAuthStore'
 import { useCourseStore } from '@/stores/courseStore'
@@ -202,7 +202,7 @@ export default {
 
         const response = await api.delete(`/user/bookmarked-materials/${bookmarkId}`, headers)
         if (response.status !== 200) {
-          this.showErrorToast(error, 'Failed to delete the Bookmark')
+          this.showErrorToast(new Error('Failed to delete the data'), 'Failed to delete the Bookmark')
           throw new Error('Failed to delete the data')
         }
         console.log(response.data)

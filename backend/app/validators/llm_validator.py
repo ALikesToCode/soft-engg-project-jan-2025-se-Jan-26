@@ -1,7 +1,10 @@
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 import re
+import logging
 from typing import Optional
 from html import escape
+
+logger = logging.getLogger(__name__)
 
 class LLMInputValidator(BaseModel):
     """
@@ -27,15 +30,34 @@ class LLMInputValidator(BaseModel):
     # Validators
     @field_validator('query')
     def validate_query(cls, v):
+        # Log the incoming value for debugging
+        logger.info(f"Validating query input: {repr(v)}")
+        
+        # Check for None
+        if v is None:
+            logger.error("Query is None")
+            raise ValueError("Query cannot be None")
+        
+        # Check for empty string
+        if not v:
+            logger.error("Query is empty string")
+            raise ValueError("Query cannot be empty")
+        
         # Remove any null bytes
-        v = v.replace('\x00', '')
+        if '\x00' in v:
+            logger.warning("Query contains null bytes, removing them")
+            v = v.replace('\x00', '')
         
         # Check for empty query after trimming
         if not v.strip():
+            logger.error("Query contains only whitespace")
             raise ValueError("Query cannot be empty or contain only whitespace")
         
         # Basic XSS protection
+        v_original = v
         v = escape(v)
+        if v != v_original:
+            logger.warning("Query contains HTML special chars that were escaped")
         
         # Remove any potential SQL injection patterns
         sql_patterns = [
@@ -47,12 +69,17 @@ class LLMInputValidator(BaseModel):
         
         for pattern in sql_patterns:
             if re.search(pattern, v):
+                logger.warning(f"Query contains potential SQL pattern: {pattern}")
                 raise ValueError("Invalid characters or patterns detected in query")
         
         # Remove any potential command injection patterns
-        if any(char in v for char in ['&', '|', ';', '`', '$', '(', ')']):
+        injection_chars = ['&', '|', ';', '`', '$', '(', ')']
+        if any(char in v for char in injection_chars):
+            found_chars = [char for char in injection_chars if char in v]
+            logger.warning(f"Query contains potential command injection chars: {found_chars}")
             raise ValueError("Invalid characters detected in query")
         
+        logger.info(f"Query validation successful: {v.strip()}")
         return v.strip()
 
     @field_validator('max_tokens')
@@ -90,7 +117,8 @@ class LLMInputValidator(BaseModel):
             # Validate using pydantic's built-in validation
             self.model_validate(self.model_dump())
             return True
-        except Exception:
+        except Exception as e:
+            logger.error(f"Schema validation error: {str(e)}")
             return False
 
     # Pydantic v2 configuration

@@ -180,7 +180,7 @@ export const authService = {
             // Fetch user profile
             try {
                 console.log('Fetching current user profile...');
-                const response = await this.axiosInstance.get('/users/me');
+                const response = await this.axiosInstance.get('/user/profile');
                 logger.debug('Raw user profile response:', response.data);
                 
                 console.log('AUTH SERVICE: Raw user profile data:', JSON.stringify(response.data, null, 2));

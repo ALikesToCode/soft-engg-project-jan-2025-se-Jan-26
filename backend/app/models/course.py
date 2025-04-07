@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint, LargeBinary, Float, Boolean, Index
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint, LargeBinary, Float, Boolean, Index, func
 from sqlalchemy.orm import relationship
 from app.database import Base, engine, UUID
 from app.models.assignment import Assignment
@@ -281,6 +281,7 @@ class Lecture(Base):
     module = relationship("Module", back_populates="lectures")
     contents = relationship("LectureContent", back_populates="lecture", cascade="all, delete-orphan")
     contents_doc = relationship("LectureContentDoc", back_populates="lecture", cascade="all, delete-orphan")
+    transcription = relationship("LectureTranscription", back_populates="lecture", uselist=False, cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
@@ -334,6 +335,30 @@ class LectureContentDoc(Base):
             "content_desc": self.content_desc,
         }
 
+# Lecture Transcription Model
+class LectureTranscription(Base):
+    __tablename__ = "lecture_transcription"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    lecture_id = Column(Integer, ForeignKey("lecture.id", ondelete="CASCADE"), nullable=False, unique=True)
+    transcription_text = Column(Text, nullable=False)
+    ai_summary = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    processed = Column(Boolean, default=False)
+    
+    lecture = relationship("Lecture", back_populates="transcription")
+    
+    def to_dict(self):
+        return {
+            "id": str(self.id),
+            "lecture_id": str(self.lecture_id),
+            "transcription_text": self.transcription_text,
+            "ai_summary": self.ai_summary,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "processed": self.processed
+        }
 
 class UserRecommendedCourses(Base):
     __tablename__ = "user_recommended_courses"

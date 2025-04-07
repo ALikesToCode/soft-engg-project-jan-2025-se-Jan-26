@@ -838,7 +838,7 @@ class CourseService:
                 user_id=user_id,
                 title=bookmark_data.title,
                 type=bookmark_data.type,
-                date_bookmarked=datetime.datetime.now(UTC),
+                date_bookmarked=datetime.datetime.utcnow(),
                 author=bookmark_data.author,
                 course_id=bookmark_data.course_id,
             )

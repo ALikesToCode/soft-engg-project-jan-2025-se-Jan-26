@@ -20,6 +20,8 @@ from app.services.function_router import function_router
 from langchain.schema import HumanMessage
 from pydantic import BaseModel
 from fastapi import Request
+from app.services.llm_service import call_llm
+from app.services.llm import prepare_prompt_for_lecture
 
 router = APIRouter()
 
@@ -33,6 +35,8 @@ class ChatRequest(BaseModel):
 # Response model for root chat endpoint
 class ChatResponse(BaseModel):
     content: str
+    query: Optional[str] = None
+    response: Optional[str] = None
     function_calls: Optional[List[Dict[str, Any]]] = None
     function_results: Optional[List[Dict[str, Any]]] = None
 
@@ -340,36 +344,57 @@ async def get_available_functions(current_user: Optional[Dict[str, Any]] = Depen
             detail=f"Error getting available functions: {str(e)}"
         ) 
 
-@router.post("/", response_model=ChatResponse)
-async def process_chat(
-    request: ChatRequest,
-    req: Request,
-    current_user: Optional[User] = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+@router.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(
+    chat_request: ChatRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Process a chat message and return a response
-    This endpoint is a proxy to the LLM service for compatibility with the frontend
+    Endpoint for chat conversations with the AI.
     """
     try:
-        # Forward the request to the LLM service
-        from app.routes.llm import chat as llm_chat
+        # Get context data
+        context_data = chat_request.context or {}
+        context_type = context_data.get("type", "general")
         
-        # Create a LLMRequest for the llm_chat function
-        from app.routes.llm import LLMRequest
-        llm_request = LLMRequest(
-            id=request.id or str(uuid.uuid4()),
-            query=request.query
+        # Prepare system prompt based on context
+        if context_type == "lecture" and "lectureId" in context_data:
+            # Use the lecture-specific prompt preparation
+            system_prompt = await prepare_prompt_for_lecture(db, context_data)
+        else:
+            # Use the general prompt preparation
+            system_prompt = prepare_prompt_context(context_data)
+            
+        # Log request for analysis
+        logger.info(f"Chat request from user {current_user.email}: {chat_request.query[:100]}...")
+        logger.debug(f"Context type: {context_type}")
+        
+        # Prepare messages for the LLM
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": chat_request.query}
+        ]
+        
+        # Call the LLM service
+        response_data = await call_llm(messages)
+        
+        # Extract the content from the response (which might be an AIMessage)
+        if hasattr(response_data, 'content'):
+            response_text = response_data.content
+        else:
+            response_text = str(response_data)
+            
+        # Return the response
+        return ChatResponse(
+            content=response_text,
+            query=chat_request.query,
+            response=response_text,
         )
         
-        # Call the LLM chat function
-        result = await llm_chat(llm_request, req, current_user)
-        return result
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process chat: {str(e)}"
-        )
+        logger.error(f"Error in chat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.get("/", response_model=Dict[str, Any])
 async def get_chat_history(
@@ -424,4 +449,32 @@ async def clear_chat(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to clear chat: {str(e)}"
-        ) 
+        )
+
+# Helper function to prepare context
+def prepare_prompt_context(context_data: Dict[str, Any]) -> str:
+    """
+    Prepare a context prompt for general conversations.
+    
+    Args:
+        context_data: Contains context information
+        
+    Returns:
+        A formatted string with context details
+    """
+    context_type = context_data.get("type", "general")
+    
+    if context_type == "course" and "courseId" in context_data:
+        course_id = context_data.get("courseId")
+        course_name = context_data.get("courseName", "Unknown Course")
+        return f"""
+        COURSE CONTEXT: {course_name} (ID: {course_id})
+        
+        As a teaching assistant for this course, provide helpful, accurate, and concise responses to questions about this course.
+        """
+    
+    # Default general context
+    return """
+    You are an AI learning assistant for a university learning management system.
+    Provide helpful, accurate, and concise responses to questions.
+    """ 

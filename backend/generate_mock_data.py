@@ -596,7 +596,7 @@ async def create_bookmarked_materials(conn, student_ids, course_ids):
                 fake.catch_phrase(),
                 material_type,
                 fake.name() if random.choice([True, False]) else None,
-                datetime.now(UTC) - timedelta(days=random.randint(0, 60)),
+                datetime.utcnow() - timedelta(days=random.randint(0, 60)),
                 course_id
             ))
     

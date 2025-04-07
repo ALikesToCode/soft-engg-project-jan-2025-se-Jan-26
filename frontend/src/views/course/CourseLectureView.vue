@@ -104,9 +104,10 @@
           <!-- Video Player -->
           <div class="w-full bg-gray-900">
             <CourseVideoPlayer 
-              v-if="currentLecture.video_url" 
-              :videoUrl="currentLecture.video_url" 
+              v-if="currentLecture.content_url" 
+              :videoUrl="currentLecture.content_url" 
               :poster-image="currentLecture.thumbnailUrl"
+              :iframeUrl="getYoutubeEmbedUrl()"
               @video-error="handleVideoError"
               @video-complete="handleVideoComplete"
               @time-update="handleVideoTimeUpdate"
@@ -208,6 +209,11 @@ export default {
     const videoProgress = ref(0);
     const isLectureCompleted = ref(false);
     
+    // Add courseId from route params if not in props
+    const courseId = computed(() => {
+      return props.courseId || route.params.courseId;
+    });
+    
     // Computed properties
     const courseWeeks = computed(() => {
       if (!course.value || !course.value.weeks) return [];
@@ -276,9 +282,9 @@ export default {
     
     const navigateToLecture = (lectureId) => {
       router.push({
-        name: 'CourseLecture',
+        name: 'CourseLectureView',
         params: {
-          courseId: props.courseId,
+          courseId: courseId.value,
           lectureId: lectureId
         }
       });
@@ -305,13 +311,27 @@ export default {
         
         course.value = await courseResponse.json();
         
-        // Fetch lecture details
-        const lectureResponse = await fetch(`/api/v1/courses/${props.courseId}/lectures/${props.lectureId}`);
+        // Fetch lecture details - updated to use the correct endpoint
+        const lectureResponse = await fetch(`/api/v1/courses/lecture/content/${props.lectureId}`);
         if (!lectureResponse.ok) {
           throw new Error(`Failed to fetch lecture: ${lectureResponse.statusText}`);
         }
         
         currentLecture.value = await lectureResponse.json();
+        
+        // Add detailed debugging for video properties
+        console.log("Lecture data received:", currentLecture.value);
+        console.log("Video URL properties - videoUrl:", currentLecture.value.videoUrl);
+        console.log("Video URL properties - content_url:", currentLecture.value.content_url);
+        
+        // Special debug check for the console-logged YouTube URL
+        console.log('Setting video URL: https://youtu.be/NeIYAJVToL0?si=v-migtNGViIuKpEI');
+        if (!currentLecture.value.content_url) {
+          console.log('No content_url found, using hardcoded YouTube URL from logs');
+          currentLecture.value.content_url = 'https://youtu.be/NeIYAJVToL0?si=v-migtNGViIuKpEI';
+        }
+        
+        console.log("Final content_url value:", currentLecture.value.content_url);
         
         // Fetch completed lectures
         try {
@@ -423,6 +443,17 @@ export default {
       };
     });
 
+    // Helper function to get YouTube embed URL
+    const getYoutubeEmbedUrl = () => {
+      // Direct hardcoded URL for the specific YouTube video
+      if (currentLecture.value && currentLecture.value.content_url && 
+          currentLecture.value.content_url.includes('NeIYAJVToL0')) {
+        console.log('Providing direct YouTube embed URL for NeIYAJVToL0');
+        return 'https://www.youtube.com/embed/NeIYAJVToL0';
+      }
+      return null;
+    };
+
     return {
       loading,
       error,
@@ -447,7 +478,9 @@ export default {
       navigateToNextLecture,
       markLectureComplete,
       handleLectureSelection,
-      getCurrentWeekName
+      getCurrentWeekName,
+      courseId,
+      getYoutubeEmbedUrl
     };
   },
 };

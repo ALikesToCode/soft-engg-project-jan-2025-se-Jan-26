@@ -19,7 +19,7 @@
     </div>
     
     <!-- Lecture description/content -->
-    <div v-if="lecture.content" class="prose prose-lg max-w-none dark:prose-invert mb-8">
+    <div v-if="lecture.content_desc || lecture.description" class="prose prose-lg max-w-none dark:prose-invert mb-8">
       <div v-html="renderedContent"></div>
     </div>
     <div v-else class="text-gray-500 italic mb-8">
@@ -70,10 +70,11 @@ export default {
   setup(props) {
     // Render markdown content safely
     const renderedContent = computed(() => {
-      if (!props.lecture.content) return '';
+      if (!props.lecture.content_desc && !props.lecture.description) return '';
       
       // Convert markdown to HTML and sanitize to prevent XSS
-      const html = marked(props.lecture.content);
+      const contentText = props.lecture.content_desc || props.lecture.description;
+      const html = marked(contentText);
       return DOMPurify.sanitize(html);
     });
     

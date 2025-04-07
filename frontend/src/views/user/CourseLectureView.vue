@@ -79,246 +79,63 @@
                   </ol>
                 </nav>
 
-                <!-- Video Player Section -->
-                <section aria-label="Lecture video" class="mb-4">
-                  <div v-if="videoError" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                    <div class="flex items-start">
-                      <span class="material-symbols-outlined text-red-500 mr-3">error_outline</span>
-                      <div>
-                        <h3 class="font-medium text-red-800">Video playback error</h3>
-                        <p class="text-red-700 mt-1">{{ videoError }}</p>
-                        <div class="mt-3 flex space-x-3">
-                          <button 
-                            @click="tryBackupVideo" 
-                            class="px-3 py-1 bg-maroon-100 text-maroon-700 rounded hover:bg-maroon-200 transition-colors"
-                          >
-                            Try Backup Source
-                          </button>
-                          <button 
-                            @click="reportVideoIssue" 
-                            class="px-3 py-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 transition-colors"
-                          >
-                            Report Issue
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <CourseVideoPlayer
-                    :video-url="currentVideoUrl"
-                    :poster-image="selectedLecture.thumbnailUrl || ''"
-                    :current-time="videoProgress"
-                    :use-native-controls="true"
-                    @time-update="updateVideoProgress"
-                    @video-complete="handleVideoComplete"
-                    @video-error="handleVideoError"
-                  />
-
-                  <!-- Video Controls -->
-                  <div class="flex items-center justify-between mt-2">
-                    <div class="flex items-center space-x-4">
-                      <button
-                        @click="togglePlaybackSpeed"
-                        class="px-3 py-1 text-sm bg-slate-100 rounded-full hover:bg-slate-200 transition-colors flex items-center space-x-1"
-                      >
-                        <span class="material-symbols-outlined text-sm">speed</span>
-                        <span>{{ playbackSpeed }}x</span>
-                      </button>
-                      <button
-                        @click="toggleCaptions"
-                        class="px-3 py-1 text-sm bg-slate-100 rounded-full hover:bg-slate-200 transition-colors flex items-center space-x-1"
-                        :class="{ 'bg-maroon-100 text-maroon-600': captionsEnabled }"
-                      >
-                        <span class="material-symbols-outlined text-sm">closed_caption</span>
-                        <span>CC</span>
-                      </button>
-                    </div>
-                    <div class="flex items-center space-x-2">
-                      <button
-                        @click="toggleFullscreen"
-                        class="p-2 rounded-full hover:bg-slate-100 transition-colors"
-                      >
-                        <span class="material-symbols-outlined">fullscreen</span>
-                      </button>
-                    </div>
-                  </div>
-                </section>
-
-                <!-- Lecture Content -->
-                <div class="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-4">
-                  <div class="xl:col-span-2 space-y-8">
-                    <!-- Lecture Info -->
-                    <div class="bg-white rounded-2xl shadow-lg p-6">
-                      <div class="flex items-start justify-between">
-                        <div class="space-y-3">
-                          <h2 class="text-2xl font-bold text-slate-900">
-                            {{ selectedLecture.title }}
-                          </h2>
-                          <p class="text-slate-600 leading-relaxed">
-                            {{ selectedLecture.description }}
-                          </p>
-                        </div>
-                        <div class="relative w-20 h-20">
-                          <svg class="progress-ring" width="80" height="80">
-                            <circle
-                              class="text-slate-200"
-                              stroke-width="6"
-                              fill="transparent"
-                              r="37"
-                              cx="40"
-                              cy="40"
-                            ></circle>
-                            <circle
-                              class="text-maroon-500"
-                              stroke-width="6"
-                              stroke-dasharray="NaN, 234"
-                              fill="transparent"
-                              r="37"
-                              cx="40"
-                              cy="40"
-                              style="filter: drop-shadow(0 0 8px rgba(139, 0, 0, 0.2))"
-                            ></circle>
-                          </svg>
-                          <button
-                            class="absolute inset-0 flex items-center justify-center w-full h-full transition-transform duration-300 hover:scale-105"
-                          >
-                            <span
-                              class="material-symbols-outlined text-3xl"
-                              :class="isLectureCompleted ? 'text-emerald-500' : 'text-maroon-500'"
-                            >
-                              {{ isLectureCompleted ? 'check_circle' : 'play_circle' }}
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                      <div class="mt-6 flex flex-wrap gap-3">
-                        <button
-                          class="px-5 py-2.5 bg-maroon-500 text-white rounded-xl hover:bg-maroon-600 transition-all duration-300 flex items-center space-x-2 shadow-md hover:shadow-lg"
-                        >
-                          <span class="material-symbols-outlined">download</span>
-                          <span>Resources</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Key Concepts -->
-                    <div class="bg-white rounded-2xl shadow-lg p-6">
-                      <h3 class="text-xl font-bold text-slate-900 mb-5">Key Concepts</h3>
-                      <ul class="space-y-4">
-                        <li
-                          v-for="(concept, index) in selectedLecture.concepts"
-                          :key="index"
-                          class="flex items-start space-x-3 p-3 bg-slate-50/50 rounded-lg hover:bg-slate-50 transition-colors"
-                        >
-                          <span class="material-symbols-outlined text-emerald-500 mt-1"
-                            >check_circle</span
-                          >
-                          <span class="text-slate-700 leading-relaxed">{{ concept }}</span>
-                        </li>
-                      </ul>
-                    </div>
-
-                    <!-- Discussion -->
-                    <div class="bg-white rounded-2xl shadow-lg p-6">
-                      <h3 class="text-xl font-bold text-slate-900 mb-5">Community Dialogue</h3>
-                      <div class="space-y-5">
-                        <textarea
-                          placeholder="Engage with peers..."
-                          class="w-full p-4 border border-slate-200 rounded-xl focus:ring-2 focus:ring-maroon-500 focus:border-transparent transition-all duration-300 resize-none"
-                          rows="3"
-                        ></textarea>
-                        <div class="flex items-center justify-between">
-                          <div class="flex items-center space-x-2 text-slate-500">
-                            <button class="p-2 hover:bg-slate-100 rounded-lg">
-                              <span class="material-symbols-outlined">attach_file</span>
-                            </button>
-                            <button class="p-2 hover:bg-slate-100 rounded-lg">
-                              <span class="material-symbols-outlined">alternate_email</span>
-                            </button>
-                          </div>
-                          <button
-                            class="px-6 py-2.5 bg-maroon-500 text-white rounded-xl hover:bg-maroon-600 transition-all duration-300 flex items-center space-x-2 shadow-md"
-                          >
-                            <span class="material-symbols-outlined">send</span>
-                            <span>Post</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Sidebar Content -->
-                  <div class="space-y-8">
-                    <!-- Resources -->
-                    <div class="bg-white rounded-2xl shadow-lg p-6">
-                      <h3 class="text-xl font-bold text-slate-900 mb-5">Learning Toolkit</h3>
-                      <ul class="space-y-3">
-                        <li
-                          v-for="(resource, index) in selectedLecture.resources"
-                          :key="index"
-                          class="flex items-center justify-between p-3 bg-slate-50/50 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group"
-                        >
-                          <div class="flex items-center space-x-3">
-                            <span
-                              class="material-symbols-outlined text-lg transform transition-all group-hover:scale-110"
-                              :class="getResourceIcon(resource.type).color"
-                            >
-                              {{ getResourceIcon(resource.type).icon }}
-                            </span>
-                            <span class="text-sm font-medium text-slate-700">{{
-                              resource.title
-                            }}</span>
-                          </div>
-                          <button class="p-2 hover:bg-slate-200 rounded-lg transition-colors">
-                            <span class="material-symbols-outlined text-maroon-500">download</span>
-                          </button>
-                        </li>
-                      </ul>
-                    </div>
-
-                    <!-- Challenges -->
-                    <div class="bg-white rounded-2xl shadow-lg p-6">
-                      <h3 class="text-xl font-bold text-slate-900 mb-5">Skill Challenges</h3>
-                      <ul class="space-y-4">
-                        <li
-                          v-for="(challenge, index) in selectedLecture.challenges"
-                          :key="index"
-                          class="p-3 bg-slate-50/50 rounded-lg hover:bg-slate-50 transition-colors"
-                        >
-                          <div class="flex items-start space-x-3">
-                            <span
-                              class="flex-shrink-0 w-7 h-7 bg-maroon-100 text-maroon-600 rounded-lg flex items-center justify-center text-sm font-bold"
-                            >
-                              {{ index + 1 }}
-                            </span>
-                            <p class="text-slate-700 leading-relaxed">{{ challenge.question }}</p>
-                          </div>
-                        </li>
-                      </ul>
-                    </div>
+                <!-- Tabs for Content, Discussion, and Transcription -->
+                <div class="mt-8 border-b border-slate-200">
+                  <div class="flex space-x-4">
+                    <button 
+                      @click="activeTab = 'content'" 
+                      class="px-4 py-2 font-medium"
+                      :class="activeTab === 'content' ? 'text-maroon-600 border-b-2 border-maroon-600' : 'text-slate-600'"
+                    >
+                      <span class="material-symbols-outlined align-middle mr-1">article</span>
+                      Lecture Content
+                    </button>
+                    <button 
+                      @click="activeTab = 'discussion'" 
+                      class="px-4 py-2 font-medium"
+                      :class="activeTab === 'discussion' ? 'text-maroon-600 border-b-2 border-maroon-600' : 'text-slate-600'"
+                    >
+                      <span class="material-symbols-outlined align-middle mr-1">forum</span>
+                      Discussion
+                    </button>
+                    <button 
+                      @click="activeTab = 'transcription'" 
+                      class="px-4 py-2 font-medium"
+                      :class="activeTab === 'transcription' ? 'text-maroon-600 border-b-2 border-maroon-600' : 'text-slate-600'"
+                    >
+                      <span class="material-symbols-outlined align-middle mr-1">description</span>
+                      Transcript & Summary
+                    </button>
                   </div>
                 </div>
-
-                <!-- Navigation Buttons -->
-                <div class="flex items-center justify-between pt-4 border-t border-slate-200">
-                  <button
-                    v-if="previousLecture"
-                    @click="selectLecture(previousLecture)"
-                    class="flex items-center space-x-2 text-slate-600 hover:text-maroon-600 transition-colors"
-                  >
-                    <span class="material-symbols-outlined">arrow_back</span>
-                    <span>Previous Lecture</span>
-                  </button>
-                  <div class="flex-1"></div>
-                  <button
-                    v-if="nextLecture"
-                    @click="selectLecture(nextLecture)"
-                    class="flex items-center space-x-2 text-slate-600 hover:text-maroon-600 transition-colors"
-                  >
-                    <span>Next Lecture</span>
-                    <span class="material-symbols-outlined">arrow_forward</span>
-                  </button>
+                
+                <!-- Tab Content -->
+                <div class="mt-4">
+                  <!-- Lecture Content Tab -->
+                  <div v-if="activeTab === 'content'" class="animate-fadeIn">
+                    <CourseLectureContent 
+                      v-if="selectedLecture && selectedLecture.content" 
+                      :lecture="selectedLecture" 
+                      @contentLoaded="handleContentLoaded"
+                    />
+                  </div>
+                  
+                  <!-- Discussion Tab -->
+                  <div v-if="activeTab === 'discussion'" class="animate-fadeIn">
+                    <CommunityDialogue 
+                      v-if="selectedLecture" 
+                      :lectureId="selectedLecture.id" 
+                      :courseId="courseId"
+                    />
+                  </div>
+                  
+                  <!-- Transcription Tab -->
+                  <div v-if="activeTab === 'transcription'" class="animate-fadeIn h-[500px]">
+                    <LectureTranscription 
+                      v-if="selectedLecture" 
+                      :lectureId="selectedLecture.id"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -448,8 +265,14 @@ import CourseVideoPlayer from '@/components/course/CourseVideoPlayer.vue'
 import CourseLectureContent from '@/components/course/CourseLectureContent.vue'
 import { useCourse } from '@/composables/useCourse'
 import { useNotification } from '@/composables/useNotification'
+import { useChatStore } from '@/stores/useChatStore'
 import api from '@/utils/api'
 import { useToast } from 'vue-toastification'
+import LoadingState from '../../components/LoadingState.vue'
+import ErrorState from '../../components/ErrorState.vue'
+import CourseProgressTracker from '@/components/course/CourseProgressTracker.vue'
+import LectureTranscription from '@/components/course/LectureTranscription.vue'
+import CommunityDialogue from '@/components/course/CommunityDialogue.vue'
 
 export default {
   name: 'CourseLectureView',
@@ -459,6 +282,11 @@ export default {
     CourseSideNav,
     CourseVideoPlayer,
     CourseLectureContent,
+    LoadingState,
+    ErrorState,
+    CourseProgressTracker,
+    CommunityDialogue,
+    LectureTranscription,
   },
 
   setup() {
@@ -466,6 +294,7 @@ export default {
     const route = useRoute()
     const router = useRouter()
     const { notify } = useNotification()
+    const chatStore = useChatStore()
 
     // State
     const loading = ref(true)
@@ -477,9 +306,10 @@ export default {
     const autoSaveTimeout = ref(null)
     const videoError = ref(null)
     const currentVideoUrl = ref('')
+    const activeTab = ref('content')
 
     // Course Data & Methods
-    const courseId = route.params.courseId
+    const courseId = ref(route.params.courseId)
     const {
       currentCourse,
       selectedLecture,
@@ -496,7 +326,7 @@ export default {
       saveNotes,
       completedLecturesCount,
       fetchNotes,
-    } = useCourse(courseId)
+    } = useCourse(courseId.value)
 
     // Computed Properties
     const progress = computed(() => {
@@ -685,7 +515,7 @@ export default {
             Authorization: `Bearer ${token}`,
           },
         }
-        const response = await api.get(`/user/course/content?course_id=${courseId}`, headers)
+        const response = await api.get(`/user/course/content?course_id=${courseId.value}`, headers)
         currentCourse.value = response.data
         loading.value = false
         toast.success('Course Content Loaded Successfully')
@@ -956,10 +786,45 @@ export default {
       },
     )
 
-    // Lifecycle Hooks
+    // Initialize chat context when course/lecture is loaded
+    watch(selectedLecture, (newLecture) => {
+      if (newLecture && currentCourse.value) {
+        // Set chat context with course and lecture information
+        chatStore.setContext({
+          type: 'course',
+          courseId: currentCourse.value.id,
+          courseName: currentCourse.value.title,
+          lectureId: newLecture.id,
+          lectureTitle: newLecture.title,
+          weekId: newLecture.weekId
+        })
+        
+        // Ensure chat is available (but not automatically opened)
+        if (!chatStore.isOpen) {
+          console.log('Ensuring chat is available for lecture:', newLecture.title)
+        }
+      }
+    }, { immediate: true })
+
+    // Make sure chat is visible when this component mounts
     onMounted(() => {
       loadCourseData()
       // Restore video progress from saved state
+      
+      // Wait a moment to ensure UI is ready
+      setTimeout(() => {
+        if (currentCourse.value && selectedLecture.value) {
+          // Set context again to be safe
+          chatStore.setContext({
+            type: 'course',
+            courseId: currentCourse.value.id,
+            courseName: currentCourse.value.title,
+            lectureId: selectedLecture.value.id,
+            lectureTitle: selectedLecture.value.title,
+            weekId: selectedLecture.value.weekId
+          })
+        }
+      }, 500)
     })
 
     onBeforeUnmount(() => {
@@ -973,11 +838,27 @@ export default {
     watch(
       () => route.params.courseId,
       (newId) => {
-        if (newId && newId !== courseId) {
+        if (newId && newId !== courseId.value) {
           loadCourseData()
         }
       },
     )
+
+    // Add a helper to open chat with current context
+    const openLectureChat = () => {
+      if (currentCourse.value && selectedLecture.value) {
+        // Set context and open chat
+        chatStore.setContext({
+          type: 'course',
+          courseId: currentCourse.value.id,
+          courseName: currentCourse.value.title,
+          lectureId: selectedLecture.value.id,
+          lectureTitle: selectedLecture.value.title,
+          weekId: selectedLecture.value.weekId
+        })
+        chatStore.openChat()
+      }
+    }
 
     return {
       // State
@@ -1035,6 +916,12 @@ export default {
       getWordCount,
 
       selectFirstLecture,
+
+      // New chat-related method
+      openLectureChat,
+
+      // New tab-related state
+      activeTab,
     }
   },
 }
@@ -1183,7 +1070,7 @@ export default {
 
 /* Card and Button Base Styles */
 .card-base {
-  @apply bg-white rounded-2xl shadow-sm hover:shadow-md 
+  @apply bg-white rounded-2xl shadow-sm 
          border border-slate-200 transition-all duration-200;
 }
 

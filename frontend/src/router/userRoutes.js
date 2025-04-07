@@ -116,9 +116,10 @@ const userRoutes = {
             }
         },
         {
-            path: 'courses/:courseId/lecture',
+            path: 'courses/:courseId/lecture/:lectureId',
             name: 'CourseLectureView',
             component: CourseLectureView,
+            props: true,
             meta: {
                 title: 'Course Lecture',
                 hideNavbar: false,

@@ -39,48 +39,48 @@
       
       <!-- Function Calling Indicator -->
       <div v-if="isFunctionCalling" class="function-calling-indicator">
-        <div class="function-icon">
-          <span class="material-icons">functions</span>
-        </div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="function-text">Executing functions</div>
+        <span class="material-icons animate-spin mr-2">settings</span>
+        <span>Running functions...</span>
       </div>
     </div>
 
     <!-- Input Area -->
     <div class="chat-input-container">
-      <div class="swagger-tools">
-        <button class="swagger-button" @click="toggleSwaggerInfo">
-          <span class="material-icons">api</span>
-          API Docs
+      <div class="chat-options">
+        <button 
+          class="option-button"
+          title="Clear Conversation"
+          @click="clearConversation"
+        >
+          <span class="material-icons">delete_sweep</span>
         </button>
-        
-        <button v-if="currentMessages.length > 0" class="swagger-button clear-button" @click="clearChat">
-          <span class="material-icons">delete</span>
-          Clear Chat
+        <button 
+          class="option-button"
+          title="Toggle Precise Mode"
+          @click="togglePreciseMode"
+          :class="{'option-active': preciseModeActive}"
+        >
+          <span class="material-icons">travel_explore</span>
         </button>
       </div>
-      
-      <form @submit.prevent="sendMessage" class="chat-input-wrapper">
+      <div class="chat-input">
         <textarea
-          v-model="newMessage"
-          rows="1"
-          placeholder="Type your message..."
-          class="chat-input"
-          @keydown.enter.exact.prevent="sendMessage"
-          @keydown="handleKeyDown"
           ref="messageInput"
+          v-model="newMessage"
+          placeholder="Ask me a question..."
+          @keydown.enter.prevent="sendMessage"
+          @input="resizeTextarea"
+          class="chat-textarea"
+          :disabled="isTyping || isFunctionCalling"
         ></textarea>
         <button
-          type="submit"
-          class="send-button"
+          @click="sendMessage"
           :disabled="!newMessage.trim() || isTyping || isFunctionCalling"
+          class="send-button"
         >
           <span class="material-icons">send</span>
         </button>
-      </form>
+      </div>
       
       <!-- Swagger Modal -->
       <Transition name="fade">
@@ -137,8 +137,10 @@ import DOMPurify from 'dompurify'
 import { ChatService } from '@/services/chat.service'
 import ApiExecutorService from '@/services/api-executor.service'
 import { useChatStore } from '@/stores/useChatStore'
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github.css'
 
 export default {
   name: 'ChatBotBox',
@@ -165,6 +167,7 @@ export default {
     const showSwaggerInfo = ref(false)
     const loadingSwagger = ref(false)
     const swaggerError = ref(null)
+    const preciseModeActive = ref(false)
     
     // Get the current chat's messages from the chat store
     const currentMessages = computed(() => {
@@ -192,11 +195,11 @@ export default {
     
     // Scroll to the bottom of the chat
     const scrollToBottom = () => {
-      setTimeout(() => {
+      nextTick(() => {
         if (messagesContainer.value) {
           messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
         }
-      }, 100)
+      })
     }
     
     // Format message content with markdown - with type checking
@@ -212,6 +215,19 @@ export default {
             content = String(content || 'Message unavailable')
           }
         }
+        
+        // Configure marked without syntax highlighting
+        marked.setOptions({
+          breaks: true,
+          gfm: true,
+          // Remove highlight function that uses highlight.js
+          // highlight: (code, lang) => {
+          //   if (hljs.getLanguage(lang)) {
+          //     return hljs.highlight(code, { language: lang }).value
+          //   }
+          //   return hljs.highlightAuto(code).value
+          // },
+        })
         
         const html = marked(content)
         return DOMPurify.sanitize(html)
@@ -304,22 +320,38 @@ export default {
     // Get AI response from backend
     const getAIResponse = async (message) => {
       try {
+        console.log("Getting AI response for message:", message)
+        
         // Include context if available
         const payload = {
           id: threadId.value,
           query: message
         }
         
+        console.log("ThreadID used:", threadId.value)
+        
         if (props.context) {
           payload.context = props.context
+          console.log("Context included:", props.context)
         }
         
+        // Add model options based on precise mode
+        payload.options = {
+          use_grounding: true,
+          use_fallback: false,
+          temperature: preciseModeActive.value ? 0.1 : 0.7
+        }
+        
+        console.log("Sending to ChatService with payload:", JSON.stringify(payload))
         const data = await ChatService.sendMessage(payload)
         
         // Check if we have a proper response
         if (!data) {
+          console.error("Empty response from ChatService")
           return "I'm sorry, I couldn't generate a response. Please try again."
         }
+        
+        console.log("AI response received:", data)
         
         // Handle function calls if present
         if (data.function_calls && data.function_calls.length > 0) {
@@ -397,14 +429,20 @@ export default {
     
     // Handle thumbs up feedback
     const thumbsUp = (index) => {
-      // TODO: Implement feedback
-      console.log('Thumbs up for message:', index)
+      const message = currentMessages.value[index]
+      if (message) {
+        console.log("Positive feedback for message:", message.id)
+        // TODO: Send feedback to backend
+      }
     }
     
     // Handle thumbs down feedback
     const thumbsDown = (index) => {
-      // TODO: Implement feedback
-      console.log('Thumbs down for message:', index)
+      const message = currentMessages.value[index]
+      if (message) {
+        console.log("Negative feedback for message:", message.id)
+        // TODO: Send feedback to backend
+      }
     }
     
     // Clear chat history
@@ -461,6 +499,69 @@ export default {
       }
     }
     
+    // Clear the current conversation history
+    const clearConversation = async () => {
+      if (!props.chatId) return
+      
+      try {
+        // Call the service to clear the conversation on the backend
+        const result = await ChatService.clearConversation(props.chatId)
+        
+        if (result.success) {
+          // Clear the local chat store
+          chatStore.clearMessages(props.chatId)
+          
+          // Add a system message indicating the conversation was cleared
+          await chatStore.addMessage(props.chatId, {
+            id: Date.now() + '-system',
+            role: 'system',
+            type: 'ai',
+            content: "Conversation has been cleared. How can I help you today?",
+            timestamp: new Date()
+          })
+        } else {
+          console.error("Failed to clear conversation:", result.message)
+        }
+      } catch (error) {
+        console.error("Error clearing conversation:", error)
+      }
+    }
+    
+    // Toggle precise mode
+    const togglePreciseMode = () => {
+      preciseModeActive.value = !preciseModeActive.value
+      console.log("Precise mode:", preciseModeActive.value ? "enabled" : "disabled")
+      
+      // Add a system message to indicate the mode change
+      if (props.chatId) {
+        chatStore.addMessage(props.chatId, {
+          id: Date.now() + '-system',
+          role: 'system',
+          type: 'ai',
+          content: preciseModeActive.value 
+            ? "Precise mode enabled. I'll focus on accuracy and detailed information."
+            : "Precise mode disabled. I'll provide more creative and conversational responses.",
+          timestamp: new Date()
+        })
+      }
+    }
+    
+    // Resize textarea as content grows
+    const resizeTextarea = () => {
+      const textarea = messageInput.value
+      if (!textarea) return
+      
+      // Reset height to auto to get proper scrollHeight
+      textarea.style.height = 'auto'
+      
+      // Set new height based on scrollHeight, with max height
+      const newHeight = Math.min(textarea.scrollHeight, 150)
+      textarea.style.height = `${newHeight}px`
+      
+      // Scroll to bottom after resize
+      scrollToBottom()
+    }
+    
     return {
       currentMessages,
       newMessage,
@@ -481,7 +582,11 @@ export default {
       loadingSwagger,
       swaggerError,
       clearChat,
-      toggleSwaggerInfo
+      toggleSwaggerInfo,
+      clearConversation,
+      togglePreciseMode,
+      preciseModeActive,
+      resizeTextarea
     }
   }
 }
@@ -616,90 +721,128 @@ export default {
   background-color: white;
 }
 
-.chat-input-wrapper {
+.chat-options {
   display: flex;
-  border: 1px solid #e0e0e0;
-  border-radius: 1.5rem;
-  padding: 0.5rem 0.75rem;
-  background-color: white;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.option-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6c757d;
+  border-radius: 4px;
+  padding: 4px;
+  transition: all 0.2s;
+}
+
+.option-button:hover {
+  background-color: #f1f3f5;
+  color: #495057;
+}
+
+.option-active {
+  background-color: #e6f7ff;
+  color: #0084ff;
 }
 
 .chat-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background-color: #fff;
+  border-radius: 24px;
+  border: 1px solid #dee2e6;
+  overflow: hidden;
+  padding-left: 16px;
+}
+
+.chat-textarea {
   flex: 1;
   border: none;
-  outline: none;
-  font-size: 0.875rem;
+  padding: 12px 0;
   resize: none;
+  min-height: 24px;
+  max-height: 150px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
   background: transparent;
-  max-height: 120px;
 }
 
 .send-button {
-  background: none;
   border: none;
-  color: #4299e1;
+  background: none;
   cursor: pointer;
+  color: #0084ff;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: color 0.2s;
+}
+
+.send-button:hover {
+  color: #0056b3;
 }
 
 .send-button:disabled {
-  color: #a0aec0;
+  color: #adb5bd;
   cursor: not-allowed;
 }
 
 .typing-indicator {
   display: flex;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background-color: #f0f0f0;
-  border-radius: 1rem;
-  max-width: 60px;
-  margin-right: auto;
-}
-
-.typing-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #888;
-  margin: 0 2px;
-  animation: typing 1.5s infinite ease-in-out;
-}
-
-.typing-dot:nth-child(1) {
-  animation-delay: 0s;
-}
-
-.typing-dot:nth-child(2) {
-  animation-delay: 0.5s;
-}
-
-.typing-dot:nth-child(3) {
-  animation-delay: 1s;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background-color: #e9ecef;
+  margin-bottom: 12px;
+  align-self: flex-start;
+  width: 60px;
 }
 
 .function-calling-indicator {
   display: flex;
   align-items: center;
-  padding: 0.75rem 1rem;
-  background-color: #f0f2ff;
-  border: 1px solid #e0e6ff;
-  border-radius: 1rem;
-  max-width: 200px;
-  margin-right: auto;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background-color: #fff3cd;
+  color: #856404;
+  margin-bottom: 12px;
+  align-self: flex-start;
+  font-size: 0.875rem;
 }
 
-.function-icon {
-  margin-right: 8px;
-  color: #4f46e5;
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #6c757d;
+  border-radius: 50%;
+  margin: 0 2px;
+  animation: typingAnimation 1.4s infinite both;
 }
 
-.function-text {
-  font-size: 0.75rem;
-  color: #4f46e5;
-  margin-left: 8px;
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingAnimation {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
 }
 
 .swagger-tools {
@@ -865,12 +1008,16 @@ export default {
   text-align: center;
 }
 
-@keyframes typing {
-  0%, 100% {
-    transform: translateY(0);
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
   }
-  50% {
-    transform: translateY(-5px);
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -880,5 +1027,31 @@ export default {
 
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+}
+
+/* Basic code styling without highlight.js */
+.prose code {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-family: monospace;
+  font-size: 0.875em;
+}
+
+.prose pre {
+  background-color: #f1f3f5;
+  border-radius: 4px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.prose pre code {
+  background-color: transparent;
+  padding: 0;
+  display: block;
+  overflow-x: auto;
+  color: #333;
+  white-space: pre;
 }
 </style>

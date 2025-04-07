@@ -35,6 +35,9 @@ class FunctionResult(BaseModel):
 class LLMRequest(BaseModel):
     id: str
     query: str
+    context: Optional[Dict[str, Any]] = None
+    function_results: Optional[List[Dict[str, Any]]] = None
+    options: Optional[Dict[str, Any]] = None
 
 class LLMResponse(BaseModel):
     """Schema for LLM responses that may include function calls"""
@@ -42,6 +45,13 @@ class LLMResponse(BaseModel):
     function_calls: Optional[List[FunctionCall]] = None
     function_results: Optional[List[FunctionResult]] = None
     raw_tool_calls: Optional[List[Dict[str, Any]]] = None
+
+class ClearConversationRequest(BaseModel):
+    id: str
+
+class ClearConversationResponse(BaseModel):
+    success: bool
+    message: str
 
 # Vector store retrieval function
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -130,20 +140,30 @@ from starlette.requests import Request as StarletteRequest
 )
 async def chat(request: LLMRequest, req: Request, current_user: Optional[Dict[str, Any]] = Depends(get_current_user)):
     """
-    Send a message to the AI and get a response with potential function calls.
+    Send a message to the AI and get a response
     
-    This endpoint processes the user's message using the Gemini AI model,
-    allowing it to call functions when needed to gather information.
+    This endpoint accepts a user query and optional context, processes it through the LLM,
+    and returns a response that may include function calls for retrieving data or performing actions.
     
-    Args:
-        request: The validated LLM request containing the user's message
-        
-    Returns:
-        LLMResponse containing the AI's response and any function calls made
-        
-    Raises:
-        HTTPException: If input validation fails or if there's an error generating the response
+    The AI may use the available functions to retrieve information from the system.
+    Results of function calls will be included in the response.
     """
+    # Log the request for debugging
+    logger.info(f"Received chat request: {request}")
+    
+    # Validate input
+    try:
+        # Create the validator with the query
+        validator = LLMInputValidator(query=request.query)
+        # Optionally sanitize if needed
+        sanitized_query = validator.sanitize_input()
+    except Exception as e:
+        logger.error(f"Validation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid query parameter: {str(e)}"
+        )
+    
     try:
         # Use the app state to get the LLMApp
         app = req.app
@@ -171,7 +191,12 @@ async def chat(request: LLMRequest, req: Request, current_user: Optional[Dict[st
                     content="I'm sorry, I'm still starting up. Please try again in a moment."
                 )
             
-        config = {"configurable": {"thread_id": request.id}}
+        config = {
+            "configurable": {
+                "thread_id": request.id,
+                "model_options": request.options or {}
+            }
+        }
         input_message = [HumanMessage(content=request.query)]
         
         # Get available functions
@@ -240,63 +265,7 @@ async def chat(request: LLMRequest, req: Request, current_user: Optional[Dict[st
                         )
                         function_calls.append(function_call)
                 
-                # Next check for OpenAI format tool_calls
-                elif "tool_calls" in response.additional_kwargs:
-                    tool_calls = response.additional_kwargs.get("tool_calls", [])
-                    logger.info(f"Found OpenAI-format tool_calls in additional_kwargs: {tool_calls}")
-                    
-                    for tool_call in tool_calls:
-                        if isinstance(tool_call, dict):
-                            # Check for Google/OpenAI format with function inside tool_call
-                            if "function" in tool_call:
-                                function_info = tool_call["function"]
-                                function_name = function_info.get("name", "")
-                                
-                                # Parse arguments - could be string or dict
-                                args_raw = function_info.get("arguments", "{}")
-                                if isinstance(args_raw, str):
-                                    try:
-                                        args_dict = json.loads(args_raw)
-                                    except json.JSONDecodeError:
-                                        logger.error(f"Failed to parse arguments: {args_raw}")
-                                        args_dict = {}
-                                else:
-                                    args_dict = args_raw
-                                
-                                function_call = FunctionCall(
-                                    name=function_name,
-                                    arguments=args_dict
-                                )
-                                function_calls.append(function_call)
-                                
-                                # Add the raw tool call to the response for client-side use
-                                if "raw_tool_calls" not in response.additional_kwargs:
-                                    response.additional_kwargs["raw_tool_calls"] = []
-                                response.additional_kwargs["raw_tool_calls"].append(tool_call)
-                
-                # Finally check for single function_call (legacy format)
-                elif "function_call" in response.additional_kwargs:
-                    function_call_info = response.additional_kwargs.get("function_call", {})
-                    logger.info(f"Found legacy function_call format: {function_call_info}")
-                    
-                    function_name = function_call_info.get("name", "")
-                    args_raw = function_call_info.get("arguments", "{}")
-                    
-                    # Parse arguments - could be string or dict
-                    if isinstance(args_raw, str):
-                        try:
-                            args_dict = json.loads(args_raw)
-                        except json.JSONDecodeError:
-                            logger.error(f"Failed to parse arguments: {args_raw}")
-                            args_dict = {}
-                    else:
-                        args_dict = args_raw
-                    
-                    function_call = FunctionCall(
-                        name=function_name,
-                        arguments=args_dict
-                    )
-                    function_calls.append(function_call)
+                # Other formats are already handled in the llm_service.py call_llm function
             
             # If we have function calls, execute them
             if function_calls:
@@ -356,6 +325,58 @@ async def chat(request: LLMRequest, req: Request, current_user: Optional[Dict[st
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Server error: {str(e)}"
+        )
+
+@router.post("/clear",
+    summary="Clear conversation history",
+    description="Clears the conversation history for a specific thread",
+    response_model=ClearConversationResponse,
+    responses={
+        200: {"description": "Conversation cleared successfully"},
+        404: {"description": "Conversation not found"},
+        500: {"description": "Server error"}
+    }
+)
+async def clear_conversation(
+    request: ClearConversationRequest,
+    req: Request
+):
+    """
+    Clear conversation history for a specific thread
+    
+    This endpoint clears the conversation history stored in the LLMApp for a specific thread ID.
+    This can be useful for starting a new conversation with the AI without the context of previous messages.
+    """
+    try:
+        # Use the app state to get the LLMApp
+        app = req.app
+        
+        if not hasattr(app.state, "llmapp") or not app.state.llmapp:
+            logger.error("LLMApp not initialized")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="AI service is not available. Please try again later."
+            )
+        
+        # Clear the conversation
+        success = app.state.llmapp.clear_conversation(request.id)
+        
+        if success:
+            return ClearConversationResponse(
+                success=True,
+                message="Conversation history cleared successfully"
+            )
+        else:
+            return ClearConversationResponse(
+                success=False,
+                message="Conversation not found or could not be cleared"
+            )
+    
+    except Exception as e:
+        logger.error(f"Error clearing conversation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error clearing conversation: {str(e)}"
         )
 
 @router.get("/chat")
@@ -523,3 +544,38 @@ async def get_openapi_docs(req: Request, current_user: Optional[Dict[str, Any]] 
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating API documentation: {str(e)}"
         )
+
+@router.post("/chat/debug", include_in_schema=False)
+async def debug_request(req: Request):
+    """Debug endpoint to log request payload and headers"""
+    try:
+        # Get raw body
+        body = await req.body()
+        body_str = body.decode('utf-8')
+        
+        # Extract headers
+        headers = {key: value for key, value in req.headers.items()}
+        
+        # Try to parse as JSON
+        try:
+            import json
+            json_data = json.loads(body_str)
+            logger.info(f"Debug request JSON data: {json_data}")
+        except:
+            logger.info(f"Debug request raw body: {body_str}")
+        
+        logger.info(f"Debug request headers: {headers}")
+        
+        # Return payload for verification
+        return {
+            "success": True,
+            "message": "Request logged for debugging",
+            "headers": headers,
+            "body": body_str
+        }
+    except Exception as e:
+        logger.error(f"Error in debug endpoint: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }

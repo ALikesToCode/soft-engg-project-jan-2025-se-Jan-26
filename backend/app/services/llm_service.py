@@ -24,7 +24,8 @@ def get_available_models():
         "gemini-1.5-flash-latest",
         "gemini-1.5-pro", 
         "gemini-1.5-flash",
-        "gemini-2.0-flash", 
+        "gemini-2.0-pro", 
+        "gemini-2.0-flash",
         "gemini-1.0-pro"
     ]
     
@@ -32,70 +33,84 @@ def get_available_models():
     if _available_models_cache is not None:
         return _available_models_cache
     
-    # Try fast path first - if we can't connect to the API, use common models
     try:
-        # Check if model list was cached on disk
-        cache_path = os.path.join(os.path.dirname(__file__), "model_cache.json")
-        cache_expiry = 3600  # Cache validity in seconds (1 hour)
-        
-        # Check for valid cache file
-        if os.path.exists(cache_path):
-            file_age = time.time() - os.path.getmtime(cache_path)
-            if file_age < cache_expiry:
-                try:
-                    with open(cache_path, 'r') as f:
-                        cached_data = json.load(f)
-                        _available_models_cache = cached_data.get('models', common_models)
-                        logger.info(f"Using cached model list ({len(_available_models_cache)} models)")
-                        return _available_models_cache
-                except (json.JSONDecodeError, IOError):
-                    logger.warning("Failed to read model cache file")
-        
-        # If no valid cache, fetch from API
+        # Get API key
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
-            logger.error("GOOGLE_API_KEY not found in environment")
-            _available_models_cache = common_models
+            logger.warning("No Google API key found, using common models list")
             return common_models
         
-        # Call the models.list API endpoint with timeout
+        # Call models endpoint
         url = "https://generativelanguage.googleapis.com/v1beta/models"
-        response = requests.get(url, params={"key": api_key}, timeout=2.0)
+        headers = {"x-goog-api-key": api_key}
         
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Extract model names from response
-            models = [model.get("name", "").split("/")[-1] for model in data.get("models", [])]
-            
-            # Filter to include only Gemini models
-            gemini_models = [model for model in models if model.startswith("gemini")]
-            
-            if gemini_models:
-                logger.info(f"Available Gemini models: {len(gemini_models)} models")
-                # Cache the results
-                _available_models_cache = gemini_models
-                
-                # Write to cache file
-                try:
-                    with open(cache_path, 'w') as f:
-                        json.dump({'models': gemini_models}, f)
-                except IOError:
-                    logger.warning("Failed to write model cache file")
-                
-                return gemini_models
-            else:
-                logger.warning("No Gemini models found in API response")
-                _available_models_cache = common_models
-                return common_models
-        else:
-            logger.error(f"Failed to get models: {response.status_code} - {response.text}")
-            _available_models_cache = common_models
+        # Make request with timeout
+        response = requests.get(url, headers=headers, timeout=5)
+        
+        if response.status_code != 200:
+            logger.warning(f"Failed to fetch models, status code: {response.status_code}, using common models")
             return common_models
+        
+        # Parse response
+        data = response.json()
+        
+        # Filter for chat models
+        models = [
+            model["name"].split("/")[-1] 
+            for model in data.get("models", []) 
+            if "gemini" in model.get("name", "").lower() and model.get("supportedGenerationMethods", []) and "generateContent" in model.get("supportedGenerationMethods", [])
+        ]
+        
+        # Cache results
+        _available_models_cache = models
+        
+        # Log available models
+        logger.info(f"Available models: {models}")
+        
+        return models
     except Exception as e:
-        logger.warning(f"Error getting available models: {str(e)}, using default list")
-        _available_models_cache = common_models
+        logger.error(f"Error fetching models: {str(e)}")
         return common_models
+
+def get_system_prompt():
+    """Get the system prompt for the LLM
+    
+    This is used to set the behavior and tone of the AI assistant.
+    """
+    return """
+You are an AI learning assistant for a university learning management system.
+Your primary role is to help students, faculty, and support staff with their educational needs.
+don't give answers that are not related to the provided context.
+You are educator don't give answers that are not related to the provided context.
+You are not a chatbot, you are an educator.
+
+whenever students tries to ask you questions about the course, lecture, or anything related to the course, You should answer ensuring that the answer is related to the course and the lecture.
+and also make sure that answer is not giving Graded assignemnt questions or anything related to the course content.
+You should always guide the students to the course website to answer their questions.
+You should not give direct answers to the students, you should always guide them to the course website to answer their questions.
+Not answer questions that are not related to the course or the lecture.
+Not answer questions that are not related to technology. 
+You can answer question related to maths, science, computer science.
+
+CAPABILITIES:
+- Answer questions about courses, assignments, and academic materials
+- Provide learning support and explanations of complex topics
+- Help faculty manage their courses
+- Assist support staff with administrative tasks
+- Execute functions to retrieve or modify data when necessary
+
+BEHAVIOR GUIDELINES:
+- Be helpful, respectful, and educational in tone
+- Provide accurate information and admit when you don't know something
+- When the answer requires domain-specific knowledge, use your general knowledge and clearly indicate limitations
+- Respect academic integrity - never complete assignments for students or write essays on their behalf
+- Use function calling when appropriate to retrieve or update information
+- Protect user privacy by not sharing one user's information with another
+- Generate thoughtful, nuanced responses that are appropriate for an educational context
+- Focus on being helpful while maintaining appropriate educational boundaries
+
+When accessing information, use the available tools and functions that have been provided to you.
+"""
 
 # Initialize chat model
 def get_llm(functions=None, use_fallback=False, use_grounding=True):
@@ -141,148 +156,47 @@ def get_llm(functions=None, use_fallback=False, use_grounding=True):
     available_models = get_available_models()
     logger.info(f"All available models: {available_models}")
     
-    # Define model preferences - updated with newest experimental models first
-    preferred_models = [
-        # Try newest experimental/preview models first
-        "gemini-2.5-pro-preview",  # Try 2.5 Preview first
-        "gemini-2.0-pro-exp",      # Then 2.0 Pro Experimental
-        "gemini-exp-",             # Any experimental models 
-        "gemini-2.0-flash",        # Then 2.0 Flash
-        "gemini-1.5-pro-latest",   # Then 1.5 models  
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro", 
-        "gemini-1.5-flash"
-    ]
+    # Model selection logic
+    if use_fallback:
+        preferred_models = ["gemini-2.0-pro", "gemini-2.0-flash", "gemini-1.5-pro-latest", "gemini-1.5-flash-latest"]
+    else:
+        preferred_models = ["gemini-2.0-pro", "gemini-1.5-pro-latest", "gemini-1.5-pro", "gemini-2.0-flash"]
     
-    fallback_models = [
-        "gemini-2.0-flash",  # Primary fallback
-        "gemini-1.5-flash-latest",  # Secondary fallback
-        "gemini-1.0-pro"  # Last resort fallback
-    ]
+    # Find the best available model
+    model_name = next((model for model in preferred_models if model in available_models), "gemini-1.5-flash")
+    logger.info(f"Selected model: {model_name}")
     
-    # Select model based on availability
-    model_candidates = fallback_models if use_fallback else preferred_models
-    
-    # Find the first available model from our candidates
-    model_name = None
-    matched_prefix = None
-    
-    # First try exact matches
-    for model in model_candidates:
-        if model in available_models:
-            model_name = model
-            logger.info(f"Found exact match for model: {model_name}")
-            break
-    
-    # If no exact match, try prefix matches
-    if not model_name:
-        for prefix in model_candidates:
-            for available_model in available_models:
-                if available_model.startswith(prefix):
-                    model_name = available_model
-                    matched_prefix = prefix
-                    logger.info(f"Found prefix match for {prefix}: {model_name}")
-                    break
-            if model_name:
-                break
-    
-    # If no preferred models are available, use any gemini model
-    if not model_name and available_models:
-        model_name = available_models[0]  # Use the first available model
-        logger.info(f"No preferred models available, using: {model_name}")
-    
-    # Last resort fallback
-    if not model_name:
-        model_name = "gemini-1.0-pro"  # Default fallback if API didn't return models
-        logger.warning(f"No models found in API response, using default: {model_name}")
-    
-    # Detailed logging about model selection
-    logger.info(f"SELECTED MODEL: {model_name}")
-    if matched_prefix:
-        logger.info(f"Matched from prefix: {matched_prefix}")
-    logger.info(f"Fallback mode: {use_fallback}")
-    logger.info(f"Grounding enabled: {use_grounding}")
-    logger.info(f"Tools configured: {len(tools)} tools")
-    
-    # Create the model instance
-    model = ChatGoogleGenerativeAI(
-        model=model_name,
-        google_api_key=os.getenv("GOOGLE_API_KEY"),
-        temperature=0.0,  # Use zero temperature for deterministic function calling
-        convert_system_message_to_human=False,  # Updated - no longer using deprecated approach
-        tools=tools if tools else None,  # Pass the function definitions and grounding tools to the model
-        max_retries=1,  # Reduce retry attempts to fail faster
-        additional_kwargs={
-            "tool_choice": "auto"  # Enable automatic tool choice for OpenAI compatibility
-        }
-    )
-    
-    logger.info(f"Successfully created LLM instance with model: {model_name}")
-    return model
-
-# System message to help the LLM understand available functions
-def get_system_prompt():
-    """Get the system prompt for the LLM with instructions about function usage"""
-    return """You are a helpful AI assistant for an educational platform. 
-You have access to tools that you can call to retrieve information or perform actions.
-
-GUIDELINES FOR TOOL CALLING:
-1. When a user asks for specific information that requires database access, like courses, FAQs, or user details, ALWAYS use the appropriate function tool.
-2. Call functions with all required parameters and appropriate optional parameters when helpful.
-3. Directly respond to simple questions that don't require database access.
-4. Return function execution results in a user-friendly format.
-5. If a function returns an error, explain the issue to the user in simple terms.
-6. When multiple functions might apply, choose the most specific one for the task.
-
-FUNCTION CALLING INSTRUCTIONS:
-- ALWAYS use function calling for retrieving data from the system
-- When function calling is needed, call the function FIRST, then provide your response
-- DO NOT make up information about courses, users, assignments, or other system data
-- DO format function arguments correctly based on the function's parameter schema
-- Each function call will be automatically executed and the results will be returned to you
-
-IMPORTANT: You MUST use the EXACT OpenAI function calling format when using tools.
-The correct format is:
-{
-  "tool_calls": [
-    {
-      "id": "call_9g1881818181818181818181",
-      "type": "function",
-      "function": {
-        "name": "function_name",
-        "arguments": "{}"
-      }
+    # Configure model parameters
+    model_kwargs = {
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_output_tokens": 2048,
     }
-  ]
-}
-
-For example, to call getCourses:
-{
-  "tool_calls": [
-    {
-      "id": "call_9g1881818181818181818181",
-      "type": "function",
-      "function": {
-        "name": "getCourses",
-        "arguments": "{}"
-      }
-    }
-  ]
-}
-
-GROUNDING INSTRUCTIONS:
-- When you need information that is not available in the system or might be outdated, use Google Search
-- For questions about current events, latest technologies, or general knowledge not specific to the educational platform, use grounding
-- Use grounding to complement the system data, especially for providing up-to-date information
-- Properly attribute information obtained through grounding by mentioning the source
-
-IMPORTANT EXAMPLES:
-- If user asks "Show me my courses", call the getCourses() function using the EXACT format above
-- If user asks "What are my assignments?", call the getAssignments() function
-- If user asks "Find FAQs about enrollment", call the search_faqs(query="enrollment") function
-- If user asks about something not related to the system, like "What are the latest trends in AI?", use Google Search for grounding
-
-Be helpful, concise, and professional in all your responses."""
+    
+    # Create LLM instance
+    try:
+        return ChatGoogleGenerativeAI(
+            model=model_name,
+            google_api_key=os.getenv("GOOGLE_API_KEY"),
+            safety_settings={
+                "HARASSMENT": "BLOCK_MEDIUM_AND_ABOVE",
+                "HATE": "BLOCK_MEDIUM_AND_ABOVE",
+                "SEXUALLY_EXPLICIT": "BLOCK_MEDIUM_AND_ABOVE",
+                "DANGEROUS": "BLOCK_MEDIUM_AND_ABOVE"
+            },
+            convert_system_message_to_human=False,
+            tools=tools if tools else None,
+            streaming=False,
+            **model_kwargs
+        )
+    except Exception as e:
+        logger.error(f"Error creating LLM instance: {str(e)}")
+        # Fallback to simpler configuration
+        return ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            google_api_key=os.getenv("GOOGLE_API_KEY")
+        )
 
 # Store loaded LLM instances for reuse
 _llm_cache = {}
@@ -399,77 +313,44 @@ async def call_llm(messages, use_fallback=False, use_grounding=True):
     # Process tool/function calls from the response
     function_calls = []
     
-    # Check for various tool/function call formats
-    
-    # 1. Check for OpenAI format tool_calls
-    if hasattr(response, 'additional_kwargs') and response.additional_kwargs.get('tool_calls'):
-        logger.info("Found tool_calls in OpenAI format")
-        tool_calls = response.additional_kwargs.get('tool_calls', [])
+    # Check for any function calls in the response
+    if hasattr(response, 'additional_kwargs'):
+        additional_kwargs = response.additional_kwargs
         
-        for tool_call in tool_calls:
-            # Handle OpenAI-style tool call
-            if isinstance(tool_call, dict) and 'function' in tool_call:
-                function_name = tool_call['function'].get('name')
-                
-                # Parse arguments
-                if 'arguments' in tool_call['function']:
-                    args_str = tool_call['function'].get('arguments', '{}')
-                    # Convert from string if needed
-                    if isinstance(args_str, str):
-                        try:
-                            args = json.loads(args_str)
-                        except json.JSONDecodeError:
-                            args = {}
-                    else:
-                        args = args_str
-                        
-                    function_calls.append({
-                        "name": function_name,
-                        "arguments": args
-                    })
-                    logger.info(f"Parsed OpenAI-format function call: {function_name}")
-    
-    # 2. Check for LangChain standard tool_calls attribute
-    elif hasattr(response, 'tool_calls') and response.tool_calls:
-        logger.info(f"Found tool_calls directly on response: {response.tool_calls}")
-        
-        for tool_call in response.tool_calls:
-            # Skip Google Search grounding tool calls
-            if tool_call.get("name") == "google_search":
-                logger.info(f"Found Google Search grounding call: {tool_call}")
-                continue
+        # Process function calls from tool_calls
+        if 'tool_calls' in additional_kwargs:
+            tool_calls = additional_kwargs['tool_calls']
             
-            function_calls.append({
-                "name": tool_call.get("name"),
-                "arguments": tool_call.get("args", {})
-            })
-            logger.info(f"Parsed LangChain tool call: {tool_call.get('name')}")
+            for tool_call in tool_calls:
+                if 'function' in tool_call:
+                    func_call = tool_call['function']
+                    name = func_call.get('name', '')
+                    arguments = {}
+                    
+                    # Parse arguments (sometimes they come as a string, sometimes as a dict)
+                    args = func_call.get('arguments', {})
+                    if isinstance(args, str):
+                        try:
+                            arguments = json.loads(args)
+                        except json.JSONDecodeError:
+                            logger.warning(f"Could not parse function arguments: {args}")
+                            arguments = {}
+                    else:
+                        arguments = args
+                    
+                    # Add to list of function calls
+                    function_calls.append({
+                        "name": name,
+                        "arguments": arguments
+                    })
+                    
+                    logger.info(f"Extracted function call: {name}")
+            
+            # Store raw tool calls for debugging
+            response.additional_kwargs['raw_tool_calls'] = tool_calls
     
-    # 3. Check legacy function_call format
-    elif hasattr(response, 'additional_kwargs') and 'function_call' in response.additional_kwargs:
-        function_call = response.additional_kwargs['function_call']
-        function_name = function_call.get('name')
-        args_str = function_call.get('arguments', '{}')
-        
-        try:
-            if isinstance(args_str, str):
-                args = json.loads(args_str)
-            else:
-                args = args_str
-        except json.JSONDecodeError:
-            logger.error(f"Failed to parse function arguments: {args_str}")
-            args = {}
-        
-        function_calls.append({
-            "name": function_name,
-            "arguments": args
-        })
-        logger.info(f"Parsed legacy function call: {function_name}")
-    
-    # Add function calls to response if we found any
+    # Add function calls to response if any were found
     if function_calls:
-        if not hasattr(response, 'additional_kwargs'):
-            response.additional_kwargs = {}
         response.additional_kwargs['function_calls'] = function_calls
         logger.info(f"Added {len(function_calls)} function calls to response")
     
@@ -524,6 +405,13 @@ class LLMApp:
         thread_id = config.get("configurable", {}).get("thread_id", "default") if config else "default"
         conversation = self.conversations.get(thread_id, [])
         return [{"messages": conversation}]
+    
+    def clear_conversation(self, thread_id="default"):
+        """Clear a specific conversation"""
+        if thread_id in self.conversations:
+            self.conversations[thread_id] = []
+            return True
+        return False
 
 async def create_llm_app(app):
     """Initialize a simple LLM application

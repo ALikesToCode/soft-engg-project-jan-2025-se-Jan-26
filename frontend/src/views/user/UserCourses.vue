@@ -238,7 +238,7 @@ export default {
     continueCourse(course) {
       this.$router.push({
         name: 'CourseLectureView',
-        params: { courseId: course.id },
+        params: { courseId: course.id, lectureId: "1" },
       })
     },
 

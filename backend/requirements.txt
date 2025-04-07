@@ -36,8 +36,7 @@ langchain-google-genai==0.0.11
 langchain-postgres==0.0.1
 
 # Monitoring
-psutil==5.9.5
-redis==5.0.1
+loguru==0.7.0
 
 # Optional - remove for smaller deployment
 # pymupdf==1.23.8  # Only needed for PDF processing
