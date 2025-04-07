@@ -119,14 +119,13 @@ export default {
         this.allCourses = [];
         
         // Use try-catch for the API call to properly handle errors
-        await this.courseStore.getFacultyCourses();
+        const response = await this.courseStore.getUserCourses();
         
-        // Access the courses from the store directly
-        if (this.courseStore.courses && this.courseStore.courses.length > 0) {
-          this.allCourses = [...this.courseStore.courses];
+        if (response && response.data && response.data.length > 0) {
+          this.allCourses = response.data;
           console.log(`Loaded ${this.allCourses.length} courses for support notifications`);
         } else {
-          console.log('No courses available in the course store');
+          console.log('No courses available in the response');
         }
       } catch (error) {
         console.error('Failed to load courses for support:', error);
