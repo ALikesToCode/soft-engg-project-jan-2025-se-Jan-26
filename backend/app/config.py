@@ -90,5 +90,10 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> List[str]:
         return self.ALLOWED_ORIGINS.split(",")
+        
+    @property
+    def DEBUG(self) -> bool:
+        """Return True if the environment is development."""
+        return self.ENV.lower() == "development"
 
 settings = Settings()

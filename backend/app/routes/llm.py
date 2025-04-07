@@ -41,6 +41,7 @@ class LLMResponse(BaseModel):
     content: str
     function_calls: Optional[List[FunctionCall]] = None
     function_results: Optional[List[FunctionResult]] = None
+    raw_tool_calls: Optional[List[Dict[str, Any]]] = None
 
 # Vector store retrieval function
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -217,131 +218,144 @@ async def chat(request: LLMRequest, req: Request, current_user: Optional[Dict[st
         
         # Process the response from the LLM
         try:
-            # Extract content from the response
-            content = response.content if hasattr(response, "content") else "I couldn't generate a proper response."
-            
-            # Extract function calls from additional_kwargs if they exist
+            # Initialize empty lists for function calls and results
             function_calls = []
             function_results = []
             
-            if hasattr(response, "additional_kwargs") and "function_calls" in response.additional_kwargs:
-                function_calls = response.additional_kwargs["function_calls"]
-                logger.info(f"Function calls detected: {function_calls}")
+            # Extract content from the response
+            content = response.content if hasattr(response, "content") else "I couldn't generate a proper response."
+            
+            # Check for function calls in additional_kwargs
+            if hasattr(response, "additional_kwargs"):
+                # Handle multiple function call formats - first check for function_calls
+                if "function_calls" in response.additional_kwargs:
+                    # This is our standardized format from call_llm
+                    func_calls = response.additional_kwargs.get("function_calls", [])
+                    logger.info(f"Found standardized function_calls: {func_calls}")
+                    
+                    for func_call in func_calls:
+                        function_call = FunctionCall(
+                            name=func_call.get("name", ""),
+                            arguments=func_call.get("arguments", {})
+                        )
+                        function_calls.append(function_call)
                 
-                # Execute the function calls if they exist
-                user_role = None
-                if current_user:
-                    user_role = current_user.get("role")
+                # Next check for OpenAI format tool_calls
+                elif "tool_calls" in response.additional_kwargs:
+                    tool_calls = response.additional_kwargs.get("tool_calls", [])
+                    logger.info(f"Found OpenAI-format tool_calls in additional_kwargs: {tool_calls}")
+                    
+                    for tool_call in tool_calls:
+                        if isinstance(tool_call, dict):
+                            # Check for Google/OpenAI format with function inside tool_call
+                            if "function" in tool_call:
+                                function_info = tool_call["function"]
+                                function_name = function_info.get("name", "")
+                                
+                                # Parse arguments - could be string or dict
+                                args_raw = function_info.get("arguments", "{}")
+                                if isinstance(args_raw, str):
+                                    try:
+                                        args_dict = json.loads(args_raw)
+                                    except json.JSONDecodeError:
+                                        logger.error(f"Failed to parse arguments: {args_raw}")
+                                        args_dict = {}
+                                else:
+                                    args_dict = args_raw
+                                
+                                function_call = FunctionCall(
+                                    name=function_name,
+                                    arguments=args_dict
+                                )
+                                function_calls.append(function_call)
+                                
+                                # Add the raw tool call to the response for client-side use
+                                if "raw_tool_calls" not in response.additional_kwargs:
+                                    response.additional_kwargs["raw_tool_calls"] = []
+                                response.additional_kwargs["raw_tool_calls"].append(tool_call)
                 
-                # Execute each function and collect results
+                # Finally check for single function_call (legacy format)
+                elif "function_call" in response.additional_kwargs:
+                    function_call_info = response.additional_kwargs.get("function_call", {})
+                    logger.info(f"Found legacy function_call format: {function_call_info}")
+                    
+                    function_name = function_call_info.get("name", "")
+                    args_raw = function_call_info.get("arguments", "{}")
+                    
+                    # Parse arguments - could be string or dict
+                    if isinstance(args_raw, str):
+                        try:
+                            args_dict = json.loads(args_raw)
+                        except json.JSONDecodeError:
+                            logger.error(f"Failed to parse arguments: {args_raw}")
+                            args_dict = {}
+                    else:
+                        args_dict = args_raw
+                    
+                    function_call = FunctionCall(
+                        name=function_name,
+                        arguments=args_dict
+                    )
+                    function_calls.append(function_call)
+            
+            # If we have function calls, execute them
+            if function_calls:
+                logger.info(f"Executing {len(function_calls)} function calls")
+                
+                # Get user role for authorization
+                user_role = current_user.get("role") if current_user else "anonymous"
+                
                 for function_call in function_calls:
                     try:
-                        # Get function name
-                        backend_function_name = function_call["name"]
-                        
-                        # Convert camelCase to snake_case if needed for backend
-                        import re
-                        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', backend_function_name)
-                        backend_function_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+                        # Log the function call attempt
+                        logger.info(f"Executing function: {function_call.name} with args: {function_call.arguments}")
                         
                         # Execute the function
-                        logger.info(f"Executing function: {backend_function_name} with args: {function_call['arguments']}")
                         result = await function_router.execute_function(
-                            backend_function_name, 
-                            function_call["arguments"],
+                            function_call.name,
+                            function_call.arguments,
                             user_role
                         )
                         
-                        # Add the result to our list
-                        function_results.append({
-                            "name": function_call["name"],
-                            "result": result
-                        })
-                        
-                        logger.info(f"Function {function_call['name']} executed with result: {result}")
-                    except Exception as function_error:
-                        logger.error(f"Error executing function {function_call['name']}: {str(function_error)}")
-                        function_results.append({
-                            "name": function_call["name"],
-                            "result": {"error": str(function_error), "status": "error"}
-                        })
-            
-            # Also check for tool_calls format (depends on Gemini API version)
-            elif hasattr(response, "additional_kwargs") and "tool_calls" in response.additional_kwargs:
-                tool_calls = response.additional_kwargs["tool_calls"]
-                logger.info(f"Tool calls detected: {tool_calls}")
-                
-                # Execute each tool call
-                user_role = None
-                if current_user:
-                    user_role = current_user.get("role")
-                
-                for tool_call in tool_calls:
-                    try:
-                        # Extract function details
-                        if "function" in tool_call:
-                            func_details = tool_call["function"]
-                            func_name = func_details.get("name", "")
-                            
-                            # Parse arguments
-                            func_args = {}
-                            if "arguments" in func_details:
-                                try:
-                                    func_args = json.loads(func_details["arguments"])
-                                except json.JSONDecodeError:
-                                    logger.error(f"Error parsing arguments for function {func_name}")
-                                    func_args = {}
-                            
-                            # Convert camelCase to snake_case if needed
-                            import re
-                            s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', func_name)
-                            backend_func_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
-                            
-                            # Execute the function
-                            logger.info(f"Executing tool function: {backend_func_name} with args: {func_args}")
-                            result = await function_router.execute_function(
-                                backend_func_name,
-                                func_args,
-                                user_role
+                        # Add the result
+                        function_results.append(
+                            FunctionResult(
+                                name=function_call.name,
+                                result=result
                             )
-                            
-                            # Add to function calls and results
-                            function_call = {
-                                "name": func_name,
-                                "arguments": func_args
-                            }
-                            function_calls.append(function_call)
-                            
-                            function_results.append({
-                                "name": func_name,
-                                "result": result
-                            })
-                            
-                            logger.info(f"Tool function {func_name} executed with result: {result}")
-                    except Exception as tool_error:
-                        logger.error(f"Error executing tool: {str(tool_error)}")
-                        function_results.append({
-                            "name": tool_call.get("function", {}).get("name", "unknown"),
-                            "result": {"error": str(tool_error), "status": "error"}
-                        })
+                        )
+                        logger.info(f"Function {function_call.name} executed successfully")
+                    except Exception as e:
+                        logger.error(f"Error executing function {function_call.name}: {str(e)}")
+                        function_results.append(
+                            FunctionResult(
+                                name=function_call.name,
+                                result={"error": str(e)}
+                            )
+                        )
             
+            # Return the response with function calls and results
             return LLMResponse(
                 content=content,
                 function_calls=function_calls if function_calls else None,
-                function_results=function_results if function_results else None
+                function_results=function_results if function_results else None,
+                raw_tool_calls=response.additional_kwargs.get("raw_tool_calls") if hasattr(response, "additional_kwargs") and "raw_tool_calls" in response.additional_kwargs else None
             )
             
-        except Exception as processing_error:
-            logger.error(f"Error processing LLM response: {str(processing_error)}")
-            return LLMResponse(
-                content="I apologize, but I encountered an error while processing the response."
+        except Exception as process_error:
+            logger.error(f"Error processing LLM response: {str(process_error)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error processing response: {str(process_error)}"
             )
-            
+    
     except Exception as e:
-        logger.error(f"Unhandled error in chat endpoint: {str(e)}")
+        logger.error(f"Error in chat endpoint: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing chat request: {str(e)}"
+            detail=f"Server error: {str(e)}"
         )
 
 @router.get("/chat")
