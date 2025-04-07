@@ -28,6 +28,7 @@ class CourseNotification(Base):
             "message": self.message,
             "timestamp": self.timestamp.isoformat(),
             "course_id": str(self.course_id),
+            "user_id": str(self.sent_by),
         }
 
 # System Notification Model
@@ -52,6 +53,7 @@ class SystemNotification(Base):
             "title": self.title,
             "message": self.message,
             "timestamp": self.timestamp.isoformat(),
+            "user_id": str(self.sent_by),
         }
 
 # User Notification Status Model

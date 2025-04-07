@@ -10,7 +10,6 @@
           class="w-12 h-12 border-4 border-maroon-500 border-t-transparent rounded-full animate-spin mx-auto"
         ></div>
         <p class="mt-4 text-slate-200">Loading video...</p>
-        <p class="mt-2 text-sm text-slate-400 max-w-md break-all">{{ videoUrl }}</p>
       </div>
     </div>
 
@@ -36,7 +35,7 @@
           >
             Report Issue
           </button>
-          <button 
+          <button
             v-if="isYoutubeUrl"
             @click="openInNewTab"
             class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
@@ -61,7 +60,7 @@
       title="Video content"
       loading="lazy"
       sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
-      style="aspect-ratio: 16/9;"
+      style="aspect-ratio: 16/9"
     ></iframe>
 
     <!-- Standard Video Player (Non-YouTube) -->
@@ -151,7 +150,7 @@ const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2]
 export default {
   name: 'CourseVideoPlayer',
   emits: ['timeupdate', 'ended', 'video-complete', 'time-update', 'video-error'],
-  
+
   data() {
     return {
       volume: 1,
@@ -192,70 +191,73 @@ export default {
 
     // YouTube video detection and handling
     const isYoutubeUrl = computed(() => {
-      if (!props.videoUrl) return false;
-      return props.videoUrl.includes('youtube.com') || props.videoUrl.includes('youtu.be');
-    });
+      if (!props.videoUrl) return false
+      return props.videoUrl.includes('youtube.com') || props.videoUrl.includes('youtu.be')
+    })
 
     const youtubeEmbedUrl = computed(() => {
-      if (!isYoutubeUrl.value) return '';
-      
+      if (!isYoutubeUrl.value) return ''
+
       // Parse YouTube video ID from URL
-      let videoId = '';
-      
+      let videoId = ''
+
       // Handle full youtube.com URLs
       if (props.videoUrl.includes('youtube.com/watch')) {
         try {
-          const url = new URL(props.videoUrl);
-          videoId = url.searchParams.get('v');
+          const url = new URL(props.videoUrl)
+          videoId = url.searchParams.get('v')
         } catch (e) {
-          console.error('Invalid YouTube URL:', props.videoUrl);
-          const urlRegex = /[?&]v=([^&#]*)/i;
-          const match = props.videoUrl.match(urlRegex);
-          videoId = match && match[1] ? match[1] : '';
+          console.error('Invalid YouTube URL:', props.videoUrl)
+          const urlRegex = /[?&]v=([^&#]*)/i
+          const match = props.videoUrl.match(urlRegex)
+          videoId = match && match[1] ? match[1] : ''
         }
-      } 
+      }
       // Handle youtu.be short URLs
       else if (props.videoUrl.includes('youtu.be')) {
-        videoId = props.videoUrl.split('/').pop().split('?')[0];
+        videoId = props.videoUrl.split('/').pop().split('?')[0]
       }
 
       if (!videoId) {
-        console.error('Could not extract YouTube video ID from URL:', props.videoUrl);
-        return '';
+        console.error('Could not extract YouTube video ID from URL:', props.videoUrl)
+        return ''
       }
 
       // Create embed URL with additional parameters for better performance and security
-      return `https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&autoplay=0&rel=0&modestbranding=1&hl=en&color=white`;
-    });
+      return `https://www.youtube-nocookie.com/embed/${videoId}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&autoplay=0&rel=0&modestbranding=1&hl=en&color=white`
+    })
 
     const handleYoutubeLoad = () => {
-      console.log('YouTube video loaded');
-      loading.value = false;
-      error.value = null;
-    };
+      console.log('YouTube video loaded')
+      loading.value = false
+      error.value = null
+    }
 
     const handleYoutubeError = (e) => {
-      console.error('YouTube embed error:', e);
-      error.value = 'Failed to load YouTube video. Please try opening it directly on YouTube.';
-      loading.value = false;
-      emit('video-error', error.value);
-    };
+      console.error('YouTube embed error:', e)
+      error.value = 'Failed to load YouTube video. Please try opening it directly on YouTube.'
+      loading.value = false
+      emit('video-error', error.value)
+    }
 
     const openInNewTab = () => {
       if (props.videoUrl) {
-        window.open(props.videoUrl, '_blank');
+        window.open(props.videoUrl, '_blank')
       }
-    };
+    }
 
     // Watch for URL changes to reset states
-    watch(() => props.videoUrl, (newUrl) => {
-      if (newUrl) {
-        loading.value = true;
-        error.value = null;
-        videoCompleted.value = false;
-        console.log('Video URL changed, resetting player state:', newUrl);
-      }
-    });
+    watch(
+      () => props.videoUrl,
+      (newUrl) => {
+        if (newUrl) {
+          loading.value = true
+          error.value = null
+          videoCompleted.value = false
+          console.log('Video URL changed, resetting player state:', newUrl)
+        }
+      },
+    )
 
     // Cache management
     const cacheKey = computed(() => `${VIDEO_CACHE_PREFIX}${props.videoUrl}`)
@@ -267,10 +269,10 @@ export default {
           const data = JSON.parse(cached)
           if (Date.now() - data.timestamp < CACHE_DURATION) {
             savedTime.value = data.currentTime
-            
+
             // Set video position
             if (videoPlayer.value) {
-              videoPlayer.value.currentTime = savedTime.value;
+              videoPlayer.value.currentTime = savedTime.value
             }
           } else {
             localStorage.removeItem(cacheKey.value)
@@ -309,17 +311,21 @@ export default {
       if (!videoPlayer.value) return
       currentTime.value = videoPlayer.value.currentTime
       progress.value = (currentTime.value / duration.value) * 100
-      
+
       // Emit time update for parent component
       emit('time-update', currentTime.value)
-      
+
       // Save progress every 5 seconds
       if (Math.floor(currentTime.value) % 5 === 0) {
         saveVideoProgress()
       }
-      
+
       // Auto-mark as complete when watched 90% of the video
-      if (!videoCompleted.value && duration.value > 0 && currentTime.value >= duration.value * 0.9) {
+      if (
+        !videoCompleted.value &&
+        duration.value > 0 &&
+        currentTime.value >= duration.value * 0.9
+      ) {
         videoCompleted.value = true
         emit('video-complete')
       }
@@ -327,7 +333,7 @@ export default {
 
     const handleVideoEnd = () => {
       isPlaying.value = false
-      
+
       // Emit video completed event
       if (!videoCompleted.value) {
         videoCompleted.value = true
@@ -337,56 +343,56 @@ export default {
     }
 
     const handleError = (e) => {
-      console.error('Video error details:', e);
-      
+      console.error('Video error details:', e)
+
       // Check if video element is available
       if (videoPlayer.value) {
-        console.error('Video error code:', videoPlayer.value.error?.code);
-        console.error('Video error message:', videoPlayer.value.error?.message);
+        console.error('Video error code:', videoPlayer.value.error?.code)
+        console.error('Video error message:', videoPlayer.value.error?.message)
       }
-      
+
       // Different error messages based on error code
       const errorMessages = {
         1: 'The video playback was aborted',
         2: 'Network error - please check your connection',
         3: 'Video decoding failed - the format may not be supported',
-        4: 'Video is not available or has been removed'
-      };
-      
-      const errorCode = videoPlayer.value?.error?.code || 0;
-      const defaultMessage = 'Failed to load video. Please try again.';
-      
-      error.value = errorMessages[errorCode] || defaultMessage;
-      loading.value = false;
-      
+        4: 'Video is not available or has been removed',
+      }
+
+      const errorCode = videoPlayer.value?.error?.code || 0
+      const defaultMessage = 'Failed to load video. Please try again.'
+
+      error.value = errorMessages[errorCode] || defaultMessage
+      loading.value = false
+
       // Additional debugging
-      console.log('Attempted to load video URL:', props.videoUrl);
-      
+      console.log('Attempted to load video URL:', props.videoUrl)
+
       // Test if URL is accessible
-      testVideoUrl();
-      
+      testVideoUrl()
+
       // Emit the error event to the parent component
-      emit('video-error', error.value);
-    };
-    
+      emit('video-error', error.value)
+    }
+
     const testVideoUrl = () => {
-      if (!props.videoUrl) return;
-      
-      const xhr = new XMLHttpRequest();
-      xhr.open('HEAD', props.videoUrl, true);
+      if (!props.videoUrl) return
+
+      const xhr = new XMLHttpRequest()
+      xhr.open('HEAD', props.videoUrl, true)
       xhr.onreadystatechange = () => {
         if (xhr.readyState === 4) {
-          console.log('Video URL response status:', xhr.status);
-          console.log('Video URL response headers:', xhr.getAllResponseHeaders());
-          
+          console.log('Video URL response status:', xhr.status)
+          console.log('Video URL response headers:', xhr.getAllResponseHeaders())
+
           if (xhr.status >= 400) {
-            error.value = `Video unavailable (HTTP ${xhr.status}). Please contact support.`;
-            emit('video-error', error.value);
+            error.value = `Video unavailable (HTTP ${xhr.status}). Please contact support.`
+            emit('video-error', error.value)
           }
         }
-      };
-      xhr.send();
-    };
+      }
+      xhr.send()
+    }
 
     // Player controls
     const togglePlay = () => {
@@ -430,7 +436,7 @@ export default {
     const toggleFullscreen = async () => {
       const container = document.querySelector('.aspect-video')
       if (!container) return
-      
+
       try {
         if (document.fullscreenElement) {
           await document.exitFullscreen()
@@ -456,7 +462,7 @@ export default {
       error.value = null
       loading.value = true
       videoCompleted.value = false
-      
+
       // Reset video element
       if (videoPlayer.value) {
         videoPlayer.value.load()
@@ -475,22 +481,22 @@ export default {
         // Only process messages from YouTube
         if (event.origin.includes('youtube.com') || event.origin.includes('youtube-nocookie.com')) {
           try {
-            const data = JSON.parse(event.data);
-            
+            const data = JSON.parse(event.data)
+
             // YouTube API event for video state changes
             if (data.event === 'onStateChange' && data.info === 0) {
               // State 0 means the video has ended
-              handleVideoEnd();
+              handleVideoEnd()
             } else if (data.event === 'infoDelivery' && data.info && data.info.playerState === 0) {
               // Alternative way to detect video end
-              handleVideoEnd();
+              handleVideoEnd()
             }
           } catch (e) {
             // Not a JSON message or other error, ignore
           }
         }
-      });
-    };
+      })
+    }
 
     // Cleanup
     onBeforeUnmount(() => {
@@ -501,8 +507,8 @@ export default {
     })
 
     onMounted(() => {
-      setupYouTubeCompletionTracking();
-    });
+      setupYouTubeCompletionTracking()
+    })
 
     return {
       videoPlayer,
@@ -535,9 +541,9 @@ export default {
       retryLoading,
       reportIssue,
       testVideoUrl,
-      videoCompleted
+      videoCompleted,
     }
-  }
+  },
 }
 </script>
 

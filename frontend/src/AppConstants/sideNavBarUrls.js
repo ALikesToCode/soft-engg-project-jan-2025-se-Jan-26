@@ -10,11 +10,6 @@ const studentDashboardUrls = [
         label: 'Courses'
     },
     {
-        path: '/user/notifications',
-        icon: 'notifications',
-        label: 'Notifications'
-    },
-    {
         path: '/user/course-history',
         icon: 'history',
         label: 'History'

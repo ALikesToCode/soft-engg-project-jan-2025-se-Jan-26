@@ -45,7 +45,7 @@ async def get_unique_course_code(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@course_router.get("/courses", response_model=list[dict],
+@course_router.get("/faculty/courses", response_model=list[dict],
     summary="Get faculty's courses",
     description="Retrieves all courses taught by the faculty",
     response_description="List of courses",

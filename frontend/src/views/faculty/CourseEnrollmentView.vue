@@ -158,7 +158,7 @@
                     <div class="flex items-center">
                       <div class="flex-shrink-0 h-10 w-10">
                         <img
-                          :src="student.avatar"
+                          :src="student.picture"
                           referrerpolicy="no-referrer"
                           class="h-10 w-10 rounded-full"
                           alt=""
@@ -185,7 +185,7 @@
                     >
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800">
-                    {{ formatDate(student.last_activity) }}
+                    {{ student.last_activity }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
@@ -293,7 +293,7 @@ export default {
         //   api.get('/courses/' + courseId.value + '/students'),
         //   api.get('/courses/' + courseId.value + '/progress'),
         // ])
-        const studentsResponse = await api.get('/courses/' + courseId.value + '/student')
+        const studentsResponse = await api.get('/courses/' + courseId.value + '/students')
         const progressResponse = await api.get('/courses/' + courseId.value + '/progress')
 
         // Combine student data with progress data

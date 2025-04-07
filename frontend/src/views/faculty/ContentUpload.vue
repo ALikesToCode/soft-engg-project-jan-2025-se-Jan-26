@@ -132,12 +132,12 @@
 
               <!-- Action Buttons -->
               <div class="flex justify-between mt-6">
-                <button
+                <!-- <button
                   @click="saveAsDraft"
                   class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Save as Draft
-                </button>
+                </button> -->
                 <button
                   v-if="!isExistingData"
                   @click="publishContent"

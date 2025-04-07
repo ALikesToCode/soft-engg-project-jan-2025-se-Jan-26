@@ -62,7 +62,7 @@ export default {
       ],
       bookmarkedMaterials: [],
       isDevelopment: import.meta.env.VITE_NODE_ENV === 'development',
-      notifications: []
+      notifications: [],
     }
   },
   components: {
@@ -83,7 +83,7 @@ export default {
     },
     authStore() {
       return useAuthStore()
-    }
+    },
   },
   methods: {
     showSuccessToast(msg) {
@@ -117,7 +117,7 @@ export default {
     },
     toggleSplitScreen() {
       this.showSplitScreen = !this.showSplitScreen
-      
+
       // If we're closing split screen, ensure chat is also closed
       if (!this.showSplitScreen && this.chatStore.isOpen) {
         this.chatStore.closeChat()
@@ -125,18 +125,18 @@ export default {
     },
     activateChat() {
       // Directly open the chat without setTimeout
-      const chatStore = useChatStore();
+      const chatStore = useChatStore()
       // First make sure we have a valid selected chat
       if (chatStore.chatHistory.length > 0 && !chatStore.currentChatId) {
-        chatStore.setCurrentChat(chatStore.chatHistory[0].id);
+        chatStore.setCurrentChat(chatStore.chatHistory[0].id)
       } else if (chatStore.chatHistory.length === 0) {
         // Create a new chat if there are none
-        chatStore.startNewChat("New Conversation");
+        chatStore.startNewChat('New Conversation')
       }
-      
+
       // Open the chat - use direct property access instead of the method
-      chatStore.isOpen = true;
-      console.log("Chat activated from dashboard, open state:", chatStore.isOpen);
+      chatStore.isOpen = true
+      console.log('Chat activated from dashboard, open state:', chatStore.isOpen)
     },
     //API calls
     async getRecommendedCourses() {
@@ -220,18 +220,18 @@ export default {
         console.log('User not logged in, skipping notifications')
         return
       }
-      
+
       console.log('Getting notifications')
       try {
         // Don't pass custom headers, let the API interceptor handle authorization
         FacultyNotificationService.getRecentNotifications()
-          .then(response => {
+          .then((response) => {
             if (response && response.data) {
               this.notifications = response.data.slice(0, 5) // Get only the first 5 notifications
               console.log('Loaded notifications:', this.notifications)
             }
           })
-          .catch(error => {
+          .catch((error) => {
             console.error('Failed to load notifications:', error)
           })
       } catch (error) {
@@ -254,18 +254,18 @@ export default {
         'bg-orange-100 text-orange-800': priority === 'high',
         'bg-red-100 text-red-800': priority === 'urgent',
       }
-    }
+    },
   },
 
   mounted() {
-    this.getRecommendedCourses();
-    this.getBookMarkedMaterials();
-    this.getNotifications();
+    this.getRecommendedCourses()
+    this.getBookMarkedMaterials()
+    this.getNotifications()
 
     // Make sure the GlobalChat component from App.vue is initialized
-    const chatStore = useChatStore();
+    const chatStore = useChatStore()
     if (!chatStore.initialized) {
-      chatStore.initialize();
+      chatStore.initialize()
     }
   },
 
@@ -275,7 +275,7 @@ export default {
     const toast = useToast()
     const isLoading = ref(false)
     const userInfo = ref({
-      name: 'User'
+      name: 'User',
     })
 
     const loadNotifications = async () => {
@@ -366,8 +366,8 @@ export default {
 
     return {
       userInfo,
-      notifications,
-      courses,
+      // notifications,
+      // courses,
       isLoading,
       formatTime,
       getNotificationTypeClass,
@@ -388,8 +388,11 @@ export default {
       <div class="flex-1 p-6 overflow-y-auto bg-gray-50">
         <div class="max-w-7xl mx-auto">
           <!-- Alert Message -->
-          <AlertMessage v-if="showAlertMessage" message="This material doesn't have a learning path or tutorial yet." />
-          
+          <AlertMessage
+            v-if="showAlertMessage"
+            message="This material doesn't have a learning path or tutorial yet."
+          />
+
           <!-- Loading Spinner -->
           <LoadingSpinner v-if="isDataLoading" />
 
@@ -502,7 +505,7 @@ export default {
         </div>
       </div>
     </div>
-    
+
     <!-- Floating Chat Toggle Button -->
     <button
       v-if="!chatStore.isOpen && !showSplitScreen"
@@ -510,7 +513,9 @@ export default {
       class="fixed bottom-6 right-6 bg-maroon-600 text-white rounded-full p-4 shadow-lg hover:bg-maroon-700 transition-all z-[100] group"
     >
       <span class="material-icons">chat</span>
-      <span class="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-3 py-1 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+      <span
+        class="absolute right-full mr-3 top-1/2 -translate-y-1/2 px-3 py-1 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
+      >
         Ask Learning Assistant
       </span>
     </button>

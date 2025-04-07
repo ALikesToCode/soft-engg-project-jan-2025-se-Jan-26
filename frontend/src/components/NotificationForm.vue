@@ -183,7 +183,7 @@
       <!-- Schedule Options -->
       <div class="space-y-4">
         <label class="block text-sm font-medium text-gray-900">Schedule</label>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-1 gap-4">
           <button
             @click="scheduleType = 'now'"
             class="p-4 rounded-lg border-2 transition-all duration-200 flex items-center"
@@ -209,7 +209,7 @@
             </div>
           </button>
 
-          <button
+          <!-- <button
             @click="scheduleType = 'schedule'"
             class="p-4 rounded-lg border-2 transition-all duration-200 flex items-center"
             :class="[
@@ -232,7 +232,7 @@
               <div class="font-medium text-gray-900">Schedule</div>
               <div class="text-sm text-gray-600">Send at a specific date & time</div>
             </div>
-          </button>
+          </button> -->
         </div>
 
         <!-- Schedule DateTime -->

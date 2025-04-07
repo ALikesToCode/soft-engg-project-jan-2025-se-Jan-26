@@ -18,7 +18,32 @@ class NotificationService:
     @staticmethod
     async def get_user_notification(db: AsyncSession, user_id: UUID):
         logger.info("Just entered in get_user_notification in NotificationService class")
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        logger.info(f"User found with id = {user_id} and role = {user.role}")
         try:
+
+            if user.role.lower() in ['faculty', 'support']:
+                # list of notifications for faculty or support users
+                notifications = await NotificationService.get_recent_notifications_for_faculty_or_support(db, user_id)
+                response = []
+                for notif in notifications:
+                    logger.info(f"notification ===== {notif}")
+                    response.append({
+                        "user_id": notif["user_id"],
+                        "notification_id": notif["id"],
+                        "read": False,
+                        "notification_type": notif["type"],
+                        "priority": notif["priority"],
+                        "category": notif["category"],
+                        "title": notif["title"],
+                        "message": notif["message"],
+                        "timestamp": notif["timestamp"],
+                        "course_id": notif.get("course_id")
+                    })
+                logger.info(f"{user.role} Notification fetched successfully...")
+                return response
+
             # Fetch user notifications
             result = await db.execute(select(UserNotificationStatus).where(UserNotificationStatus.user_id == user_id))
             user_notifications = result.scalars().all()
@@ -237,7 +262,11 @@ class NotificationService:
     @staticmethod
     async def markNotificationAsRead(notification_id: int, type:str, db: AsyncSession,user_id:UUID):
         logger.info(f"In markNotificationAsRead in NotificationService class with id = {notification_id}, type={type}")
-        
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() in ['faculty', 'support']:
+            logger.info(f"For faculty this feature is not available")
+            raise HTTPException(status_code=404, detail="Feature not available for faculty/support users")
         if not isinstance(type, str) or type.lower() not in ['system', 'course']:
             raise ValueError("Notification type is invalid")
         
@@ -310,6 +339,12 @@ class NotificationService:
     async def markAllNotificationAsRead(notifications: List[Dict[str, str]], db: AsyncSession, user_id: str):
         logger.info("Inside markAllNotificationAsRead in NotificationService")
         
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalars().first()
+        if user.role.lower() in ['faculty', 'support']:
+            logger.info(f"For faculty this feature is not available")
+            raise HTTPException(status_code=404, detail="Feature not available for faculty/support users")
+
         if not isinstance(type, str) or type.lower() not in ['system', 'course']:
             raise ValueError("Notification type is invalid")
         try:

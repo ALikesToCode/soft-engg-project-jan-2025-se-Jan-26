@@ -184,15 +184,15 @@ async def get_course_progress(
         return [
             StudentProgress(
                 student_id=str(row[0]),
-                progress=row[1] or 0,  # Default to 0 if None
+                progress=row[1] or str(0),  # Default to 0 if None
                 last_activity=row[2],
                 completed_assignments=row[3],
                 total_assignments=row[4]
             ) for row in result.fetchall()
         ]
         
-    except HTTPException:
-        raise
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.error(f"Error retrieving progress data for course {course_id}: {str(e)}", exc_info=True)
         raise HTTPException(

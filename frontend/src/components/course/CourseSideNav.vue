@@ -1,9 +1,9 @@
 <template>
   <div>
     <!-- Mobile Toggle Button - Only visible on small screens -->
-    <button 
+    <button
       v-if="isCollapsible"
-      @click="toggleSidebar" 
+      @click="toggleSidebar"
       class="lg:hidden fixed bottom-4 right-4 z-50 rounded-full bg-maroon-600 text-white p-3 shadow-lg hover:bg-maroon-700 transition-all duration-300"
       aria-label="Toggle course navigation"
     >
@@ -17,13 +17,19 @@
       class="fixed lg:relative inset-y-0 left-0 z-40 bg-slate-50 border-r border-slate-200 overflow-y-auto transition-all duration-300 h-full transform lg:transform-none"
       :class="[
         isCollapsed ? '-translate-x-full' : 'translate-x-0',
-        isCollapsible ? 'w-full sm:w-3/4 md:w-2/3 lg:w-80 xl:w-96' : 'w-full lg:w-80 xl:w-96'
+        isCollapsible ? 'w-full sm:w-3/4 md:w-2/3 lg:w-80 xl:w-96' : 'w-full lg:w-80 xl:w-96',
       ]"
     >
       <!-- Mobile Header - Only visible on small screens when sidebar is open -->
-      <div v-if="isCollapsible" class="lg:hidden flex items-center justify-between p-4 border-b border-slate-200">
+      <div
+        v-if="isCollapsible"
+        class="lg:hidden flex items-center justify-between p-4 border-b border-slate-200"
+      >
         <h2 class="text-lg font-bold text-slate-900">Course Navigation</h2>
-        <button @click="toggleSidebar" class="p-2 rounded-full hover:bg-slate-200 transition-colors">
+        <button
+          @click="toggleSidebar"
+          class="p-2 rounded-full hover:bg-slate-200 transition-colors"
+        >
           <span class="material-symbols-outlined">close</span>
         </button>
       </div>
@@ -33,9 +39,9 @@
         <div class="mb-6 space-y-4">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-bold text-slate-900">Course Journey</h2>
-            <span class="text-sm text-slate-600 font-medium bg-slate-100 px-3 py-1 rounded-full">
+            <!-- <span class="text-sm text-slate-600 font-medium bg-slate-100 px-3 py-1 rounded-full">
               {{ completedLectureCount }}/{{ totalLectures }} lessons
-            </span>
+            </span> -->
           </div>
           <div class="relative w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
             <div
@@ -65,19 +71,22 @@
                 </p>
               </div>
               <div class="flex items-center space-x-2">
-                <div class="w-16 h-8 bg-maroon-50 rounded-lg flex items-center justify-center">
-                  <span class="text-sm font-medium text-maroon-600">{{ getWeekProgress(week) }}%</span>
-                </div>
+                <!-- <div class="w-16 h-8 bg-maroon-50 rounded-lg flex items-center justify-center">
+                  <span class="text-sm font-medium text-maroon-600"
+                    >{{ getWeekProgress(week) }}%</span
+                  >
+                </div> -->
                 <span
                   class="material-symbols-outlined text-maroon-400 transition-transform duration-300 transform group-hover:text-maroon-600"
                   :class="[week.isExpanded ? 'rotate-180' : '']"
-                >expand_more</span>
+                  >expand_more</span
+                >
               </div>
             </div>
 
             <!-- Week Lectures -->
-            <div 
-              v-show="week.isExpanded" 
+            <div
+              v-show="week.isExpanded"
               class="border-t border-slate-100 pt-2 transition-all duration-300"
             >
               <div
@@ -99,9 +108,12 @@
                             ' hover:' +
                             getActivityIcon(lecture.type).color,
                     ]"
-                  >{{
-                    lecture.completed ? 'check_circle' : getActivityIcon(lecture.type).materialIcon
-                  }}</span>
+                    >{{
+                      lecture.completed
+                        ? 'check_circle'
+                        : getActivityIcon(lecture.type).materialIcon
+                    }}</span
+                  >
                 </div>
                 <div class="ml-3 flex-grow">
                   <h4 class="text-sm font-medium text-slate-900">{{ lecture.title }}</h4>
@@ -124,7 +136,9 @@
                       v-if="lecture.materials?.length"
                       class="flex items-center space-x-1 text-slate-500 text-xs"
                     >
-                      <span class="material-symbols-outlined text-maroon-400 text-sm">attach_file</span>
+                      <span class="material-symbols-outlined text-maroon-400 text-sm"
+                        >attach_file</span
+                      >
                       <span>{{ lecture.materials.length }}</span>
                     </div>
                   </div>
@@ -135,10 +149,10 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Backdrop overlay for mobile - only visible when sidebar is open on mobile -->
-    <div 
-      v-if="isCollapsible && !isCollapsed" 
+    <div
+      v-if="isCollapsible && !isCollapsed"
       class="fixed inset-0 bg-slate-900/50 z-30 lg:hidden"
       @click="toggleSidebar"
     ></div>
@@ -172,7 +186,7 @@ export default {
     isCollapsible: {
       type: Boolean,
       default: true,
-    }
+    },
   },
   emits: ['select-lecture', 'toggle'],
   computed: {
@@ -182,23 +196,23 @@ export default {
   },
   methods: {
     toggleSidebar() {
-      this.$emit('toggle');
+      this.$emit('toggle')
     },
     toggleWeek(week) {
       // Use Vue.set for reactivity with arrays/objects
-      week.isExpanded = !week.isExpanded;
+      week.isExpanded = !week.isExpanded
     },
     selectLecture(lecture) {
-      this.$emit('select-lecture', lecture);
-      
+      this.$emit('select-lecture', lecture)
+
       // On mobile, automatically collapse the sidebar after selection
       if (this.isCollapsible && window.innerWidth < 1024) {
-        this.$emit('toggle');
+        this.$emit('toggle')
       }
     },
     getWeekProgress(week) {
-      if (!week.lectures || week.lectures.length === 0) return 0;
-      
+      if (!week.lectures || week.lectures.length === 0) return 0
+
       const completedInWeek = week.lectures.filter((lecture) =>
         this.completedLectures.includes(lecture.id),
       ).length
@@ -253,17 +267,17 @@ export default {
   mounted() {
     // Expand the week containing the selected lecture (if any)
     if (this.selectedLecture && this.weeks) {
-      const weekWithSelectedLecture = this.weeks.find(week => 
-        week.lectures.some(lecture => lecture.id === this.selectedLecture.id)
-      );
-      
+      const weekWithSelectedLecture = this.weeks.find((week) =>
+        week.lectures.some((lecture) => lecture.id === this.selectedLecture.id),
+      )
+
       if (weekWithSelectedLecture) {
         this.$nextTick(() => {
-          weekWithSelectedLecture.isExpanded = true;
-        });
+          weekWithSelectedLecture.isExpanded = true
+        })
       }
     }
-  }
+  },
 }
 </script>
 

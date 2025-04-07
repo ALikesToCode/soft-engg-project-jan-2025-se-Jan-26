@@ -44,8 +44,8 @@ export const useCourseStore = defineStore('course', () => {
       loading.value = true
       // Don't add custom headers, let the api interceptor handle the authorization
       // This was causing an issue with the cache busting timestamp
-      const response = await api.get('/courses', { 
-        params: { 
+      const response = await api.get('/faculty/courses', {
+        params: {
           _t: Date.now() // Explicitly add timestamp to prevent caching
         }
       })

@@ -82,6 +82,7 @@ async def get_all_courses(db: AsyncSession, user_id: uuid.UUID = None):
         List of Courses with their details
     """
     try:
+        logger.info("Inside get_all_courses function in course_service")
         if user_id:
             # Fetch all course objects for a specific faculty
             user_result = await db.execute(
@@ -838,7 +839,7 @@ class CourseService:
                 user_id=user_id,
                 title=bookmark_data.title,
                 type=bookmark_data.type,
-                date_bookmarked=datetime.datetime.now(UTC),
+                date_bookmarked=datetime.datetime.utcnow(),
                 author=bookmark_data.author,
                 course_id=bookmark_data.course_id,
             )
@@ -909,14 +910,20 @@ async def get_students_by_course(course_id: UUID, db: AsyncSession):
     try:            
         # Fetch all students for the given course and return as a list
         result = await db.execute(
-            select(User).join(CourseEnrollment)
-            .where(and_(
-                CourseEnrollment.course_id == course_id, 
-                CourseEnrollment.student_id == User.id
-            ))
+            select(User).join(CourseEnrollment, CourseEnrollment.student_id == User.id).where(
+                CourseEnrollment.course_id == course_id
+            )
         )
-        students = result.scalars().all()  
-        return [student.to_dict() for student in students]
+        students = result.scalars().all()
+        all_students = []
+        for student in students:
+            all_students.append({
+                "id": str(student.id),
+                "name": student.name,
+                "email": student.email,
+                "picture": student.picture,
+            })
+        return all_students
     except Exception as e:
         logger.error(f"Error fetching students for course {course_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Error fetching students")
