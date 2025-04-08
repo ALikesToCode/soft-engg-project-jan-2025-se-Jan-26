@@ -122,8 +122,10 @@ export const authService = {
             if (response.data.user && response.data.user.role) {
                 const originalRole = response.data.user.role;
                 const normalizedRole = originalRole.toUpperCase();
+                console.log(`AUTH SERVICE: Original role from backend: "${originalRole}", type: ${typeof originalRole}`);
+                console.log(`AUTH SERVICE: Normalized role: "${normalizedRole}"`);
                 localStorage.setItem('userRole', normalizedRole);
-                console.log(`User role from login: Original=${originalRole}, Normalized=${normalizedRole}`);
+                console.log(`AUTH SERVICE: Saved userRole to localStorage: "${localStorage.getItem('userRole')}"`);
             } else {
                 console.warn('No role found in login response user object');
             }
@@ -162,51 +164,46 @@ export const authService = {
     // Get current user
     async getCurrentUser() {
         try {
-            logger.log('Getting current user...');
-            // Check if token exists before making the request
+            // Check if we already have the user data in cache
+            if (this._cachedUserData) {
+                logger.debug('Returning cached user data');
+                return this._cachedUserData;
+            }
+            
+            // Get auth token
             const token = localStorage.getItem('token');
             if (!token) {
-                logger.warn('No token found in localStorage');
+                logger.warn('No auth token found in localStorage');
                 return null;
             }
-
-            // Log token details in development mode
-            if (isDev) {
-                this.debugTokenStatus();
-            }
-
-            // Clear any cached user data to ensure fresh fetch
-            if (this._cachedUserData) {
-                logger.debug('Clearing cached user data');
-                this._cachedUserData = null;
-            }
-
-            // Make the request to the backend
+            
+            // Fetch user profile
             try {
-                // The correct endpoint should be /user/profile (not using /api/v1)
-                const response = await this.axiosInstance.get('/user/profile');
-                logger.log('Current user data retrieved successfully');
+                console.log('Fetching current user profile...');
+                const response = await this.axiosInstance.get('/users/me');
+                logger.debug('Raw user profile response:', response.data);
                 
-                if (!response.data) {
-                    logger.warn('User profile API returned empty response');
-                    return null;
-                }
+                console.log('AUTH SERVICE: Raw user profile data:', JSON.stringify(response.data, null, 2));
                 
-                // Log the original data for debugging
-                logger.debug('Raw user data from API:', response.data);
-                
-                // Create a well-formed user object with consistent properties
-                const userData = {
-                    id: response.data.id || '',
-                    email: response.data.email || '',
-                    name: response.data.name || '',
-                    role: (response.data.role || 'student').toUpperCase(),
-                    has_password: response.data.has_password || false,
-                    // Add any other properties that might be used
+                // Extract and normalize user data
+                let userData = {
+                    id: response.data.id,
+                    name: response.data.name || 'User',
+                    email: response.data.email,
+                    role: response.data.role || 'STUDENT', // Default role
+                    is_google_user: response.data.is_google_user,
+                    has_password: true // Assume true since user was retrieved
                 };
                 
-                // Normalize the role to uppercase
-                logger.debug(`Setting normalized role in localStorage: ${userData.role}`);
+                // Always normalize role to uppercase for frontend consistency
+                if (userData.role) {
+                    userData.role = userData.role.toUpperCase();
+                }
+                
+                console.log('AUTH SERVICE: Normalized user data:', JSON.stringify(userData, null, 2));
+                console.log(`AUTH SERVICE: User role after normalization: "${userData.role}"`);
+                
+                // Store role in localStorage for navigation guards
                 localStorage.setItem('userRole', userData.role);
                 
                 // Cache the user data for subsequent calls within the same session

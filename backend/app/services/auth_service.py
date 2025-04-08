@@ -10,6 +10,7 @@ from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 import logging
 import uuid
+from datetime import datetime, UTC
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -188,7 +189,6 @@ async def get_or_create_user(db: AsyncSession, user_data: dict) -> User:
             
             # Create a new user using direct SQL
             user_id = uuid.uuid4()
-            from datetime import datetime, UTC
             now = datetime.now(UTC)
             
             await db.execute(
@@ -199,7 +199,7 @@ async def get_or_create_user(db: AsyncSession, user_data: dict) -> User:
                 {
                     "id": user_id,
                     "email": email,
-                    "name": user_data.get("name", ""),
+                    "name": user_data.get("name", email.split("@")[0]),
                     "hashed_password": "",
                     "is_google_user": True,
                     "picture": user_data.get("picture"),
@@ -214,13 +214,13 @@ async def get_or_create_user(db: AsyncSession, user_data: dict) -> User:
             new_user = User(
                 id=user_id,
                 email=email,
-                name=user_data.get("name", ""),
+                name=user_data.get("name", email.split("@")[0]),
                 hashed_password="",
                 is_google_user=True,
                 picture=user_data.get("picture"),
                 role=role,
-                created_at=now,
-                updated_at=now
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
             )
             
             return new_user
@@ -459,7 +459,6 @@ async def create_default_users(db: AsyncSession) -> None:
                 logger.info(f"Creating support user {support_email}")
                 hashed_password = pwd_context.hash("support123")
                 
-                from datetime import datetime, UTC
                 now = datetime.now(UTC)
                 
                 # Use direct SQL to avoid ORM issues
@@ -496,7 +495,6 @@ async def create_default_users(db: AsyncSession) -> None:
                 logger.info(f"Creating faculty user {faculty_email}")
                 hashed_password = pwd_context.hash("faculty123")
                 
-                from datetime import datetime, UTC
                 now = datetime.now(UTC)
                 
                 # Use direct SQL to avoid ORM issues

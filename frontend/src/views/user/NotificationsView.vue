@@ -196,12 +196,16 @@ export default {
     
     const loadCourses = async () => {
       try {
-        const response = await courseStore.getUserCourses()
+        const response = await courseStore.getUserCourses();
         if (response && response.data) {
-          courses.value = response.data
+          courses.value = response.data;
+          console.log(`Loaded ${courses.value.length} courses for user notifications`);
+        } else {
+          console.log('No courses available in the response');
         }
       } catch (error) {
-        console.error('Failed to load courses:', error)
+        console.error('Failed to load courses:', error);
+        toast.error('Failed to load courses');
       }
     }
     

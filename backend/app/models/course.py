@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint, LargeBinary, Float, Boolean
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Enum, Table, Text, UniqueConstraint, LargeBinary, Float, Boolean, Index
 from sqlalchemy.orm import relationship
 from app.database import Base, engine, UUID
 from app.models.assignment import Assignment
@@ -29,6 +29,26 @@ user_courses = Table(
 
 # Course Model
 class Course(Base):
+    """
+    Course model representing academic courses in the system.
+    
+    This model stores information about courses including their syllabus, 
+    enrollment details, status, and relationships to instructors and students.
+    
+    Attributes:
+        id: Unique UUID primary key for the course
+        name: Course name
+        code: Unique course code used for registration
+        title: Course title displayed to users
+        syllabus: Course syllabus document
+        description: Detailed course description
+        credits: Number of academic credits for the course
+        status: Current status of the course (DRAFT, ACTIVE, ARCHIVED)
+        faculty_id: ID of the faculty member teaching the course
+        created_by: ID of the user who created the course
+        created_at: Timestamp when the course record was created
+        updated_at: Timestamp when the course record was last updated
+    """
     __tablename__ = "courses"
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
@@ -65,40 +85,105 @@ class Course(Base):
     enrollments = relationship("CourseEnrollment", back_populates="course")
     assignments = relationship("Assignment", back_populates="course")
 
-    def to_dict(self):
-        return {
+    # Add indexes for frequently queried fields
+    __table_args__ = (
+        Index('idx_course_status', 'status'),
+        Index('idx_course_faculty', 'faculty_id'),
+        Index('idx_course_created_by', 'created_by'),
+        Index('idx_course_semester_year', 'semester', 'year'),
+    )
+
+    def to_dict(self, detail_level="basic"):
+        """
+        Convert course model to dictionary representation with configurable detail levels.
+        
+        Args:
+            detail_level (str): Level of detail to include:
+                - "basic": Only core information
+                - "standard": Standard course details
+                - "full": All course information including related objects
+        
+        Returns:
+            dict: Dictionary representation of the course
+        """
+        # Basic information always included
+        data = {
             "id": str(self.id),
             "name": self.name,
             "code": self.code,
             "title": self.title,
-            "syllabus": self.syllabus,
-            "description": self.description,
-            "credits": self.credits,
-            "duration": self.duration,
-            "semester": self.semester,
-            "year": self.year,
-            "status": self.status,
-            "start_date": self.start_date.isoformat() if self.start_date else None,
-            "end_date": self.end_date.isoformat() if self.end_date else None,
-            "enrollment_limit": self.enrollment_limit,
-            "waitlist_limit": self.waitlist_limit,
-            "capacity": self.capacity,
+            "status": self.status.value if hasattr(self.status, 'value') else self.status,
+            "faculty_id": str(self.faculty_id) if self.faculty_id else None,
             "enrolled_count": self.enrolled_count,
-            "image": self.image,
-            "level": self.level,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "faculty_id": str(self.faculty_id) if self.faculty_id else None
+            "capacity": self.capacity,
         }
+        
+        # Add standard details
+        if detail_level in ["standard", "full"]:
+            data.update({
+                "description": self.description,
+                "credits": self.credits,
+                "duration": self.duration,
+                "semester": self.semester,
+                "year": self.year,
+                "level": self.level,
+                "start_date": self.start_date.isoformat() if self.start_date else None,
+                "end_date": self.end_date.isoformat() if self.end_date else None,
+                "enrollment_limit": self.enrollment_limit,
+                "waitlist_limit": self.waitlist_limit,
+                "image": self.image,
+                "created_at": self.created_at.isoformat() if self.created_at else None,
+                "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            })
+        
+        # Add full details including relationships
+        if detail_level == "full":
+            if self.faculty:
+                data["faculty"] = {
+                    "id": str(self.faculty.id),
+                    "name": self.faculty.name,
+                    "email": self.faculty.email
+                }
+            
+            if self.modules:
+                data["modules"] = [module.to_dict() for module in self.modules]
+            
+            if self.assignments:
+                data["assignments"] = [
+                    {
+                        "id": str(assignment.id),
+                        "title": assignment.title,
+                        "due_date": assignment.due_date.isoformat() if assignment.due_date else None
+                    }
+                    for assignment in self.assignments
+                ]
+        
+        return data
 
 class CourseEnrollment(Base):
+    """
+    CourseEnrollment model tracking student enrollment in courses.
+    
+    This model stores information about a student's enrollment status,
+    grades, and progress in a specific course.
+    
+    Attributes:
+        id: Unique UUID primary key for the enrollment
+        course_id: ID of the course
+        student_id: ID of the enrolled student
+        user_id: ID of the user (same as student_id, kept for compatibility)
+        status: Current enrollment status (ENROLLED, COMPLETED, DROPPED, WAITLISTED)
+        enrollment_date: Date when the student enrolled
+        completion_date: Date when the student completed the course
+        grade: Student's grade in the course
+        progress: Student's progress percentage in the course
+    """
     __tablename__ = "course_enrollments"
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
     course_id = Column(UUID, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     student_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(UUID, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    # status = Column(String, nullable=False, default=EnrollmentStatus.ENROLLED.value)
     status = Column(ENUM(EnrollmentStatus, name="enrollmentstatus"), nullable=False, default=EnrollmentStatus.ENROLLED)
     enrollment_date = Column(DateTime(timezone=True), nullable=False, default=datetime.now(UTC))
     completion_date = Column(DateTime(timezone=True))
@@ -115,6 +200,46 @@ class CourseEnrollment(Base):
     student = relationship("User", foreign_keys=[student_id], back_populates="course_enrollments")
     user = relationship("User", foreign_keys=[user_id], back_populates="enrollments")
 
+    # Add indexes for frequently queried fields
+    __table_args__ = (
+        Index('idx_enrollment_course', 'course_id'),
+        Index('idx_enrollment_student', 'student_id'),
+        Index('idx_enrollment_status', 'status'),
+        Index('idx_enrollment_user', 'user_id'),
+    )
+
+    def to_dict(self, include_course=False):
+        """
+        Convert enrollment model to dictionary representation.
+        
+        Args:
+            include_course (bool): Whether to include course information
+        
+        Returns:
+            dict: Dictionary representation of the enrollment
+        """
+        data = {
+            "id": str(self.id),
+            "course_id": str(self.course_id),
+            "student_id": str(self.student_id),
+            "status": self.status.value if hasattr(self.status, 'value') else self.status,
+            "enrollment_date": self.enrollment_date.isoformat() if self.enrollment_date else None,
+            "completion_date": self.completion_date.isoformat() if self.completion_date else None,
+            "grade": self.grade,
+            "progress": self.progress,
+            "last_activity": self.last_activity.isoformat() if self.last_activity else None,
+            "is_favorited": self.is_favorited,
+        }
+        
+        if include_course and self.course:
+            data["course"] = {
+                "id": str(self.course.id),
+                "title": self.course.title,
+                "code": self.course.code
+            }
+            
+        return data
+
 # Module Model (Course → Modules)
 class Module(Base):
     __tablename__ = "module"
@@ -126,15 +251,24 @@ class Module(Base):
     course = relationship("Course", back_populates="modules")
     lectures = relationship("Lecture", back_populates="module", cascade="all, delete-orphan")
 
-    __table_args__ = (UniqueConstraint("course_id", "position", name="module_position_unique"),)
+    __table_args__ = (
+        UniqueConstraint("course_id", "position", name="module_position_unique"),
+        Index('idx_module_course', 'course_id'),
+    )
 
-    def to_dict(self):
-        return {
+    def to_dict(self, include_lectures=False):
+        """Convert module to dictionary with option to include lectures"""
+        data = {
             "id": str(self.id),
             "course_id": str(self.course_id),
             "title": self.title,
             "position": self.position,
         }
+        
+        if include_lectures and self.lectures:
+            data["lectures"] = [lecture.to_dict() for lecture in self.lectures]
+            
+        return data
 
 # Lecture Model (Module → Lectures)
 class Lecture(Base):
@@ -216,6 +350,11 @@ class UserRecommendedCourses(Base):
     # Relationships
     user = relationship("User", back_populates="recommended_courses")
 
+    # Add index for user_id
+    __table_args__ = (
+        Index('idx_recommended_user', 'user_id'),
+    )
+
     def to_dict(self):
         """Converts the UserRecommendedCourses object to a dictionary"""
         return {
@@ -242,6 +381,13 @@ class BookmarkedMaterials(Base):
     
     # Relationships
     user = relationship("User", back_populates="bookmarks")
+    
+    # Add indexes for frequent queries
+    __table_args__ = (
+        Index('idx_bookmarked_user', 'user_id'),
+        Index('idx_bookmarked_course', 'course_id'),
+        Index('idx_bookmarked_type', 'type'),
+    )
     
     def to_dict(self):
         """Converts the BookmarkedMaterials object to a dictionary"""

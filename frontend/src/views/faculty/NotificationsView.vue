@@ -103,14 +103,15 @@ export default {
       this.isLoading = true
       try {
         const response = await this.courseStore.getFacultyCourses()
-        response.data.forEach((course) => {
-          this.enrolledCourses.push(course)
-        })
-        this.isLoading = false
+        if (response && response.data) {
+          this.enrolledCourses = response.data
+          console.log(`Loaded ${this.enrolledCourses.length} courses for faculty notifications`)
+        } else {
+          console.log('No courses available in the response')
+        }
       } catch (error) {
-        this.isLoading = false
         this.showErrorToast(error, 'Failed to load the courses')
-        throw error
+        console.error('Error loading faculty courses:', error)
       } finally {
         this.isLoading = false
       }
