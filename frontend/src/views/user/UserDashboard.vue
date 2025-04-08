@@ -360,7 +360,7 @@ export default {
 
     onMounted(() => {
       getUserInfo()
-      loadCourses()
+      // loadCourses()
       loadNotifications()
     })
 

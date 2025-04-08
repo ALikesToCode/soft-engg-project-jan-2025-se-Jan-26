@@ -44,11 +44,12 @@ class NotificationService:
                 logger.info(f"{user.role} Notification fetched successfully...")
                 return response
 
+            logger.info("Not a faculty or support user, fetching notifications for students...")
+
             # Fetch user notifications
             result = await db.execute(select(UserNotificationStatus).where(UserNotificationStatus.user_id == user_id))
             user_notifications = result.scalars().all()
             notifications = []
-
             for user_notification in user_notifications:
                 # Fetch CourseNotification
                 course_notif_result = await db.execute(
@@ -93,6 +94,7 @@ class NotificationService:
                     })
 
             logger.info("User Notification fetched successfully...")
+            logger.info("Total notifications fetched: %d", len(notifications))
             return notifications
 
         except Exception as e:
