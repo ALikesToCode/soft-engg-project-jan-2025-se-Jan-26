@@ -121,8 +121,12 @@ export const FacultyNotificationService = {
   
   // Get courses for faculty
   async getCourses() {
-    return api.get('/courses', {
-      params: { _t: Date.now() }
-    });
+    try {
+      const response = await api.get(`${API_ROUTES.FACULTY}/courses`)
+      return response.data
+    } catch (error) {
+      console.error('Error fetching faculty courses:', error)
+      throw error
+    }
   }
 } 
