@@ -39,6 +39,26 @@ export const useCourseStore = defineStore('course', () => {
     }
   }
 
+  // Add getUserCourses method - same implementation as fetchCourses
+  async function getUserCourses() {
+    try {
+      loading.value = true
+      const response = await api.get('/courses', {
+        params: { 
+          _t: Date.now() // Add timestamp to prevent caching
+        }
+      })
+      courses.value = response.data
+      return response
+    } catch (err) {
+      error.value = err.message
+      console.error('Error fetching user courses:', err)
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function getFacultyCourses() {
     try {
       loading.value = true
@@ -125,6 +145,7 @@ export const useCourseStore = defineStore('course', () => {
     activeCourses,
     // Actions
     fetchCourses,
+    getUserCourses,
     getFacultyCourses,
     createCourse,
     updateCourse,

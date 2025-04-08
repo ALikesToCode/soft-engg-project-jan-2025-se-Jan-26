@@ -27,18 +27,32 @@ export default {
       if (!backendRole) return ROLE.STUDENT;
       
       // Log the original role from backend for debugging
-      console.log(`Mapping backend role: ${backendRole}`);
+      console.log(`Mapping backend role: ${backendRole}, type: ${typeof backendRole}`);
       
-      switch(backendRole.toLowerCase()) {
+      // Add more debug info
+      console.log(`ROLE constants:`, ROLE);
+      console.log(`rolePaths:`, rolePaths);
+      
+      const lowerCaseRole = backendRole.toLowerCase();
+      console.log(`Lowercase role: ${lowerCaseRole}`);
+      
+      let result;
+      switch(lowerCaseRole) {
         case 'faculty':
-          return ROLE.FACULTY;
+          result = ROLE.FACULTY;
+          break;
         case 'support':
         case 'admin':
-          return ROLE.SUPPORT;
+          result = ROLE.SUPPORT;
+          break;
         case 'student':
         default:
-          return ROLE.STUDENT;
+          result = ROLE.STUDENT;
+          break;
       }
+      
+      console.log(`Mapped role result: ${result}`);
+      return result;
     }
 
     onMounted(async () => {
@@ -92,31 +106,46 @@ export default {
             throw new Error("Failed to get user data");
           }
           
+          // Detailed logging of user data
+          console.log("Complete user data:", JSON.stringify(userData, null, 2));
+          
           // Update role from user data (most accurate source)
           if (userData.role) {
+            console.log(`Current userRole before mapping: ${authStore.userRole}`);
             const updatedRole = mapBackendRoleToFrontend(userData.role);
+            console.log(`Updated role after mapping: ${updatedRole}`);
             authStore.setUserRole(updatedRole);
-            console.log(`Role updated from user data: ${updatedRole}`);
+            console.log(`Role updated in store: ${authStore.userRole}`);
           }
           
           // Check for redirect path from localStorage
           const redirectPath = localStorage.getItem('loginRedirectPath');
+          console.log(`Stored redirect path: ${redirectPath}`);
           let targetPath;
+          
+          console.log(`Current user role for redirection: ${authStore.userRole}`);
+          console.log(`Role comparison: authStore.userRole === ROLE.SUPPORT: ${authStore.userRole === ROLE.SUPPORT}`);
           
           if (redirectPath && redirectPath.includes('/monitoring') && authStore.userRole === ROLE.SUPPORT) {
             // If there's a redirect path to monitoring and user has support role, go there
             targetPath = redirectPath;
+            console.log(`Using stored redirect path for support user: ${targetPath}`);
           } else {
             // Use rolePaths for consistent redirects based on role
+            console.log(`Using rolePaths for redirection based on role: ${authStore.userRole}`);
+            
             switch(authStore.userRole) {
               case ROLE.SUPPORT:
                 targetPath = rolePaths.SUPPORT.dashboard;
+                console.log(`Support user redirecting to: ${targetPath}`);
                 break;
               case ROLE.FACULTY:
                 targetPath = rolePaths.FACULTY.dashboard;
+                console.log(`Faculty user redirecting to: ${targetPath}`);
                 break;
               default:
                 targetPath = rolePaths.STUDENT.dashboard;
+                console.log(`Student/default user redirecting to: ${targetPath}`);
             }
           }
           

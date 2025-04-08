@@ -5,7 +5,7 @@ import { API_URL } from '@/config'
 // Create custom axios instance with the base URL
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 30000,
+  timeout: 60000, // Increase timeout to 60 seconds
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json'
@@ -53,6 +53,7 @@ api.interceptors.response.use(
 
     // Handle authentication errors
     if (error.response && error.response.status === 401) {
+      console.error('Authentication error (401):', error.response.data || error.message)
       localStorage.removeItem('token')
       localStorage.removeItem('user')
 
@@ -60,29 +61,32 @@ api.interceptors.response.use(
       if (router.currentRoute.value.path !== '/login') {
         router.push({ path: '/login', query: { redirect: router.currentRoute.value.path } })
       }
-    }
-
-    // Handle network errors with potential retry
-    if (!error.response && error.code === 'ECONNABORTED') {
-      console.log('Request timeout, retrying...')
-
-      // Retry the request once
+    } 
+    // Handle server errors
+    else if (error.response && error.response.status >= 500) {
+      console.error('Server error:', error.response.status, error.response.data || error.message)
+    } 
+    // Handle network errors or timeouts
+    else if (!error.response || error.code === 'ECONNABORTED') {
+      console.error('Network error or timeout:', error.message || error)
+      
+      // Retry the request once for network issues
       try {
         // Create a new request with original config but increased timeout
-        const config = { ...error.config }
-        config.timeout = config.timeout * 1.5 // Increase timeout for retry
-
-        // Don't retry a failed retry
-        if (config._isRetry) {
-          throw error
+        if (!error.config._isRetry) {
+          console.log('Retrying failed request...')
+          const config = {...error.config}
+          config.timeout = 90000 // 90 seconds for retry attempts
+          config._isRetry = true
+          return await axios(config)
         }
-
-        config._isRetry = true
-        return await axios(config)
       } catch (retryError) {
         console.error('Retry failed:', retryError)
-        return Promise.reject(error) // Return original error if retry fails
       }
+    } 
+    // Handle other errors
+    else {
+      console.error('API error:', error.response?.status, error.response?.data || error.message)
     }
 
     return Promise.reject(error)

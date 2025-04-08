@@ -14,6 +14,12 @@ import { FacultyNotificationService } from '@/services/facultyNotification.servi
 
 export default {
   name: 'DashboardView',
+  components: {
+    SideNavBar,
+    ChatBotWrapper,
+    LoadingSpinner,
+    AlertMessage,
+  },
   data() {
     return {
       showAlertMessage: false,
@@ -64,12 +70,6 @@ export default {
       isDevelopment: import.meta.env.VITE_NODE_ENV === 'development',
       notifications: [],
     }
-  },
-  components: {
-    SideNavBar,
-    ChatBotWrapper,
-    LoadingSpinner,
-    AlertMessage,
   },
   computed: {
     mainContentClass() {
@@ -274,6 +274,8 @@ export default {
     const courseStore = useCourseStore()
     const toast = useToast()
     const isLoading = ref(false)
+    const notifications = ref([])
+    const courses = ref([])
     const userInfo = ref({
       name: 'User',
     })
@@ -293,7 +295,7 @@ export default {
     const loadCourses = async () => {
       isLoading.value = true
       try {
-        const response = await courseStore.getUserCourses()
+        const response = await courseStore.fetchCourses()
         if (response && response.data) {
           courses.value = response.data
         }
