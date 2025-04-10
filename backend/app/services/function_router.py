@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional, Set
+from typing import List, Dict, Any, Optional, Set, Tuple
 from pydantic import BaseModel
 from fastapi import HTTPException
 import inspect
@@ -25,6 +25,7 @@ class FunctionRouter:
     def __init__(self):
         self._functions: Dict[str, Dict] = {}
         self._function_declarations: List[Dict] = []
+        self._function_registry: Dict[str, Dict] = {}
 
     def register_function(self, name: str, description: str, handler, parameters: Dict[str, Any], roles: Optional[List[str]] = None):
         """
@@ -134,98 +135,131 @@ class FunctionRouter:
         # No match found
         return None
 
-    async def execute_function(self, name: str, args: Dict[str, Any], user_role: str = None) -> Any:
+    async def execute_function(self, name: str, arguments: Dict[str, Any], role: Optional[str] = None) -> Any:
         """
         Execute a registered function with the given arguments
         
         Args:
             name: Name of the function to execute
-            args: Arguments to pass to the function
-            user_role: Role of the user executing the function, used for authorization
+            arguments: Arguments to pass to the function
+            role: Optional role to check permissions against
             
         Returns:
-            Result of the function execution
-        
-        Raises:
-            ValueError: If the function is not registered or user is not authorized
-        """
-        # Get canonical function name (handling different case conventions)
-        canonical_name = self.get_canonical_function_name(name)
-        if not canonical_name:
-            logger.error(f"Function {name} not registered (no canonical match)")
-            raise ValueError(f"Function '{name}' not registered")
-        
-        function_info = self._functions[canonical_name]
-        
-        # Check if function requires authorization
-        if function_info.get("roles") and user_role:
-            # If roles are specified, check if user has the required role
-            allowed_roles = function_info.get("roles")
-            if user_role not in allowed_roles:
-                logger.warning(f"User with role {user_role} not authorized to execute function {canonical_name}")
-                raise ValueError(f"Not authorized to execute function '{canonical_name}'")
-        
-        # Get the function handler
-        handler = function_info.get("handler")
-        if not handler or not callable(handler):
-            logger.error(f"Function {canonical_name} has no valid handler")
-            raise ValueError(f"Function '{canonical_name}' has no valid handler")
-        
-        # Execute the function with the provided arguments
-        try:
-            # Check if the handler is async
-            if inspect.iscoroutinefunction(handler):
-                result = await handler(**args)
-            else:
-                # Run synchronous functions in a thread pool
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(None, lambda: handler(**args))
+            Function result
             
-            # If we got a Pydantic model back, convert it to a dictionary
-            if hasattr(result, "dict") and callable(result.dict):
-                result = result.dict()
-            elif hasattr(result, "model_dump") and callable(result.model_dump):
-                result = result.model_dump()
+        Raises:
+            HTTPException: If function execution fails
+        """
+        # Check function exists
+        if name not in self._functions:
+            raise HTTPException(status_code=404, detail=f"Function {name} not found")
+            
+        # Check role permissions
+        func_info = self._functions[name]
+        if role and func_info["roles"] and role not in func_info["roles"]:
+            raise HTTPException(status_code=403, detail=f"Role {role} not authorized for function {name}")
+            
+        # Validate arguments
+        is_valid, error = self.validate_function_call(name, arguments)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=error)
+            
+        try:
+            # Execute function
+            result = await func_info["handler"](**arguments)
+            
+            # Format response
+            if result is None:
+                return {"status": "success"}
+            elif isinstance(result, (str, int, float, bool)):
+                return {"result": result}
+            elif isinstance(result, (list, dict)):
+                return result
+            else:
+                return {"result": str(result)}
                 
-            logger.info(f"Successfully executed function {canonical_name}")
-            return result
         except Exception as e:
-            logger.error(f"Error executing function {canonical_name}: {str(e)}")
+            # Log error
             import traceback
-            logger.error(traceback.format_exc())
-            raise
+            traceback.print_exc()
+            
+            # Return error response
+            raise HTTPException(
+                status_code=500,
+                detail=f"Function execution failed: {str(e)}"
+            )
 
     def function_declaration(self, name: str, description: str, parameters: Dict[str, Any], roles: Optional[List[str]] = None):
         """
-        Decorator to register API endpoint functions
+        Decorator for registering functions with the router
         
-        Example:
-            @function_router.function_declaration(
-                name="get_courses",
-                description="Get available courses",
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "category": {
-                            "type": "string",
-                            "description": "Course category"
-                        }
-                    }
-                },
-                roles=["student", "faculty", "admin"]
-            )
-            async def get_courses(category: str):
-                # Function implementation
-                pass
+        Args:
+            name: Name of the function
+            description: Description of what the function does
+            parameters: JSON schema of the function parameters
+            roles: Optional list of roles allowed to execute this function
         """
         def decorator(func):
-            @wraps(func)
-            async def wrapper(*args, **kwargs):
-                return await func(*args, **kwargs)
+            # Validate and normalize the parameter schema
+            schema = {
+                "type": "object",
+                "properties": parameters.get("properties", {}),
+                "required": parameters.get("required", []),
+                "additionalProperties": parameters.get("additionalProperties", True)
+            }
             
-            self.register_function(name, description, wrapper, parameters, roles)
-            return wrapper
+            # Add type information if missing
+            for prop_name, prop_info in schema["properties"].items():
+                if "type" not in prop_info:
+                    # Try to infer type from any default value
+                    if "default" in prop_info:
+                        default_type = type(prop_info["default"]).__name__
+                        prop_info["type"] = {
+                            "str": "string",
+                            "int": "integer",
+                            "float": "number",
+                            "bool": "boolean",
+                            "list": "array",
+                            "dict": "object"
+                        }.get(default_type, "string")
+                    else:
+                        # Default to string if no type info available
+                        prop_info["type"] = "string"
+            
+            # Create the function declaration
+            declaration = {
+                "name": name,
+                "description": description,
+                "parameters": schema
+            }
+            
+            if roles:
+                declaration["roles"] = roles
+            
+            # Register the function
+            self._functions[name] = {
+                "handler": func,
+                "declaration": declaration,
+                "roles": roles
+            }
+            
+            # Add function to the registry for schema generation
+            self._function_registry[name] = {
+                "function": func,
+                "parameters": schema,
+                "description": description
+            }
+            
+            logger.info(f"Registered function {name} with schema: {schema}")
+            return func
+            
         return decorator
+
+    def get_function_schema(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get the schema for a specific function"""
+        if name in self._functions:
+            return self._functions[name]["declaration"]["parameters"]
+        return None
 
     async def web_search(self, query: str, num_results: int = 5) -> List[Dict[str, str]]:
         """
@@ -267,6 +301,98 @@ class FunctionRouter:
         except Exception as e:
             logger.error(f"Error in web_search: {str(e)}")
             return [{"title": "Error", "snippet": f"Failed to perform web search: {str(e)}", "url": ""}]
+
+    def validate_function_call(self, name: str, arguments: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+        """
+        Validate a function call before execution
+        
+        Args:
+            name: Name of the function to validate
+            arguments: Arguments to validate against the function schema
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if name not in self._functions:
+            return False, f"Function {name} not found"
+            
+        schema = self._functions[name]["declaration"]["parameters"]
+        
+        # Check required parameters
+        for required in schema.get("required", []):
+            if required not in arguments:
+                return False, f"Missing required parameter: {required}"
+        
+        # Validate parameter types
+        for param_name, param_value in arguments.items():
+            if param_name not in schema["properties"]:
+                if not schema.get("additionalProperties", True):
+                    return False, f"Unknown parameter: {param_name}"
+                continue
+                
+            param_schema = schema["properties"][param_name]
+            param_type = param_schema["type"]
+            
+            # Type validation
+            if param_type == "string" and not isinstance(param_value, str):
+                return False, f"Parameter {param_name} must be a string"
+            elif param_type == "number" and not isinstance(param_value, (int, float)):
+                return False, f"Parameter {param_name} must be a number"
+            elif param_type == "integer" and not isinstance(param_value, int):
+                return False, f"Parameter {param_name} must be an integer"
+            elif param_type == "boolean" and not isinstance(param_value, bool):
+                return False, f"Parameter {param_name} must be a boolean"
+            elif param_type == "array" and not isinstance(param_value, list):
+                return False, f"Parameter {param_name} must be an array"
+            elif param_type == "object" and not isinstance(param_value, dict):
+                return False, f"Parameter {param_name} must be an object"
+                
+        return True, None
+
+    def get_function_info(self, name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed information about a registered function
+        
+        Args:
+            name: Name of the function
+            
+        Returns:
+            Dictionary with function information or None if not found
+        """
+        if name not in self._functions:
+            return None
+            
+        info = self._functions[name]
+        return {
+            "name": name,
+            "description": info["declaration"]["description"],
+            "parameters": info["declaration"]["parameters"],
+            "roles": info["roles"],
+            "handler": info["handler"]
+        }
+
+    def list_functions(self, role: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        List available functions, optionally filtered by role
+        
+        Args:
+            role: Optional role to filter functions by
+            
+        Returns:
+            List of function declarations
+        """
+        functions = []
+        for name, info in self._functions.items():
+            if role and info["roles"] and role not in info["roles"]:
+                continue
+                
+            functions.append({
+                "name": name,
+                "description": info["declaration"]["description"],
+                "parameters": info["declaration"]["parameters"],
+                "roles": info["roles"]
+            })
+        return functions
 
 # Create global function router instance
 function_router = FunctionRouter() 

@@ -173,13 +173,14 @@ def get_available_models():
         return common_models
 
 # Initialize chat model
-def get_llm(functions=None, use_fallback=False, use_grounding=True):
+def get_llm(functions=None, use_fallback=False, use_grounding=True, force_tool_choice=False):
     """Get the LLM model instance with function calling enabled
     
     Args:
         functions: List of function declarations to pass to the model
         use_fallback: Whether to use the fallback model (gemini-2.0-flash)
         use_grounding: Whether to enable grounding capabilities
+        force_tool_choice: Force the model to use tool calling (for testing)
         
     Returns:
         LLM instance configured with the appropriate model
@@ -210,7 +211,7 @@ def get_llm(functions=None, use_fallback=False, use_grounding=True):
     # Add grounding tool if enabled
     if use_grounding:
         logger.info("Enabling grounding with Google Search")
-        tools.append({"google_search": {}})
+        tools.append({"type": "google_search"})
     
     # Get available models
     available_models = get_available_models()
@@ -298,6 +299,22 @@ def get_llm(functions=None, use_fallback=False, use_grounding=True):
     logger.info(f"Grounding enabled: {use_grounding}")
     logger.info(f"Tools configured: {len(tools)} tools")
     
+    # Set tool_choice parameter based on whether we're forcing tool calling
+    tool_choice = None
+    if force_tool_choice and tools and len(tools) > 0:
+        # Force using the first available tool
+        first_tool = tools[0]
+        if isinstance(first_tool, dict) and "function" in first_tool:
+            tool_name = first_tool["function"].get("name")
+            logger.info(f"Forcing tool choice to: {tool_name}")
+            tool_choice = {"type": "function", "function": {"name": tool_name}}
+        else:
+            # Default to "auto" if we can't extract the tool name
+            tool_choice = "auto"
+    else:
+        # Use automatic tool choice by default
+        tool_choice = "auto"
+    
     # Create the model instance
     model = ChatGoogleGenerativeAI(
         model=model_name,
@@ -307,7 +324,7 @@ def get_llm(functions=None, use_fallback=False, use_grounding=True):
         tools=tools if tools else None,  # Pass the function definitions and grounding tools to the model
         max_retries=1,  # Reduce retry attempts to fail faster
         additional_kwargs={
-            "tool_choice": "auto"  # Enable automatic tool choice for OpenAI compatibility
+            "tool_choice": tool_choice  # Use the configured tool choice
         }
     )
     
@@ -320,74 +337,63 @@ def get_system_prompt():
     return """
     You are a helpful AI assistant for an educational platform. 
 You have access to tools that you can call to retrieve information or perform actions.
-you should anaswer only about the course related questions 
-in case of questions that are quiz and assignemnt related avoid direct answer guide the user to the correct answer by step by step solving on his part.  
-talk only about the courses and dont talk about other stuff. 
+You should answer only about course-related questions.
+For quiz and assignment-related questions, avoid direct answers and guide the user to the correct answer by providing step-by-step help.
+Talk only about courses and don't talk about other topics.
 
-GUIDELINES FOR TOOL CALLING:
-1. When a user asks for specific information that requires database access, like courses, FAQs, or user details, ALWAYS use the appropriate function tool.
-2. Call functions with all required parameters and appropriate optional parameters when helpful.
-3. Directly respond to simple questions that don't require database access.
-4. Return function execution results in a user-friendly format.
-5. If a function returns an error, explain the issue to the user in simple terms.
-6. When multiple functions might apply, choose the most specific one for the task.
-
-FUNCTION CALLING INSTRUCTIONS:
-- ALWAYS use function calling for retrieving data from the system
-- When function calling is needed, call the function FIRST, then provide your response
-- DO NOT make up information about courses, users, assignments, or other system data
-- DO format function arguments correctly based on the function's parameter schema
-- Each function call will be automatically executed and the results will be returned to you
-- DO NOT print the function call JSON in your response content - it must be provided in the designated tool_calls field
-
-CRITICAL INSTRUCTIONS ABOUT FUNCTION OUTPUTS:
-- NEVER output function calls directly in your text response like this:
-  ❌ WRONG: "Let me call getCourses()"
-  ❌ WRONG: "print(getCourses())"
-  ❌ WRONG: "getCourses()"
-  ❌ WRONG: "function getCourses()"
-- ALWAYS use the proper tool_calls or function_call format as structured data
-- NEVER include code blocks with function calls
-- DO NOT use backticks (```) to format function calls
-
-IMPORTANT TECHNICAL NOTE ABOUT JSON FORMATTING:
-- Function arguments MUST be valid JSON
-- Always use double quotes (") for keys and string values, not single quotes (')
-- Boolean values must be lowercase: true or false, not True or False
-- Numbers should not have quotes
-- Example of properly formatted arguments: {"name": "value", "count": 3, "active": true}
-
-CRITICALLY IMPORTANT: DO NOT INCLUDE THE FUNCTION CALL JSON IN YOUR RESPONSE TEXT.
-The AI system will automatically detect and execute your function calls - you only need to make them in the proper format.
-The function call should be provided in the tool_calls field, NOT in your text response.
+CRITICAL INSTRUCTIONS ABOUT FUNCTIONS:
+1. When a user asks for specific information that requires database access, like courses, FAQs, or user details, you MUST use the appropriate function tool.
+2. DO NOT ATTEMPT TO ANSWER DATABASE QUERIES DIRECTLY - you MUST call a function to get the data.
+3. Always return function calls in the EXACT FORMAT expected by the API.
+4. NEVER use natural language to describe a function call - only use the proper format.
 
 FUNCTION CALLING FORMAT:
-You MUST use the EXACT OpenAI function calling format when using tools.
-The correct format is a JSON object with tool_calls array containing function objects:
+You must use this EXACT format when calling a function:
 {
-  "tool_calls": [
-    {
-      "id": "call_9g1881818181818181818181",
-      "type": "function",
-      "function": {
-        "name": "function_name",
-        "arguments": "{\"param1\": \"value1\", \"param2\": 42}"
-      }
+  "type": "function",
+  "function": {
+    "name": "functionName",
+    "arguments": {
+      "param1": "value1",
+      "param2": 42
     }
-  ]
+  }
 }
 
-EXAMPLE FUNCTION CALLING WORKFLOW:
-1. User asks: "Show me my courses"
-2. You call the getCourses() function using the correct tool_calls format (not printed in the response)
-3. System executes the function and returns results to you
-4. You provide a human-friendly response based on those results
+DO NOT use other formats like:
+- functionName(param1="value1", param2=42)
+- print(functionName(...))
+- Direct function printing in markdown code blocks
 
-GROUNDING INSTRUCTIONS:
-- When you need information that is not available in the system or might be outdated, use Google Search
-- For questions about current events, latest technologies, or general knowledge not specific to the educational platform, use grounding
-- Use grounding to complement the system data, especially for providing up-to-date information
-- Properly attribute information obtained through grounding by mentioning the source
+WHEN TO USE FUNCTIONS:
+- When the user asks about their courses, use getCourses
+- When the user asks about their profile, use getUserProfile
+- When the user asks about assignments for a course, use getAssignments
+- When the user asks a question about the platform, use search_faqs
+- When the user needs general knowledge not in our system, use web_search
+
+EXAMPLES OF CORRECT FUNCTION CALLS:
+If user asks "What courses am I taking?", respond only with:
+{
+  "type": "function",
+  "function": {
+    "name": "getCourses",
+    "arguments": {
+      "user_id": "current_user"
+    }
+  }
+}
+
+If user asks about assignments in a course, respond only with:
+{
+  "type": "function",
+  "function": {
+    "name": "getAssignments",
+    "arguments": {
+      "course_id": "course123"
+    }
+  }
+}
 
 Be helpful, concise, and professional in all your responses."""
 
@@ -451,373 +457,207 @@ async def call_llm(messages, use_fallback=False, use_grounding=True):
         # Call the LLM with the prompt
         start_time = time.time()
         logger.info("Sending request to LLM...")
+        
+        # Add detailed debugging info before calling the model
+        logger.debug(f"Function declarations used: {len(formatted_functions)}")
+        for idx, func in enumerate(formatted_functions[:5]):  # Log first 5 functions
+            logger.debug(f"Function {idx}: {func.get('function', {}).get('name')} - {func.get('type')}")
+        
+        # Print the first message to help with debugging
+        if prompt and len(prompt) > 0:
+            logger.debug(f"First prompt message type: {type(prompt[0]).__name__}")
+            if hasattr(prompt[0], 'content'):
+                logger.debug(f"First message content excerpt: {prompt[0].content[:200]}...")
+        
+        # Make the actual call to the LLM
         response = await llm.ainvoke(prompt)
         elapsed = time.time() - start_time
         logger.info(f"LLM response received in {elapsed:.2f} seconds")
         
+        # Enhanced detailed logging of the response
+        logger.debug(f"Response type: {type(response).__name__}")
+        logger.debug(f"Response attributes: {dir(response)}")
+        
         # Log the raw response for debugging
         if hasattr(response, 'additional_kwargs'):
-            logger.debug(f"Response additional_kwargs: {json.dumps(response.additional_kwargs, default=str)}")
+            logger.debug(f"Response additional_kwargs keys: {list(response.additional_kwargs.keys())}")
+            logger.debug(f"Response additional_kwargs content: {json.dumps(response.additional_kwargs, default=str)}")
         
+        if hasattr(response, 'content'):
+            content_preview = response.content[:500] + ('...' if len(response.content) > 500 else '') if response.content else 'None'
+            logger.debug(f"Response content preview: {content_preview}")
+            
+        # Check for standard tool_calls attribute directly on AIMessage from LangChain
+        if hasattr(response, 'tool_calls') and response.tool_calls:
+            logger.debug(f"Direct tool_calls attribute found: {json.dumps(response.tool_calls, default=str)}")
+
         # Check for grounding evidence in the response
         has_grounding = False
         if hasattr(response, 'additional_kwargs') and 'grounding' in str(response.additional_kwargs):
             has_grounding = True
             logger.info("Grounding information detected in response")
         
-        logger.info(f"Grounding enabled: {use_grounding}, Grounding detected: {has_grounding}")
+        # Process tool/function calls from the response
+        function_calls = []
         
-    except Exception as e:
-        logger.warning(f"Primary model failed: {str(e)}. Falling back to secondary model")
-        import traceback
-        logger.warning(traceback.format_exc())
-        
-        # Try the fallback model
         try:
-            # Check if we have a cached fallback LLM instance
-            fallback_key = "fallback_grounding_true"
-            if fallback_key not in _llm_cache:
-                # Create and cache the fallback LLM
-                logger.info("Creating new fallback LLM instance")
-                _llm_cache[fallback_key] = get_llm(formatted_functions, use_fallback=True, use_grounding=True)
-            else:
-                logger.info("Using cached fallback LLM instance")
-            
-            # Get the cached fallback LLM
-            llm_fallback = _llm_cache[fallback_key]
-            
-            # Use the same prompt template as before
-            prompt_template = call_llm._prompt_template
-            prompt = await prompt_template.ainvoke({"messages": messages})
-            
-            # Call the fallback LLM
-            start_time = time.time()
-            logger.info("Sending request to fallback LLM...")
-            response = await llm_fallback.ainvoke(prompt)
-            elapsed = time.time() - start_time
-            logger.info(f"Fallback LLM response received in {elapsed:.2f} seconds")
-            
-            # Check for grounding evidence in fallback response
-            has_grounding = False
-            if hasattr(response, 'additional_kwargs') and 'grounding' in str(response.additional_kwargs):
-                has_grounding = True
-                logger.info("Grounding information detected in fallback response")
-            
-            logger.info(f"Fallback grounding enabled: {use_grounding}, Grounding detected: {has_grounding}")
-            
-        except Exception as fallback_error:
-            logger.error(f"Fallback model also failed: {str(fallback_error)}")
-            import traceback
-            logger.error(traceback.format_exc())
-            raise
-    
-    # Process tool/function calls from the response
-    function_calls = []
-    
-    try:
-        # Check for various tool/function call formats
-        
-        # 1. Check for OpenAI format tool_calls
-        if hasattr(response, 'additional_kwargs') and response.additional_kwargs.get('tool_calls'):
-            logger.info("Found tool_calls in OpenAI format")
-            tool_calls = response.additional_kwargs.get('tool_calls', [])
-            
-            for tool_call in tool_calls:
-                # Handle OpenAI-style tool call
-                if isinstance(tool_call, dict) and 'function' in tool_call:
-                    function_name = tool_call['function'].get('name')
+            # Check for tool_calls in the LangChain response object
+            if hasattr(response, 'additional_kwargs') and 'tool_calls' in response.additional_kwargs:
+                logger.info("Found tool_calls in response additional_kwargs")
+                tool_calls = response.additional_kwargs['tool_calls']
+                
+                for tool_call in tool_calls:
+                    if isinstance(tool_call, dict) and 'function' in tool_call:
+                        func_info = tool_call['function']
+                        if 'name' in func_info:
+                            func_name = func_info['name']
+                            
+                            # Parse arguments
+                            args = {}
+                            if 'arguments' in func_info:
+                                args_str = func_info['arguments']
+                                if isinstance(args_str, str):
+                                    try:
+                                        args = json.loads(args_str)
+                                    except json.JSONDecodeError:
+                                        logger.error(f"Failed to parse arguments for {func_name}: {args_str}")
+                                        args = {}
+                                else:
+                                    args = args_str
+                            
+                            function_calls.append({
+                                "name": func_name,
+                                "arguments": args
+                            })
+                            logger.info(f"Parsed function call: {func_name} with args: {args}")
+                        
+            # Also check LangChain's direct tool_calls attribute 
+            elif hasattr(response, 'tool_calls') and response.tool_calls:
+                logger.info("Found tool_calls attribute on the response object")
+                for tool_call in response.tool_calls:
+                    # Skip grounding calls
+                    if 'name' in tool_call and tool_call['name'] == 'google_search':
+                        continue
+                        
+                    func_name = tool_call.get('name')
+                    func_args = tool_call.get('args', {})
+                    
+                    function_calls.append({
+                        "name": func_name,
+                        "arguments": func_args
+                    })
+                    logger.info(f"Parsed tool call: {func_name} with args: {func_args}")
+                    
+            # Check legacy function_call format as fallback
+            elif hasattr(response, 'additional_kwargs') and 'function_call' in response.additional_kwargs:
+                logger.info("Found legacy function_call format")
+                func_call = response.additional_kwargs['function_call']
+                if isinstance(func_call, dict) and 'name' in func_call:
+                    func_name = func_call['name']
                     
                     # Parse arguments
-                    if 'arguments' in tool_call['function']:
-                        args_str = tool_call['function'].get('arguments', '{}')
-                        # Convert from string if needed
+                    args = {}
+                    if 'arguments' in func_call:
+                        args_str = func_call['arguments']
                         if isinstance(args_str, str):
                             try:
                                 args = json.loads(args_str)
-                            except json.JSONDecodeError as e:
-                                logger.error(f"Failed to parse function arguments for {function_name}: {args_str}")
-                                logger.error(f"JSON error: {str(e)}")
-                                # Try to salvage by cleaning the string
-                                cleaned_args = args_str.replace("'", "\"").strip()
-                                try:
-                                    args = json.loads(cleaned_args)
-                                    logger.info(f"Successfully parsed arguments after cleaning: {args}")
-                                except json.JSONDecodeError:
-                                    logger.error(f"Failed to parse arguments even after cleaning: {cleaned_args}")
-                                    args = {}
+                            except json.JSONDecodeError:
+                                logger.error(f"Failed to parse arguments for {func_name}: {args_str}")
+                                args = {}
                         else:
                             args = args_str
                             
-                        function_calls.append({
-                            "name": function_name,
-                            "arguments": args
-                        })
-                        logger.info(f"Parsed OpenAI-format function call: {function_name}")
-        
-        # 2. Check for LangChain standard tool_calls attribute
-        elif hasattr(response, 'tool_calls') and response.tool_calls:
-            logger.info(f"Found tool_calls directly on response: {response.tool_calls}")
+                    function_calls.append({
+                        "name": func_name,
+                        "arguments": args
+                    })
+                    logger.info(f"Parsed legacy function call: {func_name} with args: {args}")
             
-            for tool_call in response.tool_calls:
-                # Skip Google Search grounding tool calls
-                if tool_call.get("name") == "google_search":
-                    logger.info(f"Found Google Search grounding call: {tool_call}")
-                    continue
+            # NEW: Check content for structured tool calls (some models embed them in content)
+            if not function_calls and hasattr(response, 'content') and response.content:
+                content = response.content
+                logger.info("Checking content for embedded function calls")
                 
-                function_calls.append({
-                    "name": tool_call.get("name"),
-                    "arguments": tool_call.get("args", {})
-                })
-                logger.info(f"Parsed LangChain tool call: {tool_call.get('name')}")
-        
-        # 3. Check legacy function_call format
-        elif hasattr(response, 'additional_kwargs') and 'function_call' in response.additional_kwargs:
-            function_call = response.additional_kwargs['function_call']
-            function_name = function_call.get('name')
-            args_str = function_call.get('arguments', '{}')
-            
-            try:
-                if isinstance(args_str, str):
-                    args = json.loads(args_str)
-                else:
-                    args = args_str
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse function arguments for {function_name}: {args_str}")
-                logger.error(f"JSON error: {str(e)}")
-                # Try to salvage by cleaning the string
-                cleaned_args = args_str.replace("'", "\"").strip()
-                try:
-                    args = json.loads(cleaned_args)
-                    logger.info(f"Successfully parsed arguments after cleaning: {args}")
-                except json.JSONDecodeError:
-                    logger.error(f"Failed to parse arguments even after cleaning: {cleaned_args}")
-                    args = {}
-            
-            function_calls.append({
-                "name": function_name,
-                "arguments": args
-            })
-            logger.info(f"Parsed legacy function call: {function_name}")
-        
-        # 4. Check for {type: 'function', function: {name, arguments}} format
-        elif hasattr(response, 'content') and isinstance(response.content, str):
-            try:
-                # Log the full content for debugging
-                logger.debug(f"Checking content for function calls: {response.content[:300]}...")
-                
-                # Try to parse content to see if it contains function calls in JSON format
-                if '[' in response.content and ']' in response.content:
-                    # Look for array of function calls in the content
-                    
-                    # More robust JSON pattern that matches arrays with objects
-                    json_pattern = r'\[\s*\{(?:\s*"[^"]*"|\s*\'[^\']*\'|\s*[^{}"\',])*\}\s*\]'
-                    match = re.search(json_pattern, response.content, re.DOTALL)
-                    
-                    if match:
-                        logger.debug(f"Found potential JSON match: {match.group(0)}")
-                        try:
-                            content_json = json.loads(match.group(0))
-                            logger.info(f"Found potential function calls array in content: {content_json}")
-                            
-                            if isinstance(content_json, list):
-                                for item in content_json:
-                                    logger.debug(f"Processing array item: {item}")
-                                    if isinstance(item, dict) and 'type' in item and item['type'] == 'function' and 'function' in item:
-                                        function_info = item['function']
-                                        function_name = function_info.get('name', '')
-                                        args_raw = function_info.get('arguments', {})
-                                        
-                                        logger.debug(f"Found function in content: {function_name} with args: {args_raw}")
-                                        
-                                        # Handle string arguments
-                                        args = args_raw
-                                        if isinstance(args_raw, str):
-                                            try:
-                                                args = json.loads(args_raw)
-                                                logger.debug(f"Successfully parsed arguments as JSON: {args}")
-                                            except json.JSONDecodeError:
-                                                logger.error(f"Failed to parse function arguments for {function_name}: {args_raw}")
-                                                # Try to clean up problematic characters
-                                                clean_args = args_raw.replace("'", "\"").strip()
-                                                try:
-                                                    args = json.loads(clean_args)
-                                                    logger.info(f"Successfully parsed arguments after cleaning: {args}")
-                                                except json.JSONDecodeError:
-                                                    logger.error(f"Failed to parse arguments even after cleaning: {clean_args}")
-                                                    args = {}
-                                        
-                                        function_calls.append({
-                                            "name": function_name,
-                                            "arguments": args
-                                        })
-                                        logger.info(f"Parsed function call from content JSON: {function_name}")
-                                        
-                                        # Remove the JSON array from content to avoid double-processing
-                                        response.content = response.content.replace(match.group(0), "").strip()
-                        except json.JSONDecodeError as e:
-                            logger.warning(f"Failed to parse JSON array from content: {match.group(0)}, error: {str(e)}")
-                            
-                # Also try to extract function calls with a more explicit pattern
-                function_pattern = r'\{\s*"type"\s*:\s*"function"\s*,\s*"function"\s*:\s*\{(?:\s*"[^"]*"|\s*\'[^\']*\'|\s*[^{}"\',])*\}\s*\}'
-                matches = re.findall(function_pattern, response.content, re.DOTALL)
-                
-                if matches:
-                    logger.debug(f"Found individual function matches: {matches}")
-                    for match in matches:
-                        try:
-                            func_obj = json.loads(match)
-                            if func_obj.get('type') == 'function' and 'function' in func_obj:
-                                function_info = func_obj['function']
-                                function_name = function_info.get('name', '')
-                                args_raw = function_info.get('arguments', {})
-                                
-                                logger.debug(f"Found individual function: {function_name} with args: {args_raw}")
-                                
-                                # Handle string arguments
-                                args = args_raw
-                                if isinstance(args_raw, str):
-                                    try:
-                                        args = json.loads(args_raw)
-                                    except json.JSONDecodeError:
-                                        logger.error(f"Failed to parse function arguments for {function_name}: {args_raw}")
-                                        # Try cleaning
-                                        clean_args = args_raw.replace("'", "\"").strip()
-                                        try:
-                                            args = json.loads(clean_args)
-                                        except json.JSONDecodeError:
-                                            args = {}
-                                
+                # Try to extract function calls from content using regex pattern matching
+                if isinstance(content, str):
+                    # Pattern 1: Look for JSON-like function call structures
+                    try:
+                        import re
+                        # Match patterns like: {"type":"function","function":{"name":"func_name","arguments":{...}}}
+                        pattern = r'\{\s*"type"\s*:\s*"function"\s*,\s*"function"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]+)"[^}]*"arguments"\s*:\s*(\{[^}]+\})'
+                        matches = re.findall(pattern, content)
+                        
+                        for match in matches:
+                            func_name = match[0]
+                            try:
+                                args = json.loads(match[1])
                                 function_calls.append({
-                                    "name": function_name,
+                                    "name": func_name,
                                     "arguments": args
                                 })
-                                logger.info(f"Parsed individual function call from content: {function_name}")
-                                
-                                # Remove the match from content
-                                response.content = response.content.replace(match, "").strip()
-                        except json.JSONDecodeError as e:
-                            logger.warning(f"Failed to parse individual function: {match}, error: {str(e)}")
-            except Exception as e:
-                logger.error(f"Error checking for function calls in content: {str(e)}")
-                import traceback
-                logger.error(traceback.format_exc())
-
-        # 5. Check for code blocks with function calls using a pattern like print(test(...))
-        if not function_calls and "```" in response.content:
-            logger.debug("Checking for function calls in code blocks")
-            
-            # Extract code blocks with better support for tool_code
-            code_block_pattern = r"```(?:tool_code|python|json)?\n(.*?)```"
-            code_blocks = re.findall(code_block_pattern, response.content, re.DOTALL)
-            
-            if code_blocks:
-                logger.debug(f"Found {len(code_blocks)} code blocks: {code_blocks}")
-                
-                for code_block in code_blocks:
-                    # Look for print(function_name(param1='value', param2=42)) pattern
-                    print_func_pattern = r'print\(\s*(\w+)\s*\(([^)]*)\)\s*\)'
-                    print_matches = re.findall(print_func_pattern, code_block, re.DOTALL)
-                    
-                    if print_matches:
-                        logger.debug(f"Found print function calls: {print_matches}")
-                        for function_match in print_matches:
-                            function_name = function_match[0]
-                            args_str = function_match[1].strip()
+                                logger.info(f"Extracted embedded function call from content: {func_name}")
+                            except json.JSONDecodeError:
+                                logger.error(f"Failed to parse arguments for embedded function call: {match[1]}")
+                        
+                        # If still no matches, try looser pattern
+                        if not function_calls:
+                            # Look for function call annotations using markdown or similar
+                            func_pattern = r'function(?:_call|Call)?\s*:\s*([a-zA-Z0-9_]+)'
+                            arg_pattern = r'arguments\s*:\s*(\{[^}]+\})'
                             
-                            logger.debug(f"Parsing function: {function_name} with args: {args_str}")
+                            func_matches = re.findall(func_pattern, content)
+                            arg_matches = re.findall(arg_pattern, content)
                             
-                            # Extract key-value pairs from args string
-                            # Pattern matches param1='value', param2=42
-                            param_pattern = r"(\w+)\s*=\s*([^,]+)"
-                            param_matches = re.findall(param_pattern, args_str)
+                            if func_matches and arg_matches and len(func_matches) == len(arg_matches):
+                                for i in range(len(func_matches)):
+                                    try:
+                                        args = json.loads(arg_matches[i])
+                                        function_calls.append({
+                                            "name": func_matches[i],
+                                            "arguments": args
+                                        })
+                                        logger.info(f"Extracted loose function call from content: {func_matches[i]}")
+                                    except json.JSONDecodeError:
+                                        logger.error(f"Failed to parse arguments for loose function call: {arg_matches[i]}")
+                    except Exception as e:
+                        logger.error(f"Error extracting function calls from content: {str(e)}")
                             
-                            args_dict = {}
-                            for param in param_matches:
-                                param_name = param[0]
-                                param_value = param[1].strip()
-                                
-                                # Handle string values (remove quotes)
-                                if (param_value.startswith("'") and param_value.endswith("'")) or \
-                                   (param_value.startswith('"') and param_value.endswith('"')):
-                                    param_value = param_value[1:-1]
-                                # Handle numbers
-                                elif param_value.isdigit():
-                                    param_value = int(param_value)
-                                elif param_value.lower() == 'true':
-                                    param_value = True
-                                elif param_value.lower() == 'false':
-                                    param_value = False
-                                    
-                                args_dict[param_name] = param_value
-                            
-                            logger.info(f"Extracted function call from code block: {function_name}({args_dict})")
-                            function_calls.append({
-                                "name": function_name,
-                                "arguments": args_dict
-                            })
-                    
-                    # Also look for direct function calls without print
-                    direct_func_pattern = r'(\w+)\s*\(([^)]*)\)'
-                    direct_matches = re.findall(direct_func_pattern, code_block, re.DOTALL)
-                    
-                    if direct_matches:
-                        logger.debug(f"Found direct function calls: {direct_matches}")
-                        for function_match in direct_matches:
-                            function_name = function_match[0]
-                            
-                            # Skip if we already processed this via print() pattern
-                            if any(call.get("name") == function_name for call in function_calls):
-                                continue
-                                
-                            # Skip common Python functions that aren't API functions
-                            if function_name in ['print', 'str', 'int', 'list', 'dict', 'set', 'tuple']:
-                                continue
-                            
-                            args_str = function_match[1].strip()
-                            
-                            logger.debug(f"Parsing direct function: {function_name} with args: {args_str}")
-                            
-                            # Extract key-value pairs from args string
-                            param_pattern = r"(\w+)\s*=\s*([^,]+)"
-                            param_matches = re.findall(param_pattern, args_str)
-                            
-                            args_dict = {}
-                            for param in param_matches:
-                                param_name = param[0]
-                                param_value = param[1].strip()
-                                
-                                # Handle string values (remove quotes)
-                                if (param_value.startswith("'") and param_value.endswith("'")) or \
-                                   (param_value.startswith('"') and param_value.endswith('"')):
-                                    param_value = param_value[1:-1]
-                                # Handle numbers
-                                elif param_value.isdigit():
-                                    param_value = int(param_value)
-                                elif param_value.lower() == 'true':
-                                    param_value = True
-                                elif param_value.lower() == 'false':
-                                    param_value = False
-                                    
-                                args_dict[param_name] = param_value
-                            
-                            logger.info(f"Extracted direct function call from code block: {function_name}({args_dict})")
-                            function_calls.append({
-                                "name": function_name,
-                                "arguments": args_dict
-                            })
-    except Exception as parse_error:
-        logger.error(f"Error parsing function calls: {str(parse_error)}")
+        except Exception as e:
+            logger.error(f"Error parsing function calls: {str(e)}")
+            import traceback
+            logger.error(traceback.format_exc())
+        
+        # Add extracted function calls to the response
+        if function_calls:
+            logger.info(f"Adding {len(function_calls)} function calls to response")
+            if not hasattr(response, 'additional_kwargs'):
+                response.additional_kwargs = {}
+            response.additional_kwargs['function_calls'] = function_calls
+        
+        # Ensure there is always some content in the response
+        if not response.content or response.content.strip() == '':
+            # If we have function calls but no content, add a more informative message
+            if function_calls:
+                response.content = "I'm processing your request through our system..."
+            else:
+                # If no function calls and no content, provide a more helpful response
+                response.content = "I apologize, but I couldn't generate a proper response. Please try rephrasing your question or providing more details."
+                logger.info("Added more helpful fallback content to empty response")
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error in primary model: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
-    
-    # Add function calls to response if we found any
-    if function_calls:
-        if not hasattr(response, 'additional_kwargs'):
-            response.additional_kwargs = {}
-        response.additional_kwargs['function_calls'] = function_calls
-        logger.info(f"Added {len(function_calls)} function calls to response")
-    
-    return response
+        
+        # Try fallback model if enabled
+        if not use_fallback:
+            logger.info("Attempting fallback model...")
+            return await call_llm(messages, use_fallback=True, use_grounding=use_grounding)
+        else:
+            raise
 
 class LLMApp:
     """Simple LLM application class to replace LangGraph"""
@@ -1011,3 +851,158 @@ async def generate_quiz_questions(topic: str, difficulty: str, count: int = 5) -
     """
     # Implementation would be similar to generate_learning_insights but with different prompt
     pass
+
+# Add diagnostic function at the end of the file
+async def debug_function_calling(test_query="What courses am I enrolled in?"):
+    """Test function calling with a simple example"""
+    logger.info(f"Running function calling diagnostic test with query: {test_query}")
+    
+    test_messages = [
+        {"role": "system", "content": get_system_prompt()},
+        {"role": "user", "content": test_query}
+    ]
+    
+    # Create a simple test function declaration
+    test_functions = [{
+        "name": "getCourses",
+        "description": "Get courses for a user",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "user_id": {"type": "string", "description": "User ID"}
+            },
+            "required": ["user_id"]
+        }
+    }]
+    
+    # Format the function for the model
+    formatted_functions = [{
+        "type": "function",
+        "function": {
+            "name": func["name"],
+            "description": func["description"],
+            "parameters": func["parameters"]
+        }
+    } for func in test_functions]
+    
+    # Test with forcing function calling
+    try:
+        # Try multiple models to find one that works with function calling
+        test_models = [
+            "gemini-1.5-pro", 
+            "gemini-1.5-flash",
+            "gemini-1.0-pro"
+        ]
+        
+        results = {}
+        
+        # Test without forcing tool choice first
+        for model_name in test_models:
+            logger.info(f"Testing function calling with model (auto tool choice): {model_name}")
+            
+            # Create test model with automatic tool choice
+            model = ChatGoogleGenerativeAI(
+                model=model_name,
+                google_api_key=os.getenv("GOOGLE_API_KEY"),
+                temperature=0,
+                tools=formatted_functions,
+                max_retries=1,
+                additional_kwargs={"tool_choice": "auto"}
+            )
+            
+            # Make the call
+            try:
+                response = await model.ainvoke(test_messages)
+                
+                logger.info(f"Model {model_name} response received")
+                logger.info(f"Response content: {response.content}")
+                
+                has_tool_calls = False
+                tool_calls_info = "None"
+                
+                if hasattr(response, 'tool_calls') and response.tool_calls:
+                    has_tool_calls = True
+                    tool_calls_info = str(response.tool_calls)
+                    
+                if hasattr(response, 'additional_kwargs') and 'tool_calls' in response.additional_kwargs:
+                    has_tool_calls = True
+                    tool_calls_info = str(response.additional_kwargs['tool_calls'])
+                
+                results[model_name] = {
+                    "success": has_tool_calls,
+                    "tool_calls": tool_calls_info,
+                    "content": response.content
+                }
+                
+                # If we found a working model, update the preferred models list
+                if has_tool_calls:
+                    logger.info(f"Model {model_name} successfully generated function calls")
+                    break
+                    
+            except Exception as e:
+                logger.error(f"Error testing model {model_name}: {str(e)}")
+                results[model_name] = {"error": str(e)}
+        
+        # Now test with forced tool choice
+        logger.info("Testing with forced tool choice...")
+        for model_name in test_models:
+            logger.info(f"Testing function calling with model (forced tool choice): {model_name}")
+            
+            # Force the model to call our test function
+            forced_tool_choice = {
+                "type": "function", 
+                "function": {"name": "getCourses"}
+            }
+            
+            # Create test model with forced tool choice
+            model = ChatGoogleGenerativeAI(
+                model=model_name,
+                google_api_key=os.getenv("GOOGLE_API_KEY"),
+                temperature=0,
+                tools=formatted_functions,
+                max_retries=1,
+                additional_kwargs={"tool_choice": forced_tool_choice}
+            )
+            
+            # Make the call
+            try:
+                response = await model.ainvoke(test_messages)
+                
+                logger.info(f"Model {model_name} (forced tool) response received")
+                logger.info(f"Response content: {response.content}")
+                
+                has_tool_calls = False
+                tool_calls_info = "None"
+                
+                if hasattr(response, 'tool_calls') and response.tool_calls:
+                    has_tool_calls = True
+                    tool_calls_info = str(response.tool_calls)
+                    
+                if hasattr(response, 'additional_kwargs') and 'tool_calls' in response.additional_kwargs:
+                    has_tool_calls = True
+                    tool_calls_info = str(response.additional_kwargs['tool_calls'])
+                
+                results[f"{model_name}_forced"] = {
+                    "success": has_tool_calls,
+                    "tool_calls": tool_calls_info,
+                    "content": response.content
+                }
+                
+                # If we found a working model, note it
+                if has_tool_calls:
+                    logger.info(f"Model {model_name} with forced tool choice successfully generated function calls")
+                    # Note this model works with forced tool choice for future reference
+                    results["working_model_forced"] = model_name
+                    break
+                    
+            except Exception as e:
+                logger.error(f"Error testing model {model_name} with forced tool: {str(e)}")
+                results[f"{model_name}_forced"] = {"error": str(e)}
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Diagnostic test failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"error": str(e)}

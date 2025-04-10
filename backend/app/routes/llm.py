@@ -114,6 +114,22 @@ function_router.register_function(
     }
 )
 
+# Add a test function for verifying function calling
+function_router.register_function(
+    name="test_function_calling",
+    description="Test function to verify that function calling is working properly",
+    handler=lambda message="Hello": {"status": "success", "message": message},
+    parameters={
+        "type": "object",
+        "properties": {
+            "message": {
+                "type": "string",
+                "description": "Test message to return"
+            }
+        }
+    }
+)
+
 from fastapi import Request as FastAPIRequest
 from starlette.requests import Request as StarletteRequest
 
@@ -216,6 +232,49 @@ async def chat(request: LLMRequest, req: Request, current_user: Optional[Dict[st
         import traceback
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+
+@router.post("/test-function-calling", 
+    summary="Test endpoint specifically for function calling",
+    description="Sends a message to the LLM that should trigger function calling to test if it's working",
+    response_model=LLMResponse,
+    responses={
+        200: {"description": "Test completed successfully"},
+        500: {"description": "Server error during test"}
+    }
+)
+async def test_function_calling(req: Request):
+    """Test endpoint to verify function calling is working properly"""
+    try:
+        # Create a simple test message that should trigger function calling
+        test_message = "Please test the function calling system by calling the test_function_calling function with the message 'Function calling is working'."
+        
+        # Process the test message
+        llm_result = await process_query(test_message)
+        
+        # Extract content and function calls
+        content = llm_result.get("response", "")
+        function_calls = llm_result.get("function_calls", [])
+        function_results = llm_result.get("function_results", [])
+        
+        # Log the result
+        logger.info(f"Function calling test result: {len(function_calls)} function calls detected")
+        if function_calls:
+            for fc in function_calls:
+                logger.info(f"Function call: {fc.get('name')} with args: {fc.get('arguments')}")
+        
+        # Return detailed response for debugging
+        return LLMResponse(
+            content=content,
+            function_calls=function_calls,
+            function_results=function_results,
+            raw_tool_calls=llm_result.get("raw_tool_calls", None)
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in test function calling endpoint: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error in function calling test: {str(e)}")
 
 @router.get("/chat")
 async def get_chat_history(id: str, req: Request):
@@ -487,3 +546,38 @@ async def get_user_courses(
     except Exception as e:
         logger.error(f"Error getting courses: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting courses: {str(e)}")
+
+@router.get("/debug-function-calling", 
+    summary="Debug the function calling capabilities",
+    description="Run a diagnostic test of function calling with the LLM models",
+    response_model=Dict[str, Any]
+)
+async def debug_function_calling_route(
+    query: str = Query("What courses am I enrolled in?", description="Test query to use"),
+    current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)
+):
+    """
+    Run diagnostics on function calling to help troubleshoot issues.
+    This endpoint will test different models and configurations.
+    """
+    try:
+        from app.services.llm_service import debug_function_calling
+        
+        # Run the diagnostic function
+        results = await debug_function_calling(query)
+        
+        return {
+            "status": "success",
+            "results": results,
+            "message": "Function calling diagnostic completed"
+        }
+    except Exception as e:
+        logger.error(f"Error in function calling diagnostic: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Function calling diagnostic failed"
+        }
