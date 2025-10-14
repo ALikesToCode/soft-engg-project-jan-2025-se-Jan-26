@@ -102,10 +102,6 @@ Run tests with pytest:
 pytest
 ```
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
 ## Vector Store Retrieval
 
 This application includes a vector store for retrieving relevant information from course materials. The vector store is implemented using:
