@@ -36,8 +36,8 @@ psycopg2-binary==2.9.9
 pgvector==0.3.6
 
 # HTTP and networking
-aiohttp==3.11.14
-requests==2.32.3
+aiohttp==3.12.14
+requests==2.32.4
 
 # Monitoring
 psutil==5.9.5
